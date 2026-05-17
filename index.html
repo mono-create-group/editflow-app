@@ -124,6 +124,8 @@ a{color:inherit;text-decoration:none}
 .chk:hover{border-color:var(--purple)}
 .chk.done{background:var(--green);border-color:var(--green)}
 .chk.done::after{content:'✓';color:#fff;font-size:11px;font-weight:700}
+.chk.fail{background:var(--red);border-color:var(--red)}
+.chk.fail::after{content:'✕';color:#fff;font-size:11px;font-weight:700}
 .task-body{flex:1;min-width:0}
 .task-ttl{font-weight:500;word-break:break-word}
 .task-ttl.done{text-decoration:line-through;color:var(--t2)}
@@ -224,6 +226,9 @@ a{color:inherit;text-decoration:none}
 .hday.done{background:var(--gdim);border-color:var(--green);color:var(--green)}
 .hday.done::after{content:'✓';font-size:12px}
 .hday.done span{display:none}
+.hday.fail{background:var(--rdim);border-color:var(--red);color:var(--red)}
+.hday.fail::after{content:'✕';font-size:12px}
+.hday.fail span{display:none}
 .hday.today-h{border-color:var(--purple)}
 .hday.future-h{cursor:default;opacity:.35}
 .habit-meta{font-size:11px;color:var(--t2);display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
@@ -964,7 +969,7 @@ function checkDailyLock(){
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.content||j.gratitude||j.win));
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
-  const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td));
+  const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
   return !hasMorning||!hasEvening||!habitDone;
 }
 function rLockScreen(){
@@ -972,7 +977,7 @@ function rLockScreen(){
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.content||j.gratitude||j.win));
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
-  const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td));
+  const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
   const missing=[];
   if(!hasMorning)missing.push('🌅 朝のジャーナル');
   if(!hasEvening)missing.push('🌙 夜のジャーナル');
@@ -1806,8 +1811,10 @@ ${atRisk.length?`<div style="background:var(--rdim);border:1px solid var(--red);
 </div>`:''}
 ${habits.map(h=>{
   const comp=h.completedDates||[];
+  const failDates=h.failedDates||[];
   const streak=calcStreak(comp);
   const doneToday=comp.includes(td);
+  const failToday=failDates.includes(td);
   const risk=isStreakRisk(h);
   const daysLabel=(h.daysOfWeek&&h.daysOfWeek.length)?h.daysOfWeek.map(d=>DAYS[d]).join('・'):'毎日';
   return`<div class="habit-item" style="${risk?'border-color:var(--amber)':''}">
@@ -1815,7 +1822,7 @@ ${habits.map(h=>{
     <div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <div class="habit-name">${esc(h.title)}</div>
-        ${doneToday?'<span class="badge bg">✓ 今日完了</span>':''}
+        ${doneToday?'<span class="badge bg">✓ 今日完了</span>':failToday?'<span class="badge" style="background:var(--rdim);color:var(--red)">✕ できなかった</span>':''}
         ${risk?'<span class="streak-risk">⚠️ 今日やらないと途切れる</span>':''}
       </div>
       ${h.description?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(h.description)}</div>`:''}
@@ -1832,9 +1839,9 @@ ${habits.map(h=>{
     ${h.intention?`<span>📍 ${esc(h.intention)}</span>`:''}
   </div>
   <div class="habit-week">
-    ${week.map(w=>`<div class="hday ${comp.includes(w.date)?'done':''} ${w.isToday?'today-h':''} ${w.isFuture?'future-h':''}"
+    ${week.map(w=>{const fd=h.failedDates||[];return`<div class="hday ${comp.includes(w.date)?'done':fd.includes(w.date)?'fail':''} ${w.isToday?'today-h':''} ${w.isFuture?'future-h':''}"
       ${!w.isFuture?`onclick="toggleHabit('${h.id}','${w.date}')"`:''}
-    ><span>${w.label}</span></div>`).join('')}
+    ><span>${w.label}</span></div>`;}).join('')}
   </div>
 </div>`}).join('')}`;
 }
@@ -1905,16 +1912,17 @@ function rHabitsSchedule(){
   });
   const habitsHtml=habits.length?habits.map(h=>{
     const done=(h.completedDates||[]).includes(td);
+    const fail=(h.failedDates||[]).includes(td);
     const daysLabel=(h.daysOfWeek&&h.daysOfWeek.length)?h.daysOfWeek.map(d=>DAYS[d]).join('・'):'毎日';
-    return`<div class="habit-sched-item" style="${done?'opacity:.6':'border-color:var(--border)'}">
+    return`<div class="habit-sched-item" style="${done||fail?'opacity:.6':'border-color:var(--border)'}">
     ${h.time?`<div class="habit-time-badge">${h.time}</div>`:`<div class="habit-time-badge" style="color:var(--t3)">未設定</div>`}
     <div style="flex:1">
-      <div class="habit-sched-name">${done?'<span style="color:var(--green)">✓ </span>':''}${esc(h.title)}</div>
+      <div class="habit-sched-name">${done?'<span style="color:var(--green)">✓ </span>':fail?'<span style="color:var(--red)">✕ </span>':''}${esc(h.title)}</div>
       <div class="habit-sched-days">📅 ${daysLabel} ${h.intention?`| 📍 ${esc(h.intention)}`:''}</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="streak-badge">🔥 ${calcStreak(h.completedDates)}</div>
-      <div class="chk ${done?'done':''}" onclick="toggleHabit('${h.id}','${td}')"></div>
+      <div class="chk ${done?'done':fail?'fail':''}" onclick="toggleHabit('${h.id}','${td}')"></div>
     </div>
   </div>`;}).join('')
   :`<div class="empty" style="padding:20px 0"><div class="empty-icon">🔥</div><div class="empty-title">習慣を設定しよう</div></div>`;
@@ -3158,9 +3166,23 @@ ${t.procCount>=3?`<div style="margin-top:10px;background:var(--rdim);border-radi
 function toggleHabit(id,date){
   const h=S.habits.find(h=>h.id===id);if(!h)return;
   if(!h.completedDates)h.completedDates=[];
-  const idx=h.completedDates.indexOf(date);
-  if(idx>=0)h.completedDates.splice(idx,1);
-  else{h.completedDates.push(date);const s=calcStreak(h.completedDates);if(s%7===0&&s>0)toast(`🔥 ${s}日連続達成！素晴らしい！`);else toast('🔥 習慣を記録しました！');}
+  if(!h.failedDates)h.failedDates=[];
+  const done=h.completedDates.includes(date);
+  const fail=h.failedDates.includes(date);
+  if(!done&&!fail){
+    // なし→✓
+    h.completedDates.push(date);
+    const s=calcStreak(h.completedDates);
+    if(s%7===0&&s>0)toast(`🔥 ${s}日連続達成！素晴らしい！`);else toast('✅ 習慣を記録しました！');
+  }else if(done){
+    // ✓→✗
+    h.completedDates=h.completedDates.filter(d=>d!==date);
+    h.failedDates.push(date);
+    toast('✕ できなかった日として記録しました');
+  }else{
+    // ✗→なし
+    h.failedDates=h.failedDates.filter(d=>d!==date);
+  }
   save();render();
 }
 function delHabit(id){const h=S.habits.find(h=>h.id===id);if(h)h.deleted=true;save();closeModal();render();toast('習慣を削除しました');}
