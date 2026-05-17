@@ -1062,7 +1062,7 @@ function checkDailyLock(){
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.commitment||j.content||j.gratitude||j.win));
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
-  const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
+  const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
   return !hasMorning||!hasEvening||!habitDone;
 }
 function rLockScreen(){
@@ -1070,7 +1070,7 @@ function rLockScreen(){
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.commitment||j.content||j.gratitude||j.win));
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
-  const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
+  const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
   const missing=[];
   if(!hasMorning)missing.push('🌅 朝のジャーナル');
   if(!hasEvening)missing.push('🌙 夜のジャーナル');
