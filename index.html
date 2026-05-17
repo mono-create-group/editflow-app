@@ -2,7 +2,12 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EditFlow">
+<meta name="theme-color" content="#7c3aed">
+<link rel="manifest" href="/editflow-app/manifest.json">
 <title>EditFlow — クリエイター専用管理アプリ</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -4389,6 +4394,20 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 render();
+
+// ===SERVICE WORKER===
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/editflow-app/sw.js').then(reg=>{
+    // 起動のたびに最新版をチェック
+    reg.update();
+    // 新しいSWが有効になったら自動リロード（最新版を即反映）
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      // 初回登録時のリロードは避ける
+      if(sessionStorage.getItem('sw_init'))window.location.reload();
+      sessionStorage.setItem('sw_init','1');
+    });
+  }).catch(e=>console.warn('SW registration failed:',e));
+}
 </script>
 </body>
 </html>
