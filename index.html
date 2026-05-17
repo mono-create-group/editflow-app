@@ -956,8 +956,49 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 document.addEventListener('input',e=>{
   if(document.getElementById('modal-overlay')?.contains(e.target))_modalDirty=true;
 });
+function checkDailyLock(){
+  const now=new Date();
+  const hour=now.getHours();
+  if(hour<19)return false; // 19時前はロックしない
+  const td=today();
+  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.content||j.gratitude||j.win));
+  const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
+  const todayHabits=S.habits.filter(h=>!h.deleted);
+  const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td));
+  return !hasMorning||!hasEvening||!habitDone;
+}
+function rLockScreen(){
+  const td=today();
+  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.content||j.gratitude||j.win));
+  const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
+  const todayHabits=S.habits.filter(h=>!h.deleted);
+  const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td));
+  const missing=[];
+  if(!hasMorning)missing.push('🌅 朝のジャーナル');
+  if(!hasEvening)missing.push('🌙 夜のジャーナル');
+  if(!habitDone)missing.push('✅ 習慣トラッカー');
+  return`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:40px 20px">
+  <div style="font-size:64px;margin-bottom:20px">🔒</div>
+  <div style="font-size:22px;font-weight:700;margin-bottom:12px">本日の記録が未完了です</div>
+  <div style="font-size:14px;color:var(--t2);margin-bottom:24px;line-height:1.7">19時を過ぎたため、以下の記録が完了するまで<br>アプリが使えません。</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 28px;margin-bottom:28px;text-align:left">
+    ${missing.map(m=>`<div style="font-size:15px;padding:6px 0;color:var(--red)">❌ ${m}</div>`).join('')}
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    ${!hasMorning||!hasEvening?`<button class="btn btn-p" onclick="V='journal';render()">📔 ジャーナルを記入する</button>`:''}
+    ${!habitDone?`<button class="btn btn-p" onclick="V='habits';render()">✅ 習慣トラッカーを記入する</button>`:''}
+  </div>
+  <div style="font-size:12px;color:var(--t3);margin-top:24px">記録完了後、自動的にアプリが開きます</div>
+</div>`;
+}
 function render(){
   sessionStorage.setItem('ef_view',V);
+  // 19時以降ロックチェック（ジャーナル・習慣トラッカー）
+  if(checkDailyLock()&&V!=='journal'&&V!=='habits'){
+    document.getElementById('view').innerHTML=rLockScreen();
+    renderNav();
+    return;
+  }
   const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize};
   let html;
   if(V.startsWith('cp_')){
