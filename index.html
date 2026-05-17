@@ -1064,7 +1064,7 @@ function checkDailyLock(){
   const hour=now.getHours();
   if(hour<19)return false; // 19時前はロックしない
   const td=today();
-  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.commitment||j.content||j.gratitude||j.win));
+  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
@@ -1072,7 +1072,7 @@ function checkDailyLock(){
 }
 function rLockScreen(){
   const td=today();
-  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.commitment||j.content||j.gratitude||j.win));
+  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
@@ -1088,7 +1088,8 @@ function rLockScreen(){
     ${missing.map(m=>`<div style="font-size:15px;padding:6px 0;color:var(--red)">❌ ${m}</div>`).join('')}
   </div>
   <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
-    ${!hasMorning||!hasEvening?`<button class="btn btn-p" onclick="V='journal';render()">📔 ジャーナルを記入する</button>`:''}
+    ${!hasMorning?`<button class="btn btn-p" onclick="V='journal';JT='morning';render()">🌅 朝のジャーナルを記入する</button>`:''}
+    ${!hasEvening?`<button class="btn btn-p" onclick="V='journal';JT='evening';render()">🌙 夜のジャーナルを記入する</button>`:''}
     ${!habitDone?`<button class="btn btn-p" onclick="V='habits';render()">✅ 習慣トラッカーを記入する</button>`:''}
   </div>
   <div style="font-size:12px;color:var(--t3);margin-top:24px">記録完了後、自動的にアプリが開きます</div>
@@ -2275,7 +2276,7 @@ function saveJournalEntry(){
     S.journals=S.journals.filter(j=>!(j.date===JD&&j.type==='evening'));
     if(Object.values(entry).some(v=>v&&v!==JD&&v!=='evening'))S.journals.push(entry);
   }
-  save();toast('ジャーナルを保存しました 📔');
+  save();render();toast('ジャーナルを保存しました 📔');
 }
 // ===REVENUE===
 function rRevenue(){
@@ -4396,7 +4397,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260517-3';
+const APP_VERSION='20260517-4';
 (function(){
   const stored=localStorage.getItem('ef_app_ver');
   if(stored&&stored!==APP_VERSION){
@@ -4417,8 +4418,12 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/editflow-app/sw.js').then(reg=>{
     reg.update();
     navigator.serviceWorker.addEventListener('controllerchange',()=>{
-      if(sessionStorage.getItem('sw_init'))location.reload();
-      sessionStorage.setItem('sw_init','1');
+      if(sessionStorage.getItem('sw_init')){
+        sessionStorage.removeItem('sw_init');
+        location.reload();
+      }else{
+        sessionStorage.setItem('sw_init','1');
+      }
     });
   }).catch(e=>console.warn('SW:',e));
 }
