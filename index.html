@@ -1059,7 +1059,7 @@ function checkDailyLock(){
   const hour=now.getHours();
   if(hour<19)return false; // 19時前はロックしない
   const td=today();
-  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.content||j.gratitude||j.win));
+  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.commitment||j.content||j.gratitude||j.win));
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
@@ -1067,7 +1067,7 @@ function checkDailyLock(){
 }
 function rLockScreen(){
   const td=today();
-  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.content||j.gratitude||j.win));
+  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.commitment||j.content||j.gratitude||j.win));
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.some(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
@@ -2168,24 +2168,49 @@ function rJournal(){
   for(let i=1;i<=last.getDate();i++)dayGrid.push(new Date(y,m,i).toISOString().slice(0,10));
 
   const morningForm=`
-  <div class="fg"><div class="fl">気分</div>
+  <div style="font-size:12px;color:var(--t3);margin-bottom:14px;padding:8px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--purple)">今日という一日を<strong style="color:var(--pl)">経営者として設計</strong>する時間です。5分で書ける・判断が研ぎ澄まされる内容にフォーカスしてください。</div>
+
+  <div class="fg" style="margin-bottom:14px"><div class="fl">🧠 今日のエネルギー・コンディション</div>
     <div class="mood-row" id="j-mood-row">
-      ${['😔','😕','😐','🙂','😊'].map((e,i)=>`<button class="mood-btn ${morningEntry.mood===i+1?'sel':''}" data-mood="${i+1}" onclick="this.parentElement.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('sel'));this.classList.add('sel')">${e}</button>`).join('')}
+      ${['🪫 枯渇','😴 低め','😐 普通','⚡ 良好','🔥 最高'].map((e,i)=>`<button class="mood-btn ${morningEntry.mood===i+1?'sel':''}" data-mood="${i+1}" onclick="this.parentElement.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('sel'));this.classList.add('sel')" style="font-size:11px;padding:5px 8px">${e}</button>`).join('')}
     </div>
   </div>
-  <div class="frow">
-    <div class="fg"><div class="fl">🙏 感謝していること</div>
-      <textarea id="j-grat" rows="2" placeholder="例：天気が良かった、集中できた…">${esc(morningEntry.gratitude||'')}</textarea>
+
+  <div class="fg" style="margin-bottom:14px">
+    <div class="fl">🎯 今日の最重要事項（1つだけ）</div>
+    <div class="fhint" style="margin-bottom:6px">今日これだけ終わらせれば「良い一日だった」と言えること。迷ったら目標達成確認の目標から逆算する。</div>
+    <input id="j-top" placeholder="例：〇〇の動画編集を完成させる" value="${esc(morningEntry.topPriority||'')}">
+  </div>
+
+  <div class="frow" style="margin-bottom:14px">
+    <div class="fg">
+      <div class="fl">⚡ 今日の集中ブロック</div>
+      <div class="fhint" style="margin-bottom:6px">何時〜何時に何をするか（深い仕事の時間帯）</div>
+      <textarea id="j-focus" rows="2" placeholder="例：8:00〜10:00 編集集中 / 13:00〜15:00 サムネイル作成">${esc(morningEntry.focusBlock||'')}</textarea>
     </div>
-    <div class="fg"><div class="fl">🏆 今日の小さな勝利</div>
-      <textarea id="j-win" rows="2" placeholder="例：タスクを1つ完了した…">${esc(morningEntry.win||'')}</textarea>
+    <div class="fg">
+      <div class="fl">🚫 今日やらないこと（Not-To-Do）</div>
+      <div class="fhint" style="margin-bottom:6px">注意・エネルギーを奪う行動を事前に禁止する</div>
+      <textarea id="j-notdo" rows="2" placeholder="例：SNSの無目的スクロール / 返信を即座にする">${esc(morningEntry.notToDo||'')}</textarea>
     </div>
   </div>
-  <div class="fg"><div class="fl">📝 振り返り・日記</div>
-    <textarea id="j-content" rows="5" placeholder="今日の気づき、感情、出来事など自由に書きましょう…">${esc(morningEntry.content||'')}</textarea>
+
+  <div class="fg" style="margin-bottom:14px">
+    <div class="fl">🤔 今日下す可能性のある重要な意思決定</div>
+    <div class="fhint" style="margin-bottom:6px">今日直面しそうな判断・選択・交渉を先に書き出す（事前に答えを考えておくと判断が速くなる）</div>
+    <textarea id="j-decision" rows="2" placeholder="例：〇〇案件を受けるか断るか / ワーカーに追加発注するか / SNS投稿のトーンをどうするか">${esc(morningEntry.decisions||'')}</textarea>
   </div>
-  <div class="fg"><div class="fl">💡 明日改善したいこと</div>
-    <input id="j-improve" placeholder="例：もっと早く編集を始める" value="${esc(morningEntry.improve||'')}">
+
+  <div class="fg" style="margin-bottom:14px">
+    <div class="fl">🏔 今の最大の課題・障害</div>
+    <div class="fhint" style="margin-bottom:6px">今最も自分の成長・収益・目標達成を妨げているものは何か</div>
+    <input id="j-obstacle" placeholder="例：編集速度が遅い / クライアントの指示が曖昧 / 集中力が続かない" value="${esc(morningEntry.obstacle||'')}">
+  </div>
+
+  <div class="fg">
+    <div class="fl">💬 今日の自分へのコミットメント（一言）</div>
+    <div class="fhint" style="margin-bottom:6px">今日という一日に対して自分に誓う姿勢・在り方</div>
+    <input id="j-commit" placeholder="例：完璧より完了。まず動く。 / 判断を先延ばしにしない。" value="${esc(morningEntry.commitment||'')}">
   </div>`;
 
   const eveningForm=`
@@ -2204,7 +2229,7 @@ function rJournal(){
   ${['月','火','水','木','金','土','日'].map(d=>`<div class="month-dow">${d}</div>`).join('')}
   ${dayGrid.map(d=>{
     if(!d)return`<div></div>`;
-    const has=S.journals.some(j=>j.date===d&&(j.content||j.achievement));
+    const has=S.journals.some(j=>j.date===d&&(j.topPriority||j.content||j.achievement));
     return`<div class="jcal-day ${has?'has-entry':''} ${JD===d?'selected':''} ${d===td?'today-j':''}" onclick="JD='${d}';render()">${+d.slice(8)}</div>`;
   }).join('')}
 </div>
@@ -2221,21 +2246,23 @@ function rJournal(){
   ${JT==='morning'?morningForm:eveningForm}
 </div>
 
-${S.journals.filter(j=>(j.content||j.achievement)&&j.date!==JD).slice(0,5).length?`
+${S.journals.filter(j=>(j.topPriority||j.content||j.achievement)&&j.date!==JD).slice(0,5).length?`
 ${secTitle('過去の記録')}
-${S.journals.filter(j=>(j.content||j.achievement)&&j.date!==JD).sort((a,b)=>b.date>a.date?1:-1).slice(0,5).map(j=>`
-<div class="card card-sm" style="margin-bottom:7px;cursor:pointer" onclick="JD='${j.date}';render()">
+${S.journals.filter(j=>(j.topPriority||j.content||j.achievement)&&j.date!==JD).sort((a,b)=>b.date>a.date?1:-1).slice(0,5).map(j=>{
+  const moodLabels=['🪫','😴','😐','⚡','🔥'];
+  const preview=j.type==='evening'?(j.achievement||''):(j.topPriority||j.content||'');
+  return`<div class="card card-sm" style="margin-bottom:7px;cursor:pointer" onclick="JD='${j.date}';JT='${j.type||'morning'}';render()">
   <div style="display:flex;align-items:center;justify-content:space-between">
     <span style="font-weight:600">${j.date} ${j.type==='evening'?'🌙':'🌅'}</span>
-    ${j.mood?['😔','😕','😐','🙂','😊'][j.mood-1]:''}
+    ${j.mood?moodLabels[j.mood-1]:''}
   </div>
-  <div style="font-size:12px;color:var(--t2);margin-top:3px">${esc(((j.type==='evening'?j.achievement:j.content)||'').slice(0,80))}${((j.type==='evening'?j.achievement:j.content)||'').length>80?'…':''}</div>
-</div>`).join('')}`:''}`;
+  <div style="font-size:12px;color:var(--t2);margin-top:3px">${j.type!=='evening'&&j.topPriority?`🎯 ${esc(j.topPriority.slice(0,70))}`:esc(preview.slice(0,80))}${preview.length>80?'…':''}</div>
+</div>`;}).join('')}\`:''}`;
 }
 function saveJournalEntry(){
   if(JT==='morning'){
     const mood=[...document.querySelectorAll('#j-mood-row .mood-btn.sel')][0]?.dataset.mood;
-    const entry={date:JD,type:'morning',mood:+mood||null,gratitude:document.getElementById('j-grat')?.value.trim(),win:document.getElementById('j-win')?.value.trim(),content:document.getElementById('j-content')?.value.trim(),improve:document.getElementById('j-improve')?.value.trim()};
+    const entry={date:JD,type:'morning',mood:+mood||null,topPriority:document.getElementById('j-top')?.value.trim(),focusBlock:document.getElementById('j-focus')?.value.trim(),notToDo:document.getElementById('j-notdo')?.value.trim(),decisions:document.getElementById('j-decision')?.value.trim(),obstacle:document.getElementById('j-obstacle')?.value.trim(),commitment:document.getElementById('j-commit')?.value.trim()};
     S.journals=S.journals.filter(j=>!(j.date===JD&&(j.type==='morning'||!j.type)));
     if(Object.values(entry).some(v=>v&&v!==JD&&v!=='morning'))S.journals.push(entry);
   }else{
