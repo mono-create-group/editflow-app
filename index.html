@@ -4395,18 +4395,32 @@ initReminders();
 checkClientDraftTasks();
 render();
 
+// ===VERSION CHECK & AUTO-UPDATE===
+const APP_VERSION='20260517-3';
+(function(){
+  const stored=localStorage.getItem('ef_app_ver');
+  if(stored&&stored!==APP_VERSION){
+    // バージョンが古い → キャッシュを消して強制リロード
+    localStorage.setItem('ef_app_ver',APP_VERSION);
+    if('caches' in window){
+      caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).then(()=>location.reload(true));
+    }else{
+      location.reload(true);
+    }
+  }else{
+    localStorage.setItem('ef_app_ver',APP_VERSION);
+  }
+})();
+
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/editflow-app/sw.js').then(reg=>{
-    // 起動のたびに最新版をチェック
     reg.update();
-    // 新しいSWが有効になったら自動リロード（最新版を即反映）
     navigator.serviceWorker.addEventListener('controllerchange',()=>{
-      // 初回登録時のリロードは避ける
-      if(sessionStorage.getItem('sw_init'))window.location.reload();
+      if(sessionStorage.getItem('sw_init'))location.reload();
       sessionStorage.setItem('sw_init','1');
     });
-  }).catch(e=>console.warn('SW registration failed:',e));
+  }).catch(e=>console.warn('SW:',e));
 }
 </script>
 </body>
