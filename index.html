@@ -1096,13 +1096,18 @@ function rLockScreen(){
 </div>`;
 }
 function render(){
-  sessionStorage.setItem('ef_view',V);
-  // 19時以降ロックチェック（ジャーナル・習慣トラッカー）
-  if(checkDailyLock()&&V!=='journal'&&V!=='habits'&&V!=='aichat'){
-    document.getElementById('view').innerHTML=rLockScreen();
-    renderNav();
-    return;
+  // 19時以降ロックチェック（ジャーナル・習慣ページのみ通過許可）
+  if(checkDailyLock()){
+    // ロック中はジャーナルと習慣トラッカーのみアクセス可
+    if(V!=='journal'&&V!=='habits'){
+      V='dashboard'; // 不正なビューをリセット
+      sessionStorage.setItem('ef_view','dashboard');
+      document.getElementById('view').innerHTML=rLockScreen();
+      renderNav();
+      return;
+    }
   }
+  sessionStorage.setItem('ef_view',V);
   const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat};
   let html;
   if(V.startsWith('cp_')){
@@ -2527,6 +2532,13 @@ ${secTitle('📅 固定タイムスケジュール（再掲）')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:8px">スケジュール表示に使われる固定の時間割です</div>
   <button class="btn btn-g btn-sm" onclick="V='tasks';TV='schedule';render()">スケジュール表示を開く</button>
+</div>
+
+${secTitle('🔄 アプリのアップデート')}
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:13px;color:var(--t2);margin-bottom:10px">スマホで古いバージョンが表示される場合はこちらで強制更新できます。</div>
+  <div style="font-size:12px;color:var(--t3);margin-bottom:10px">現在のバージョン: ${APP_VERSION}</div>
+  <button class="btn btn-p btn-sm" onclick="forceAppUpdate()">🔄 キャッシュをクリアして最新版に更新</button>
 </div>
 
 ${secTitle('🤖 AI APIキー設定')}
@@ -4397,19 +4409,21 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260517-4';
+const APP_VERSION='20260517-5';
+function forceAppUpdate(){
+  if('caches' in window){
+    caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).then(()=>{
+      if('serviceWorker' in navigator){
+        navigator.serviceWorker.getRegistrations().then(regs=>Promise.all(regs.map(r=>r.unregister()))).then(()=>location.reload());
+      }else{location.reload();}
+    });
+  }else{location.reload();}
+}
 (function(){
   const stored=localStorage.getItem('ef_app_ver');
-  if(stored&&stored!==APP_VERSION){
-    // バージョンが古い → キャッシュを消して強制リロード
+  if(stored!==APP_VERSION){
     localStorage.setItem('ef_app_ver',APP_VERSION);
-    if('caches' in window){
-      caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).then(()=>location.reload(true));
-    }else{
-      location.reload(true);
-    }
-  }else{
-    localStorage.setItem('ef_app_ver',APP_VERSION);
+    if(stored){forceAppUpdate();} // 旧バージョンから更新 → 強制リロード
   }
 })();
 
