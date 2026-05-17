@@ -2257,7 +2257,7 @@ ${S.journals.filter(j=>(j.topPriority||j.content||j.achievement)&&j.date!==JD).s
     ${j.mood?moodLabels[j.mood-1]:''}
   </div>
   <div style="font-size:12px;color:var(--t2);margin-top:3px">${j.type!=='evening'&&j.topPriority?`🎯 ${esc(j.topPriority.slice(0,70))}`:esc(preview.slice(0,80))}${preview.length>80?'…':''}</div>
-</div>`;}).join('')}\`:''}`;
+</div>`;}).join('')}`:''}`;
 }
 function saveJournalEntry(){
   if(JT==='morning'){
