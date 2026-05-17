@@ -552,7 +552,7 @@ const BUILTIN_VIEWS=[
   {id:'habits',label:'習慣トラッカー',icon:'🔥'},
   {id:'goals',label:'目標管理',icon:'🎯'},
   {id:'journal',label:'ジャーナル',icon:'📔'},
-  {id:'revenue',label:'収益記録',icon:'💰'},
+  {id:'revenue',label:'目標達成確認',icon:'💰'},
   {id:'memo',label:'ブレインダンプ',icon:'🧠'},
 ];
 const DB_OLD='ef_v4';
@@ -657,7 +657,7 @@ function renderGcalUI(){
   }else{
     el.innerHTML=`<button onclick="gcalConnect()" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);display:flex;align-items:center;gap:7px;cursor:pointer">
       <svg width="14" height="14" viewBox="0 0 24 24" style="flex-shrink:0"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-      <span>📅 Googleカレンダー連携</span>
+      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px">📅 Gカレンダー連携</span>
     </button>`;
   }
 }
@@ -2405,6 +2405,12 @@ function openAddWorkerModal(){
   openModal(`<div class="mhdr"><div class="mtitle">ワーカー追加</div><button class="mclose" onclick="closeModal()">✕</button></div>
 ${workerAffiliationDatalist()}
 <div class="fg"><div class="fl">名前 *</div><input id="wm-name" placeholder="担当者名"></div>
+<div class="fg"><div class="fl">ステータス</div>
+  <select id="wm-status">
+    <option value="trial">トライアル</option>
+    <option value="hired">本採用</option>
+  </select>
+</div>
 <div class="fg"><div class="fl">所属</div><input id="wm-affiliation" list="wm-aff-list" placeholder="例：フリーランス・〇〇プロダクション"></div>
 <div class="fg"><div class="fl">スキル</div><input id="wm-skills" placeholder="例：動画編集・サムネイル制作"></div>
 <div class="fg"><div class="fl">連絡先</div><input id="wm-contact" placeholder="例：メール・LINE ID"></div>
@@ -2421,6 +2427,12 @@ function openWorkerEditModal(id){
   openModal(`<div class="mhdr"><div class="mtitle">ワーカー編集</div><button class="mclose" onclick="closeModal()">✕</button></div>
 ${workerAffiliationDatalist()}
 <div class="fg"><div class="fl">名前 *</div><input id="wm-name" value="${esc(w.name)}"></div>
+<div class="fg"><div class="fl">ステータス</div>
+  <select id="wm-status">
+    <option value="trial" ${(w.employStatus||'trial')==='trial'?'selected':''}>トライアル</option>
+    <option value="hired" ${w.employStatus==='hired'?'selected':''}>本採用</option>
+  </select>
+</div>
 <div class="fg"><div class="fl">所属</div><input id="wm-affiliation" list="wm-aff-list" value="${esc(w.affiliation||'')}" placeholder="例：フリーランス・〇〇プロダクション"></div>
 <div class="fg"><div class="fl">スキル</div><input id="wm-skills" value="${esc(w.skills||'')}"></div>
 <div class="fg"><div class="fl">連絡先</div><input id="wm-contact" value="${esc(w.contact||'')}"></div>
@@ -2441,8 +2453,28 @@ function saveWorkerModal(id){
   const affiliation=document.getElementById('wm-affiliation')?.value.trim();
   const minFee=parseInt(document.getElementById('wm-minfee')?.value)||0;
   const workConditions=document.getElementById('wm-workcond')?.value.trim();
-  if(id){const w=S.workers.find(w=>w.id===id);if(w)Object.assign(w,{name,skills,contact,affiliation,minFee,workConditions});}
-  else{if(!S.workers)S.workers=[];S.workers.push({id:uid(),name,skills,contact,affiliation,minFee,workConditions,createdAt:new Date().toISOString()});}
+  const employStatus=document.getElementById('wm-status')?.value||'trial';
+  if(id){
+    const w=S.workers.find(w=>w.id===id);
+    const prevStatus=w?.employStatus||'trial';
+    if(w)Object.assign(w,{name,skills,contact,affiliation,minFee,workConditions,employStatus});
+    // トライアル→本採用に変わった瞬間に採用自動記帳
+    if(prevStatus!=='hired'&&employStatus==='hired'){
+      if(!S.logs)S.logs=[];
+      S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'hired',note:'本採用に変更時に自動記帳',createdAt:new Date().toISOString()});
+      toast(`👤 ${name} の本採用を目標達成確認に記帳しました`);
+    }
+  }
+  else{
+    if(!S.workers)S.workers=[];
+    S.workers.push({id:uid(),name,skills,contact,affiliation,minFee,workConditions,employStatus,createdAt:new Date().toISOString()});
+    // 最初から本採用で追加された場合も記帳
+    if(employStatus==='hired'){
+      if(!S.logs)S.logs=[];
+      S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'hired',note:'本採用で追加時に自動記帳',createdAt:new Date().toISOString()});
+      toast(`👤 ${name} の本採用を目標達成確認に記帳しました`);
+    }
+  }
   save();closeModal();render();toast('ワーカー情報を保存しました');
 }
 function addWorker(){
@@ -2557,7 +2589,12 @@ function saveClient(){
   const name=document.getElementById('cl-name')?.value.trim();
   if(!name){toast('クライアント名を入力してください','err');return;}
   if(EID){const c=S.clients.find(c=>c.id===EID);if(c){c.name=name;c.notes=document.getElementById('cl-notes').value.trim();}}
-  else S.clients.push({id:uid(),name,notes:document.getElementById('cl-notes').value.trim(),createdAt:new Date().toISOString()});
+  else{
+    S.clients.push({id:uid(),name,notes:document.getElementById('cl-notes').value.trim(),createdAt:new Date().toISOString()});
+    // 新規クライアント追加時に営業自動記帳
+    if(!S.logs)S.logs=[];
+    S.logs.push({id:uid(),type:'sales',date:today(),title:name,result:'contacted',note:'クライアント追加時に自動記帳',createdAt:new Date().toISOString()});
+  }
   save();closeModal();render();toast('クライアントを保存しました');
 }
 
@@ -2784,7 +2821,21 @@ function saveJob(){
   const unitPrice=hasPricedSubs?subtasks.reduce((s,sub)=>s+(sub.unitPrice||0),0):(parseInt(document.getElementById('j-unit')?.value)||0);
   const workerPay=hasPricedSubs?subtasks.filter(s=>s.workerId!==SELF_WID).reduce((s,sub)=>s+(sub.workerPay||0),0):(document.getElementById('j-worker')?.value===SELF_WID?0:parseInt(document.getElementById('j-wpay')?.value)||0);
   const data={title,clientId:document.getElementById('j-cl').value||null,workerId:document.getElementById('j-worker').value||null,scope:document.getElementById('j-scope').value||null,status:document.getElementById('j-stat').value,unitPrice,profit:unitPrice,workerPay,sharedDate:document.getElementById('j-shared').value||null,editorDraftDate:document.getElementById('j-editor-draft').value||null,clientDraftDate:document.getElementById('j-client-draft').value||null,thumbnailDate:document.getElementById('j-thumbnail')?.value||null,deliveryDate:document.getElementById('j-deliver').value||null,invoiceDate:document.getElementById('j-invoice').value||null,paymentDate:document.getElementById('j-payin').value||null,payoutDate:document.getElementById('j-payout').value||null,notes:document.getElementById('j-notes').value.trim(),subtasks};
-  if(EID){const j=S.jobs.find(j=>j.id===EID);if(j)Object.assign(j,data);}
+  if(EID){
+    const j=S.jobs.find(j=>j.id===EID);
+    const prevStatus=j?.status;
+    if(j)Object.assign(j,data);
+    // 完了に変更された瞬間に収益自動記帳
+    if(prevStatus!=='完了'&&data.status==='完了'&&data.unitPrice>0){
+      const profit=data.unitPrice-(data.workerPay||0);
+      if(!S.logs)S.logs=[];
+      const already=S.logs.find(l=>!l.deleted&&l.sourceJobId===EID&&l.type==='revenue');
+      if(!already){
+        S.logs.push({id:uid(),type:'revenue',date:today(),title:data.title,clientId:data.clientId||null,amount:profit,sourceJobId:EID,createdAt:new Date().toISOString()});
+        toast(`💰 収益 ¥${profit.toLocaleString()} を目標達成確認に自動記帳しました`);
+      }
+    }
+  }
   else S.jobs.unshift({id:uid(),...data,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('案件を保存しました');
 }
