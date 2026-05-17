@@ -2499,6 +2499,7 @@ function openTaskModal(id,preDate,withTime){
   <button class="btn btn-g btn-xs" onclick="addSubField()">＋ サブタスク追加</button>
 </div>
 <div class="mfooter">
+  ${t?`<button class="btn btn-red" onclick="if(confirm('このタスクを削除しますか？')){closeModal();delTask('${t.id}')}">🗑 削除</button>`:''}
   <button class="btn btn-g" onclick="closeModal()">キャンセル</button>
   <button class="btn btn-p" onclick="saveTask()">保存</button>
 </div>`);
