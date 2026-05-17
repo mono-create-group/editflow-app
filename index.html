@@ -917,6 +917,67 @@ function thisMonthRev(){
   return S.logs.filter(l=>!l.deleted&&(l.type==='revenue'||!l.type)&&l.date?.startsWith(m)).reduce((s,l)=>s+(l.amount||0),0);
 }
 function daysLeftInMonth(){const n=new Date(),last=new Date(n.getFullYear(),n.getMonth()+1,0);return last.getDate()-n.getDate()+1;}
+function getGoalActions(){
+  const thisM=today().slice(0,7);
+  const daysLeft=daysLeftInMonth();
+  const actions=[];
+  const goals=(S.goals||[]).filter(g=>!g.deleted);
+  // Revenue goals
+  goals.filter(g=>g.category==='revenue'&&g.targetAmount>0&&(g.horizon==='this_month'||g.horizon==='monthly')).forEach(g=>{
+    const rs=revGoalStats(g);
+    if(rs.remaining>0){
+      const daily=daysLeft>0?Math.ceil(rs.remaining/daysLeft):rs.remaining;
+      actions.push({icon:'💰',label:'収益目標',text:`今月あと ¥${rs.remaining.toLocaleString()} 必要（1日あたり ¥${daily.toLocaleString()}）`,urgency:rs.pct<50?'high':'mid',action:"V='revenue';render()"});
+    }else{
+      actions.push({icon:'🎉',label:'収益目標',text:`今月の収益目標を達成済み！`,urgency:'done',action:"V='revenue';render()"});
+    }
+  });
+  // Sales goals
+  goals.filter(g=>g.category==='sales'&&g.targetSalesCount>0).forEach(g=>{
+    const cnt=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.date?.startsWith(thisM)).length;
+    const rem=g.targetSalesCount-cnt;
+    if(rem>0) actions.push({icon:'📞',label:'営業目標',text:`今月あと ${rem}件 の営業が必要（目標 ${g.targetSalesCount}件 / 達成 ${cnt}件）`,urgency:cnt/g.targetSalesCount<0.5?'high':'mid',action:"V='revenue';render()"});
+    else actions.push({icon:'🎉',label:'営業目標',text:`今月の営業目標を達成済み！`,urgency:'done',action:"V='revenue';render()"});
+  });
+  // Hire goals
+  goals.filter(g=>g.category==='hire'&&g.targetHireCount>0).forEach(g=>{
+    const cnt=S.logs.filter(l=>!l.deleted&&l.type==='hire'&&l.date?.startsWith(thisM)&&l.result==='内定').length;
+    const rem=g.targetHireCount-cnt;
+    if(rem>0) actions.push({icon:'👤',label:'採用目標',text:`今月あと ${rem}人 の採用が必要（目標 ${g.targetHireCount}人 / 達成 ${cnt}人）`,urgency:cnt/g.targetHireCount<0.5?'high':'mid',action:"V='revenue';render()"});
+    else actions.push({icon:'🎉',label:'採用目標',text:`今月の採用目標を達成済み！`,urgency:'done',action:"V='revenue';render()"});
+  });
+  // Project/skill/habit goals with milestones
+  goals.filter(g=>['project','skill','habit'].includes(g.category)&&(g.milestones||[]).length>0).forEach(g=>{
+    const ms=g.milestones||[];
+    const next=ms.find(m=>!m.done);
+    if(next) actions.push({icon:g.category==='project'?'🗂':g.category==='skill'?'📚':'🔥',label:g.title,text:`次のマイルストーン: 「${next.title}」${next.deadline?` (期限: ${next.deadline})`:''}`,urgency:'mid',action:"V='revenue';render()"});
+  });
+  // Overdue tasks signal
+  const overdue=S.tasks.filter(t=>!t.deleted&&!t.done&&t.dueDate&&t.dueDate<today()).length;
+  if(overdue>0) actions.push({icon:'⚠️',label:'期限超過タスク',text:`${overdue}件のタスクが期限を過ぎています。まず片付けましょう`,urgency:'high',action:"V='tasks';TV='today';render()"});
+  return actions;
+}
+function rGoalActionWidget(){
+  const actions=getGoalActions();
+  if(!actions.length) return`<div class="card" style="margin-bottom:16px;border-left:4px solid var(--green)"><div style="font-weight:700;font-size:15px;margin-bottom:4px">🎯 今何をすべきか</div><div style="color:var(--t2);font-size:13px">目標達成確認に目標を設定すると、今日やるべきことが表示されます。</div><button class="btn btn-g btn-sm" style="margin-top:8px" onclick="V='revenue';render()">目標を設定する →</button></div>`;
+  const hi=actions.filter(a=>a.urgency==='high');
+  const mi=actions.filter(a=>a.urgency==='mid');
+  const dn=actions.filter(a=>a.urgency==='done');
+  const rRow=a=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onclick="${a.action}">
+    <span style="font-size:18px;flex-shrink:0">${a.icon}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px">${a.label}</div>
+      <div style="font-size:13px;color:${a.urgency==='done'?'var(--green)':a.urgency==='high'?'var(--red)':'var(--t1)'};margin-top:1px">${a.text}</div>
+    </div>
+    ${a.urgency==='high'?'<span style="font-size:10px;background:var(--rdim);color:var(--red);padding:2px 6px;border-radius:99px;font-weight:700;flex-shrink:0">要対応</span>':''}
+  </div>`;
+  return`<div class="card" style="margin-bottom:16px;border-left:4px solid ${hi.length?'var(--red)':'var(--purple)'}">
+    <div style="font-weight:700;font-size:15px;margin-bottom:2px">🎯 今何をすべきか</div>
+    <div style="font-size:11px;color:var(--t2);margin-bottom:8px">目標達成確認より自動生成</div>
+    ${[...hi,...mi,...dn].map(rRow).join('')}
+    <button class="btn btn-g btn-sm" style="margin-top:10px" onclick="V='revenue';render()">目標達成確認を開く →</button>
+  </div>`;
+}
 function revGoalStats(g){
   const n=new Date(),td=today(),yr=n.getFullYear(),mo=n.getMonth();
   const hz=g.horizon||'this_month';
@@ -1079,6 +1140,8 @@ ${!ci?`<div class="checkin-banner">
   <div class="stat-card ${doneHabits===todayHabits.length&&todayHabits.length>0?'cg':''}"><div class="stat-val">${doneHabits}/${todayHabits.length}</div><div class="stat-lbl">🔥 今日の習慣</div></div>
 </div>
 
+${rGoalActionWidget()}
+
 <div class="two-col">
 <div>
 ${secTitle('今月の収益')}
@@ -1218,6 +1281,7 @@ function quickHabit(id){toggleHabit(id,today());}
 // ===TASKS===
 function rTasks(){
   return`<div class="ph"><div class="ph-title">タスク管理</div><button class="btn btn-p" onclick="openTaskModal()">＋ タスク追加</button></div>
+${rGoalActionWidget()}
 ${subTabs([['today','今日'],['weekly','週間'],['monthly','月間'],['schedule','スケジュール']],TV,'setTV')}
 ${{today:rTasksToday,weekly:rTasksWeekly,monthly:rTasksMonthly,schedule:rTasksSchedule}[TV]()}`;
 }
