@@ -496,6 +496,37 @@ a{color:inherit;text-decoration:none}
 
 /* ─── PRIORITY TABLE ─── */
 .priority-table th{position:sticky;top:0;background:var(--card2)}
+
+/* ─── AI CHAT ─── */
+.ai-model-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.ai-model-tab{padding:7px 14px;border-radius:99px;border:1.5px solid var(--border);background:var(--card);color:var(--t2);font-size:13px;cursor:pointer;transition:all .15s;font-weight:600}
+.ai-model-tab:hover{border-color:var(--purple);color:var(--text)}
+.ai-model-tab.active{color:#fff;border-color:transparent}
+.ai-msgs{display:flex;flex-direction:column;gap:12px;margin-bottom:100px}
+.ai-msg{max-width:88%;display:flex;flex-direction:column;gap:3px}
+.ai-msg-user{align-self:flex-end;align-items:flex-end}
+.ai-msg-assistant{align-self:flex-start;align-items:flex-start}
+.ai-msg-meta{font-size:11px;color:var(--t3);padding:0 4px}
+.ai-msg-body{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.6;word-break:break-word}
+.ai-msg-user .ai-msg-body{background:var(--purple);color:#fff;border-bottom-right-radius:4px}
+.ai-msg-assistant .ai-msg-body{background:var(--card2);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px}
+.ai-msg-body pre{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;overflow-x:auto;margin:8px 0;font-size:12px}
+.ai-msg-body code{font-family:monospace;background:rgba(255,255,255,.12);padding:1px 5px;border-radius:4px;font-size:12px}
+.ai-msg-body pre code{background:none;padding:0}
+.ai-msg-body ul,.ai-msg-body ol{padding-left:18px;margin:6px 0}
+.ai-msg-body li{margin-bottom:3px}
+.ai-msg-body h2,.ai-msg-body h3,.ai-msg-body h4{margin:10px 0 4px;font-size:14px}
+.ai-typing{display:flex;gap:5px;align-items:center;padding:12px 16px}
+.ai-typing span{width:7px;height:7px;background:var(--t3);border-radius:50%;animation:aibounce 1.2s infinite}
+.ai-typing span:nth-child(2){animation-delay:.2s}
+.ai-typing span:nth-child(3){animation-delay:.4s}
+@keyframes aibounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+.ai-input-bar{position:fixed;bottom:0;left:210px;right:0;padding:10px 16px;background:var(--surface);border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;z-index:90}
+@media(max-width:700px){.ai-input-bar{left:0;bottom:60px;padding:8px 12px}}
+.ai-input-bar textarea{flex:1;border:1.5px solid var(--border);border-radius:12px;padding:10px 14px;font-size:14px;background:var(--card);color:var(--text);resize:none;max-height:120px;min-height:42px;outline:none;font-family:inherit;line-height:1.4}
+.ai-input-bar textarea:focus{border-color:var(--purple)}
+.ai-ctx-bar{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--t2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ai-ctx-tag{background:var(--pdim);border:1px solid var(--purple);color:var(--pl);border-radius:99px;padding:2px 10px;font-size:11px;font-weight:600}
 </style>
 </head>
 <body>
@@ -535,8 +566,8 @@ a{color:inherit;text-decoration:none}
   <div class="mnav-item active" data-view="dashboard"><span class="nav-icon">🏠</span>ホーム</div>
   <div class="mnav-item" data-view="tasks"><span class="nav-icon">✅</span>タスク</div>
   <div class="mnav-item" data-view="projects"><span class="nav-icon">🎬</span>案件</div>
+  <div class="mnav-item" data-view="aichat"><span class="nav-icon">🤖</span>AI</div>
   <div class="mnav-item" data-view="habits"><span class="nav-icon">🔥</span>習慣</div>
-  <div class="mnav-item" data-view="goals"><span class="nav-icon">🎯</span>目標</div>
   <div class="mnav-item" id="mnav-more" onclick="toggleDrawer()"><span class="nav-icon">☰</span>メニュー</div>
 </div>
 
@@ -559,6 +590,7 @@ const BUILTIN_VIEWS=[
   {id:'journal',label:'ジャーナル',icon:'📔'},
   {id:'revenue',label:'目標達成確認',icon:'💰'},
   {id:'memo',label:'ブレインダンプ',icon:'🧠'},
+  {id:'aichat',label:'AIアシスタント',icon:'🤖'},
 ];
 const DB_OLD='ef_v4';
 const PPM=1.5, SS=7*60, SE=24*60;
@@ -1060,12 +1092,12 @@ function rLockScreen(){
 function render(){
   sessionStorage.setItem('ef_view',V);
   // 19時以降ロックチェック（ジャーナル・習慣トラッカー）
-  if(checkDailyLock()&&V!=='journal'&&V!=='habits'){
+  if(checkDailyLock()&&V!=='journal'&&V!=='habits'&&V!=='aichat'){
     document.getElementById('view').innerHTML=rLockScreen();
     renderNav();
     return;
   }
-  const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize};
+  const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat};
   let html;
   if(V.startsWith('cp_')){
     const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -2464,6 +2496,26 @@ ${secTitle('📅 固定タイムスケジュール（再掲）')}
   <button class="btn btn-g btn-sm" onclick="V='tasks';TV='schedule';render()">スケジュール表示を開く</button>
 </div>
 
+${secTitle('🤖 AI APIキー設定')}
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:12px;color:var(--t2);margin-bottom:12px">AIアシスタント機能で使用するAPIキーを登録します。キーはFirebaseに暗号化保存されます。</div>
+  <div class="frow">
+    <div class="fg">
+      <div class="fl">🔮 Gemini APIキー <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:11px;color:var(--blue)">取得する↗</a></div>
+      <input id="set-gemini-key" type="password" value="${esc(S.settings.geminiKey||'')}" placeholder="AIzaSy...">
+    </div>
+    <div class="fg">
+      <div class="fl">🟠 Claude APIキー <a href="https://console.anthropic.com/" target="_blank" style="font-size:11px;color:var(--blue)">取得する↗</a></div>
+      <input id="set-claude-key" type="password" value="${esc(S.settings.claudeKey||'')}" placeholder="sk-ant-...">
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin:8px 0">💡 Geminiは無料枠あり。Claudeはクレジットカード登録が必要です。</div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-p btn-sm" onclick="saveAIKeys()">保存</button>
+    <button class="btn btn-g btn-sm" onclick="V='aichat';render()">AIチャットを開く →</button>
+  </div>
+</div>
+
 ${secTitle('📅 Google Calendar連携')}
 <div class="card">
   <div style="font-size:12px;color:var(--t2);margin-bottom:12px">タスク・案件をGoogleカレンダーに同期できます（準備中）</div>
@@ -2612,6 +2664,166 @@ function savePomoSettings(){
 function saveTarget(){S.settings.target=parseInt(document.getElementById('set-target').value)||0;save();toast('目標を保存しました');}
 function saveIdentity(){S.settings.identity=document.getElementById('set-identity').value.trim();save();toast('アイデンティティを保存しました');}
 function saveFS(){save();toast('スケジュールを保存しました');}
+
+// ===AI CHAT===
+let _chatHistory=[];
+let _chatModel='gemini';
+let _chatLoading=false;
+let _chatCtx=false;
+const AI_MODELS={
+  gemini:{label:'Gemini',icon:'🔮',color:'#4285f4',hint:'Google Gemini 2.0 Flash'},
+  claude:{label:'Claude',icon:'🟠',color:'#d97706',hint:'Anthropic Claude Opus'},
+  'claude-code':{label:'Claude Code',icon:'💻',color:'#7c3aed',hint:'コーディング特化モード'}
+};
+function getAIKey(model){
+  if(model==='gemini')return S.settings.geminiKey||'';
+  return S.settings.claudeKey||'';
+}
+function mdToHtml(text){
+  const blocks=[];
+  text=text.replace(/```([\w]*)\n?([\s\S]*?)```/g,(_,lang,code)=>{
+    blocks.push({lang,code});return`\x00BLK${blocks.length-1}\x00`;
+  });
+  text=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  text=text.replace(/\x00BLK(\d+)\x00/g,(_,i)=>{
+    const b=blocks[i];const ec=b.code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return`<pre><code${b.lang?` class="lang-${b.lang}"`:''} style="display:block">${ec}</code></pre>`;
+  });
+  text=text.replace(/`([^`]+)`/g,'<code>$1</code>');
+  text=text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  text=text.replace(/\*(.+?)\*/g,'<em>$1</em>');
+  text=text.replace(/^### (.+)$/gm,'<h4 style="margin:8px 0 3px;font-size:13px">$1</h4>');
+  text=text.replace(/^## (.+)$/gm,'<h3 style="margin:10px 0 4px;font-size:14px">$1</h3>');
+  text=text.replace(/^# (.+)$/gm,'<h2 style="margin:12px 0 4px;font-size:15px;font-weight:700">$1</h2>');
+  text=text.replace(/^[-*•] (.+)$/gm,'<li>$1</li>');
+  text=text.replace(/(<li>[\s\S]+?<\/li>)/g,'<ul style="margin:6px 0;padding-left:18px">$1</ul>');
+  text=text.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+  text=text.replace(/\n\n/g,'<br><br>');
+  text=text.replace(/\n/g,'<br>');
+  return text;
+}
+function getAppContext(){
+  const td=today(),thisM=td.slice(0,7);
+  const tasks=(S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.dueDate&&t.dueDate>=td).slice(0,10).map(t=>`・${t.title}（${t.dueDate}）`).join('\n');
+  const goals=(S.goals||[]).filter(g=>!g.deleted).map(g=>`・[${g.category}] ${g.title}`).join('\n');
+  const rev=thisMonthRev();
+  const revGoal=(S.goals||[]).find(g=>!g.deleted&&g.category==='revenue'&&g.targetAmount>0);
+  return`【今日の日付】${td}
+【今月の収益】¥${rev.toLocaleString()}${revGoal?` / 目標¥${revGoal.targetAmount.toLocaleString()}`:''}
+【直近のタスク（最大10件）】
+${tasks||'なし'}
+【目標】
+${goals||'なし'}
+【アイデンティティ】${S.settings.identity||'未設定'}`;
+}
+function rAIChat(){
+  const m=_chatModel;const mdl=AI_MODELS[m];const hasKey=!!getAIKey(m);
+  return`<div class="ph">
+  <div class="ph-title">🤖 AIアシスタント</div>
+  <button class="btn btn-g btn-sm" onclick="clearAIChat()">🗑 クリア</button>
+</div>
+<div class="ai-model-tabs">
+  ${Object.entries(AI_MODELS).map(([k,v])=>`<button class="ai-model-tab${_chatModel===k?' active':''}" onclick="setAIModel('${k}')" style="${_chatModel===k?`background:${v.color};border-color:${v.color}`:''}">${v.icon} ${v.label}</button>`).join('')}
+</div>
+<div style="font-size:11px;color:var(--t3);margin-bottom:12px">${mdl.hint}${hasKey?` ✅`:`　⚠️ APIキー未設定`}</div>
+${!hasKey?`<div class="card" style="margin-bottom:14px;border-left:4px solid var(--amber)">
+  <div style="font-weight:700;color:var(--amber);margin-bottom:6px">⚠️ APIキーを設定してください</div>
+  <div style="font-size:13px;color:var(--t2);margin-bottom:10px">${m==='gemini'?'Google AI Studio (<a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--blue)">こちら</a>) でAPIキーを取得してください':'Anthropic Console (<a href="https://console.anthropic.com/" target="_blank" style="color:var(--blue)">こちら</a>) でAPIキーを取得してください'}</div>
+  <button class="btn btn-p btn-sm" onclick="V='settings';render()">⚙️ 設定でAPIキーを登録する</button>
+</div>`:''}
+<div style="margin-bottom:12px">
+  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--t2)">
+    <input type="checkbox" ${_chatCtx?'checked':''} onchange="_chatCtx=this.checked;renderAIChatOnly()" style="width:16px;height:16px;accent-color:var(--purple)">
+    <span>📊 アプリの状況（タスク・目標・収益）をAIに共有する</span>
+  </label>
+</div>
+<div class="ai-msgs" id="ai-chat-msgs">
+${_chatHistory.length?_chatHistory.map(msg=>`
+  <div class="ai-msg ai-msg-${msg.role}">
+    <div class="ai-msg-meta">${msg.role==='user'?'👤 あなた':AI_MODELS[msg.model||'gemini']?.icon+' '+AI_MODELS[msg.model||'gemini']?.label}</div>
+    <div class="ai-msg-body">${msg.role==='assistant'?mdToHtml(msg.content):esc(msg.content).replace(/\n/g,'<br>')}</div>
+  </div>`).join('')
+:`<div style="text-align:center;padding:50px 16px;color:var(--t2)">
+  <div style="font-size:48px;margin-bottom:14px">${mdl.icon}</div>
+  <div style="font-size:15px;font-weight:600;margin-bottom:6px">${mdl.label} に何でも聞いてください</div>
+  <div style="font-size:12px;color:var(--t3)">タスク・案件・目標・コーディングなど何でもOK</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:16px">
+    ${['今日何をすべきか教えて','目標達成のためのアドバイスをして','ブログ記事のアイデアを5つ出して','このコードのバグを見つけて'].map(q=>`<button class="btn btn-g btn-sm" onclick="quickAsk('${q}')">${q}</button>`).join('')}
+  </div>
+</div>`}
+${_chatLoading?`<div class="ai-msg ai-msg-assistant">
+  <div class="ai-msg-meta">${mdl.icon} ${mdl.label}</div>
+  <div class="ai-msg-body"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+</div>`:''}
+</div>
+<div class="ai-input-bar">
+  <textarea id="ai-input" placeholder="${m==='claude-code'?'コード・技術的な質問を入力…':'メッセージを入力… (Shift+Enterで改行)'}" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIMessage()}" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+  <button class="btn btn-p" onclick="sendAIMessage()" ${_chatLoading?'disabled':''} style="flex-shrink:0;height:42px">送信</button>
+</div>`;
+}
+function renderAIChatOnly(){
+  if(V==='aichat'){document.getElementById('view').innerHTML=rAIChat();setTimeout(()=>{const el=document.getElementById('ai-chat-msgs');if(el)el.scrollTop=el.scrollHeight;},50);}
+}
+function setAIModel(m){_chatModel=m;renderAIChatOnly();}
+function clearAIChat(){if(_chatHistory.length&&!confirm('会話履歴をクリアしますか？'))return;_chatHistory=[];renderAIChatOnly();}
+function quickAsk(q){const el=document.getElementById('ai-input');if(el){el.value=q;sendAIMessage();}}
+async function sendAIMessage(){
+  if(_chatLoading)return;
+  const el=document.getElementById('ai-input');if(!el)return;
+  const text=el.value.trim();if(!text)return;
+  const key=getAIKey(_chatModel);
+  if(!key){toast('APIキーが設定されていません。設定画面で登録してください','warn');V='settings';render();return;}
+  el.value='';el.style.height='auto';
+  _chatHistory.push({role:'user',content:text});
+  _chatLoading=true;
+  renderAIChatOnly();
+  try{
+    let reply='';
+    if(_chatModel==='gemini'){
+      reply=await callGemini(_chatHistory,key,_chatCtx?getAppContext():null);
+    }else{
+      const sys=_chatModel==='claude-code'
+        ?'あなたはエキスパートプログラマーです。コーディング・デバッグ・技術的な質問に特化して、正確で実用的な回答を日本語でしてください。コードは必ずコードブロックで記述してください。'
+        :'あなたは優秀なビジネスアシスタントです。ユーザーはYouTubeクリエイターで、動画制作・案件管理・目標達成をサポートするアプリを使っています。簡潔で実用的なアドバイスを日本語でしてください。';
+      reply=await callClaude(_chatHistory,key,sys,_chatCtx?getAppContext():null);
+    }
+    _chatHistory.push({role:'assistant',content:reply,model:_chatModel});
+  }catch(e){
+    _chatHistory.push({role:'assistant',content:`❌ エラーが発生しました: ${e.message}`,model:_chatModel});
+    console.error('AI error:',e);
+  }
+  _chatLoading=false;
+  renderAIChatOnly();
+}
+async function callGemini(history,apiKey,ctx){
+  const contents=history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+  if(ctx&&contents.length===1){contents[0].parts[0].text=`【アプリ状況】\n${ctx}\n\n${contents[0].parts[0].text}`;}
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents,generationConfig:{maxOutputTokens:2048}})
+  });
+  const d=await res.json();
+  if(!res.ok)throw new Error(d.error?.message||`Gemini API error (${res.status})`);
+  return d.candidates?.[0]?.content?.parts?.[0]?.text||'(応答なし)';
+}
+async function callClaude(history,apiKey,system,ctx){
+  const messages=history.map(m=>({role:m.role==='assistant'?'assistant':'user',content:m.content}));
+  if(ctx&&messages.length===1){messages[0].content=`【アプリ状況】\n${ctx}\n\n${messages[0].content}`;}
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-opus-4-5',max_tokens:2048,system,messages})
+  });
+  const d=await res.json();
+  if(!res.ok)throw new Error(d.error?.message||`Claude API error (${res.status})`);
+  return d.content?.[0]?.text||'(応答なし)';
+}
+function saveAIKeys(){
+  S.settings.geminiKey=document.getElementById('set-gemini-key')?.value.trim()||'';
+  S.settings.claudeKey=document.getElementById('set-claude-key')?.value.trim()||'';
+  save();toast('APIキーを保存しました ✅');
+}
+
 // ===MODALS===
 function openTaskModal(id,preDate,withTime){
   EID=id||null;
