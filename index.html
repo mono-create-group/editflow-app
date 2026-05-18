@@ -1841,101 +1841,118 @@ ${{board:rProjBoard,listing:rProjListing,list:()=>rProjList(clients),profit:rPro
 }
 
 function rProjListing(){
-  const jobs=sortJobs(S.jobs.filter(j=>!j.deleted&&j.status==='案件掲載中'));
-  if(!jobs.length)return`<div class="empty">
+  const ST='案件掲載中';
+  // 掲載中の案件（job.status === ST）
+  const listingJobs=sortJobs(S.jobs.filter(j=>!j.deleted&&j.status===ST));
+  // 掲載中のサブタスクを持つ案件（job.status !== ST だが subtask.status === ST のもの）
+  const subListingJobs=sortJobs(S.jobs.filter(j=>!j.deleted&&j.status!==ST&&(j.subtasks||[]).some(s=>s.status===ST)));
+  if(!listingJobs.length&&!subListingJobs.length)return`<div class="empty">
     <div class="empty-icon">📢</div>
-    <div class="empty-title">掲載中の案件なし</div>
-    <div style="color:var(--t2);margin-bottom:16px">ステータスが「案件掲載中」の案件がここに表示されます</div>
+    <div class="empty-title">掲載中の案件・サブタスクなし</div>
+    <div style="color:var(--t2);margin-bottom:16px">ステータスが「案件掲載中」の案件またはサブタスクがここに表示されます</div>
     <button class="btn btn-p" onclick="openJobModal(null,'案件掲載中')">＋ 掲載案件を追加</button>
   </div>`;
-  const totalIn=jobs.reduce((s,j)=>s+jobTotalIn(j),0);
-  const totalOut=jobs.reduce((s,j)=>s+jobTotalOut(j),0);
-  const totalProfit=jobs.reduce((s,j)=>s+jobProfit(j),0);
-  const totalSubtasks=jobs.reduce((s,j)=>s+(j.subtasks||[]).length,0);
-  const totalSubDone=jobs.reduce((s,j)=>s+(j.subtasks||[]).filter(sub=>sub.done).length,0);
-  // クライアント別グループ
-  const clientIds=[...new Set(jobs.map(j=>j.clientId||'__none'))];
-  const grouped=clientIds.map(cid=>{
-    const cl=S.clients.find(c=>c.id===cid);
-    const cjobs=jobs.filter(j=>(j.clientId||'__none')===cid);
-    return{cl,cjobs};
-  });
-  // サブタスク1行レンダー
-  function rSubRow(j,s,i){
+  // サマリー集計
+  const totalJobIn=listingJobs.reduce((s,j)=>s+jobTotalIn(j),0);
+  const totalJobOut=listingJobs.reduce((s,j)=>s+jobTotalOut(j),0);
+  const totalJobProfit=listingJobs.reduce((s,j)=>s+jobProfit(j),0);
+  // 掲載中サブタスク（全ジョブから）
+  const allListingSubs=S.jobs.filter(j=>!j.deleted).flatMap(j=>(j.subtasks||[]).filter(s=>s.status===ST).map(s=>({j,s})));
+  const subIn=allListingSubs.reduce((s,{s:sub})=>s+(sub.unitPrice||0),0);
+  const subOut=allListingSubs.reduce((s,{s:sub,j})=>s+(sub.workerId&&sub.workerId!==SELF_WID?sub.workerPay||0:0),0);
+
+  // サブタスク行レンダー
+  function rSubRow(j,s,i,highlight){
     const sw=S.workers.find(wk=>wk.id===s.workerId);
     const swName=s.workerId===SELF_WID?'自分':sw?esc(sw.name):'';
-    return`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;background:${s.done?'var(--card2)':'var(--surface)'};border:1px solid var(--border);margin-top:5px;${s.done?'opacity:.55':''}" onclick="event.stopPropagation();toggleJobSub('${j.id}',${i})">
+    const isListing=s.status===ST;
+    const statusBadge=s.status&&s.status!==ST?`<span class="badge ${SCOLBG[s.status]||'bk'}" style="font-size:10px">${s.status}</span>`:'';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:${isListing?'var(--cdim)':s.done?'var(--card2)':'var(--surface)'};border:1px solid ${isListing?'var(--cyan)':'var(--border)'};margin-top:5px;${s.done?'opacity:.55':''}" onclick="event.stopPropagation();toggleJobSub('${j.id}',${i})">
       <div style="width:14px;height:14px;border-radius:4px;border:1.5px solid ${s.done?'var(--cyan)':'var(--border)'};background:${s.done?'var(--cyan)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
         ${s.done?'<svg width="9" height="9" viewBox="0 0 9 9"><polyline points="1,4.5 3.5,7 8,2" stroke="#fff" stroke-width="1.5" fill="none"/></svg>':''}
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;${s.done?'text-decoration:line-through;color:var(--t3)':'color:var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</div>
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          ${isListing?`<span style="font-size:10px;color:var(--cyan);font-weight:700">📢</span>`:''}
+          <span style="font-size:12px;font-weight:600;${s.done?'text-decoration:line-through;color:var(--t3)':'color:var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</span>
+          ${statusBadge}
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;font-size:11px;color:var(--t2)">
           ${swName?`<span>🛠 ${swName}</span>`:''}
+          ${s.sharedDate?`<span>📤 共有: ${s.sharedDate}</span>`:''}
+          ${s.editorDraftDate?`<span>✏️ 初稿: ${s.editorDraftDate}</span>`:''}
+          ${s.deliveryDate?`<span class="${urgCls(s.deliveryDate)}">📅 納品: ${s.deliveryDate} (${fmt(s.deliveryDate)})</span>`:''}
           ${s.payoutDate?`<span>💸 支払: ${s.payoutDate}</span>`:''}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0;font-size:11px">
         ${s.unitPrice?`<span style="color:var(--blue)">¥${s.unitPrice.toLocaleString()}</span>`:''}
         ${s.workerPay&&s.workerId!==SELF_WID?`<span style="color:var(--amber)">支払 ¥${s.workerPay.toLocaleString()}</span>`:''}
+        ${s.unitPrice&&s.workerId!==SELF_WID?`<span style="color:${((s.unitPrice||0)-(s.workerPay||0))>=0?'var(--green)':'var(--red)'};font-weight:700">利益 ¥${((s.unitPrice||0)-(s.workerPay||0)).toLocaleString()}</span>`:''}
       </div>
     </div>`;
   }
+
+  // 案件カードレンダー（全サブタスク表示 or 掲載中サブタスクのみ）
+  function rJobCard(j,subsFilter){
+    const w=S.workers.find(wk=>wk.id===j.workerId);
+    const ti=jobTotalIn(j),to=jobTotalOut(j),pr=jobProfit(j);
+    const allSubs=j.subtasks||[];
+    const showSubs=subsFilter?allSubs.filter(subsFilter):allSubs;
+    const subDone=allSubs.filter(s=>s.done).length;
+    const isJobListing=j.status===ST;
+    return`<div class="card card-sm" style="border-left:3px solid ${isJobListing?'var(--cyan)':'var(--border)'}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="openJobModal('${j.id}')">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+            ${isJobListing?`<span class="badge bc">📢 掲載中</span>`:`<span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span>`}
+            <span style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--t2)">
+            ${w?`<span>🛠 ${esc(w.name)}</span>`:''}
+            ${j.scope?`<span>📌 ${esc(j.scope)}</span>`:''}
+            ${j.sharedDate?`<span>📤 共有: ${j.sharedDate}</span>`:''}
+            ${j.deliveryDate?`<span class="${urgCls(j.deliveryDate)}">📅 納品: ${j.deliveryDate} (${fmt(j.deliveryDate)})</span>`:''}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+          ${ti?`<div style="font-size:12px;color:var(--blue)">単価 ¥${ti.toLocaleString()}</div>`:''}
+          ${to?`<div style="font-size:12px;color:var(--amber)">支払 ¥${to.toLocaleString()}</div>`:''}
+          ${ti?`<div style="font-size:13px;font-weight:700;color:${pr>=0?'var(--green)':'var(--red)'}">利益 ¥${pr.toLocaleString()}</div>`:''}
+          ${allSubs.length?`<span class="badge bc">☑ ${subDone}/${allSubs.length}</span>`:''}
+        </div>
+      </div>
+      ${showSubs.length?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:2px">サブタスク${subsFilter?` (掲載中のみ表示)`:''}  ${showSubs.filter(s=>!s.done).length}件未完了</div>
+        ${showSubs.map((s,_)=>rSubRow(j,s,allSubs.indexOf(s),!!subsFilter)).join('')}
+      </div>`:''}
+      <div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        ${isJobListing?`<button class="btn btn-g btn-xs" onclick="quickStatusChange('${j.id}','未着手')">▷ 未着手へ</button>
+        <button class="btn btn-p btn-xs" onclick="quickStatusChange('${j.id}','進行中')">▶ 進行中へ</button>`:''}
+        <button class="btn btn-g btn-xs" style="margin-left:auto" onclick="openJobModal('${j.id}')">✏️ 編集</button>
+      </div>
+      ${j.notes?`<div style="font-size:11px;color:var(--t3);margin-top:6px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(j.notes)}</div>`:''}
+    </div>`;
+  }
+
+  const allJobIds=[...new Set([...listingJobs,...subListingJobs].map(j=>j.clientId||'__none'))];
+
   return`<div class="card" style="margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
-  <div><div style="font-size:11px;color:var(--t2)">掲載中件数</div><div style="font-size:22px;font-weight:700;color:var(--cyan)">${jobs.length}件</div></div>
-  ${totalSubtasks?`<div><div style="font-size:11px;color:var(--t2)">サブタスク</div><div style="font-size:20px;font-weight:700;color:var(--cyan)">${totalSubDone}/${totalSubtasks}</div></div>`:''}
-  ${totalIn?`<div><div style="font-size:11px;color:var(--t2)">合計単価</div><div style="font-size:20px;font-weight:700;color:var(--blue)">¥${totalIn.toLocaleString()}</div></div>`:''}
-  ${totalOut?`<div><div style="font-size:11px;color:var(--t2)">合計支払</div><div style="font-size:20px;font-weight:700;color:var(--amber)">¥${totalOut.toLocaleString()}</div></div>`:''}
-  ${totalIn?`<div><div style="font-size:11px;color:var(--t2)">見込み利益</div><div style="font-size:20px;font-weight:700;color:${totalProfit>=0?'var(--green)':'var(--red)'}">¥${totalProfit.toLocaleString()}</div></div>`:''}
+  <div><div style="font-size:11px;color:var(--t2)">掲載中案件</div><div style="font-size:22px;font-weight:700;color:var(--cyan)">${listingJobs.length}件</div></div>
+  <div><div style="font-size:11px;color:var(--t2)">掲載中サブタスク</div><div style="font-size:22px;font-weight:700;color:var(--cyan)">${allListingSubs.length}件</div></div>
+  ${(totalJobIn+subIn)?`<div><div style="font-size:11px;color:var(--t2)">合計単価</div><div style="font-size:20px;font-weight:700;color:var(--blue)">¥${(totalJobIn+subIn).toLocaleString()}</div></div>`:''}
+  ${(totalJobOut+subOut)?`<div><div style="font-size:11px;color:var(--t2)">合計支払</div><div style="font-size:20px;font-weight:700;color:var(--amber)">¥${(totalJobOut+subOut).toLocaleString()}</div></div>`:''}
+  ${(totalJobIn+subIn)?`<div><div style="font-size:11px;color:var(--t2)">見込み利益</div><div style="font-size:20px;font-weight:700;color:${(totalJobProfit+(subIn-subOut))>=0?'var(--green)':'var(--red)'}">¥${(totalJobProfit+(subIn-subOut)).toLocaleString()}</div></div>`:''}
   <button class="btn btn-p btn-sm" style="margin-left:auto" onclick="openJobModal(null,'案件掲載中')">＋ 掲載案件を追加</button>
 </div>
-${grouped.map(({cl,cjobs})=>`
-  <div style="margin-bottom:18px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <span style="font-size:13px;font-weight:700;color:var(--cyan)">📢</span>
-      <span style="font-size:13px;font-weight:700">${cl?esc(cl.name):'クライアント未設定'}</span>
-      <span style="font-size:11px;background:var(--cdim);color:var(--cyan);padding:1px 8px;border-radius:10px">${cjobs.length}件</span>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      ${cjobs.map(j=>{
-        const w=S.workers.find(wk=>wk.id===j.workerId);
-        const ti=jobTotalIn(j),to=jobTotalOut(j),pr=jobProfit(j);
-        const subs=j.subtasks||[];
-        const subDone=subs.filter(s=>s.done).length;
-        return`<div class="card card-sm" style="border-left:3px solid var(--cyan)">
-          <!-- 案件ヘッダー -->
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="openJobModal('${j.id}')">
-            <div style="flex:1;min-width:0">
-              <div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;font-size:12px;color:var(--t2)">
-                ${w?`<span>🛠 ${esc(w.name)}</span>`:''}
-                ${j.scope?`<span>📌 ${esc(j.scope)}</span>`:''}
-                ${j.sharedDate?`<span>📤 共有: ${j.sharedDate}</span>`:''}
-                ${j.deliveryDate?`<span class="${urgCls(j.deliveryDate)}">📅 納品: ${j.deliveryDate} (${fmt(j.deliveryDate)})</span>`:''}
-              </div>
-            </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
-              ${ti?`<div style="font-size:12px;color:var(--blue)">単価 ¥${ti.toLocaleString()}</div>`:''}
-              ${to?`<div style="font-size:12px;color:var(--amber)">支払 ¥${to.toLocaleString()}</div>`:''}
-              ${ti?`<div style="font-size:13px;font-weight:700;color:${pr>=0?'var(--green)':'var(--red)'}">利益 ¥${pr.toLocaleString()}</div>`:''}
-              ${subs.length?`<span class="badge bc">☑ ${subDone}/${subs.length}</span>`:''}
-            </div>
-          </div>
-          <!-- サブタスク一覧 -->
-          ${subs.length?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
-            <div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:2px;padding:0 2px">サブタスク</div>
-            ${subs.map((s,i)=>rSubRow(j,s,i)).join('')}
-          </div>`:''}
-          <!-- アクションボタン -->
-          <div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <button class="btn btn-g btn-xs" onclick="quickStatusChange('${j.id}','未着手')">▷ 未着手へ</button>
-            <button class="btn btn-p btn-xs" onclick="quickStatusChange('${j.id}','進行中')">▶ 進行中へ</button>
-            <button class="btn btn-g btn-xs" style="margin-left:auto" onclick="openJobModal('${j.id}')">✏️ 編集</button>
-          </div>
-          ${j.notes?`<div style="font-size:11px;color:var(--t3);margin-top:6px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(j.notes)}</div>`:''}
-        </div>`;}).join('')}
-    </div>
-  </div>`).join('')}`;
+${listingJobs.length?`<div style="font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:8px">📢 掲載中の案件 (${listingJobs.length}件)</div>
+<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+  ${listingJobs.map(j=>rJobCard(j,null)).join('')}
+</div>`:''}
+${subListingJobs.length?`<div style="font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:8px">📋 掲載中のサブタスクを含む案件 (${subListingJobs.length}件)</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+  ${subListingJobs.map(j=>rJobCard(j,s=>s.status===ST)).join('')}
+</div>`:''}`;
 }
 
 function rProjBoard(){
@@ -4723,7 +4740,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260518-10';
+const APP_VERSION='20260518-11';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
