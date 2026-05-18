@@ -19,6 +19,7 @@
   --red:#ef4444;--rdim:#ef444420;
   --blue:#3b82f6;--bdim:#3b82f620;
   --pink:#ec4899;--pkdim:#ec489920;
+  --cyan:#06b6d4;--cdim:#06b6d420;
   --text:#e8e8f0;--t2:#9898a8;--t3:#55556a;
   --r:12px;--rs:8px;--shadow:0 4px 24px rgba(0,0,0,.45);
 }
@@ -78,6 +79,7 @@ a{color:inherit;text-decoration:none}
 .ba{background:var(--adim);color:var(--amber)}
 .bg{background:var(--gdim);color:var(--green)}
 .bb{background:var(--bdim);color:var(--blue)}
+.bc{background:var(--cdim);color:var(--cyan)}
 .bk{background:var(--border);color:var(--t2)}
 
 /* ─── STATS GRID ─── */
@@ -644,9 +646,9 @@ const BUILTIN_VIEWS=[
 ];
 const DB_OLD='ef_v4';
 const PPM=1.5, SS=7*60, SE=24*60;
-const PSTATUS=['未着手','進行中','初稿完成','確認待ち','FB待ち','修正中','完了','キャンセル'];
-const SCOL={'未着手':'--t3','進行中':'--blue','初稿完成':'--purple','確認待ち':'--amber','FB待ち':'--pink','修正中':'--red','完了':'--green','キャンセル':'--t3'};
-const SCOLBG={'未着手':'bk','進行中':'bb','初稿完成':'bp','確認待ち':'ba','FB待ち':'bk','修正中':'br','完了':'bg','キャンセル':'bk'};
+const PSTATUS=['案件掲載中','未着手','進行中','初稿完成','確認待ち','FB待ち','修正中','完了','キャンセル'];
+const SCOL={'案件掲載中':'--cyan','未着手':'--t3','進行中':'--blue','初稿完成':'--purple','確認待ち':'--amber','FB待ち':'--pink','修正中':'--red','完了':'--green','キャンセル':'--t3'};
+const SCOLBG={'案件掲載中':'bc','未着手':'bk','進行中':'bb','初稿完成':'bp','確認待ち':'ba','FB待ち':'bk','修正中':'br','完了':'bg','キャンセル':'bk'};
 const DAYS=['日','月','火','水','木','金','土'];
 const LOG_TYPES=['revenue','sales','hire'];
 
@@ -1686,8 +1688,8 @@ ${{board:rProjBoard,list:()=>rProjList(clients),profit:rProjProfit,payment:rProj
 }
 
 function rProjBoard(){
-  const statuses=['未着手','進行中','確認待ち','修正中','初稿完成'];
-  const scols={'未着手':'#6b7280','進行中':'#3b82f6','確認待ち':'#f59e0b','修正中':'#ef4444','初稿完成':'#7c3aed'};
+  const statuses=['案件掲載中','未着手','進行中','確認待ち','修正中','初稿完成'];
+  const scols={'案件掲載中':'#06b6d4','未着手':'#6b7280','進行中':'#3b82f6','確認待ち':'#f59e0b','修正中':'#ef4444','初稿完成':'#7c3aed'};
   return`<div class="board-wrap">
 ${statuses.map(st=>{
   const jobs=sortJobs(S.jobs.filter(j=>!j.deleted&&j.status===st));
@@ -4466,7 +4468,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260518-4';
+const APP_VERSION='20260518-5';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
