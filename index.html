@@ -194,6 +194,8 @@ a{color:inherit;text-decoration:none}
 .fixed-blk-time{font-size:10px;opacity:.7}
 .task-blk{position:absolute;left:52%;right:4px;border-radius:6px;padding:4px 7px;font-size:11px;font-weight:600;overflow:hidden;background:var(--purple);color:#fff;cursor:pointer;z-index:10;min-height:20px}
 .task-blk.done-blk{opacity:.5;text-decoration:line-through}
+.task-blk.overlap-blk{background:linear-gradient(135deg,#f59e0b,#d97706);border:1.5px solid #fcd34d;box-shadow:0 0 0 1.5px #f59e0b40,2px 2px 6px rgba(0,0,0,.25)}
+.overlap-badge{position:absolute;top:2px;right:3px;background:rgba(0,0,0,.35);color:#fff;font-size:8px;font-weight:700;padding:1px 4px;border-radius:6px;line-height:1.4;pointer-events:none}
 .now-line{position:absolute;left:0;right:0;height:2px;background:var(--red);z-index:20;pointer-events:none}
 .now-line::before{content:'';position:absolute;left:-4px;top:-4px;width:10px;height:10px;background:var(--red);border-radius:50%}
 .sched-add-hint{font-size:11px;color:var(--t3);text-align:center;margin-top:8px}
@@ -751,7 +753,7 @@ fbAuth.onAuthStateChanged(user=>{
 // ===GOOGLE CALENDAR===
 let _gcalToken=null;
 let _gcalTokenClient=null;
-const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events';
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/generativelanguage';
 const GCAL_CLIENT_ID='422987578809-sr1p6f6l2tvlsgc6fqqramfsphrg8q5j.apps.googleusercontent.com';
 
 function getGcalClientId(){
@@ -874,15 +876,26 @@ async function gcalImportEvents(){
     const json=await res.json();
     events=json.items||[];
   }catch(e){console.error('gcalImportEvents error',e);toast('カレンダー取り込みに失敗しました','err');return;}
-  let n=0;
+  let n=0,nTimed=0;
   for(const event of events){
     if(!event.summary)continue;
     if(S.tasks.find(t=>t.gcalEventId===event.id))continue;
-    S.tasks.push({id:uid(),title:event.summary,dueDate:event.start?.date||event.start?.dateTime?.slice(0,10)||null,gcalEventId:event.id,done:false,createdAt:new Date().toISOString()});
+    const isTimed=!!event.start?.dateTime;
+    const dueDate=event.start?.date||event.start?.dateTime?.slice(0,10)||null;
+    let startTime=null,endTime=null;
+    if(isTimed){
+      // タイムゾーンを考慮してローカル時刻で抽出
+      const sd=new Date(event.start.dateTime),ed=new Date(event.end?.dateTime||event.start.dateTime);
+      startTime=`${String(sd.getHours()).padStart(2,'0')}:${String(sd.getMinutes()).padStart(2,'0')}`;
+      endTime=`${String(ed.getHours()).padStart(2,'0')}:${String(ed.getMinutes()).padStart(2,'0')}`;
+      if(startTime===endTime)endTime=null; // 同じなら終了なし
+      nTimed++;
+    }
+    S.tasks.push({id:uid(),title:event.summary,dueDate,startTime,endTime,gcalEventId:event.id,done:false,description:event.description||'',createdAt:new Date().toISOString()});
     n++;
   }
   if(n>0){save();render();}
-  toast(`📅 ${n}件のGoogleカレンダー予定を取り込みました`);
+  toast(`📅 ${n}件取り込み${nTimed?`（うち時刻付き ${nTimed}件）`:''}`);
 }
 
 const LOG_TYPE_LBL={revenue:'💰 収益',sales:'📞 営業',hire:'👤 採用'};
@@ -1570,24 +1583,27 @@ function rTasksSchedule(){
     const colW=44/numCols;
     const left=52+col*colW;
     const right=100-(left+colW)+0.5;
+    const isOverlap=numCols>1;
     if(isSubtask){
-      return`<div class="task-blk sub-blk${s.done?' done-blk':''}" draggable="true"
-        style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between"
+      return`<div class="task-blk sub-blk${s.done?' done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
+        style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute"
         ondragstart="schedDragStart(event,'${id}')"
         title="↳ ${esc(s.title)} (${esc(t.title)})">
         <div style="overflow:hidden">
           <div class="sub-blk-label">↳ ${esc(t.title)}</div>
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</div>
         </div>
+        ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
       </div>`;
     }
-    return`<div class="task-blk ${t.done?'done-blk':''}" draggable="true"
-      style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between"
+    return`<div class="task-blk ${t.done?'done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
+      style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute"
       ondblclick="event.stopPropagation();delTask('${t.id}')"
       ondragstart="schedDragStart(event,'${t.id}')"
-      title="${esc(t.title)} (ダブルクリックで削除)">
-      <span onclick="openTaskModal('${t.id}')" style="flex:1;overflow:hidden">${esc(t.title)}</span>
-      ${h>=36?`<div style="display:flex;gap:3px;margin-top:2px"><button onclick="event.stopPropagation();splitSchedTask('${t.id}')" style="font-size:9px;padding:1px 4px;background:rgba(255,255,255,.15);border:none;border-radius:3px;color:#fff;cursor:pointer" title="タスクを分割">✂</button></div>`:''}
+      title="${esc(t.title)}${isOverlap?` ⚡ ${numCols}件重複`:''} (ダブルクリックで削除)">
+      <span onclick="openTaskModal('${t.id}')" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isOverlap?'⚡ ':''}${esc(t.title)}</span>
+      ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
+      ${h>=36&&!isOverlap?`<div style="display:flex;gap:3px;margin-top:2px"><button onclick="event.stopPropagation();splitSchedTask('${t.id}')" style="font-size:9px;padding:1px 4px;background:rgba(255,255,255,.15);border:none;border-radius:3px;color:#fff;cursor:pointer" title="タスクを分割">✂</button></div>`:''}
     </div>`;}).join('');
   const nowLine=(isToday&&nowM>=SS&&nowM<=SE)?`<div class="now-line" style="top:${nowTop}px"></div>`:'';
   // サイドパネル用：未スケジュールのタスク（startTimeなし）
@@ -3297,7 +3313,11 @@ const AI_MODELS={
   'claude-code':{label:'Claude Code',icon:'💻',color:'#7c3aed',hint:'コーディング特化モード'}
 };
 function getAIKey(model){
-  if(model==='gemini')return S.settings.geminiKey||'';
+  if(model==='gemini'){
+    if(S.settings.geminiKey)return S.settings.geminiKey;
+    if(_gcalToken)return '__oauth__'; // Googleログイン済みなら OAuth で呼ぶ
+    return'';
+  }
   return S.settings.claudeKey||'';
 }
 function mdToHtml(text){
@@ -3338,7 +3358,11 @@ ${goals||'なし'}
 【アイデンティティ】${S.settings.identity||'未設定'}`;
 }
 function rAIChat(){
-  const m=_chatModel;const mdl=AI_MODELS[m];const hasKey=!!getAIKey(m);
+  const m=_chatModel;const mdl=AI_MODELS[m];
+  const rawKey=getAIKey(m);
+  const hasKey=!!rawKey;
+  const isOAuth=rawKey==='__oauth__';
+  const isGcalConnected=!!_gcalToken;
   return`<div class="ph">
   <div class="ph-title">🤖 AIアシスタント</div>
   <button class="btn btn-g btn-sm" onclick="clearAIChat()">🗑 クリア</button>
@@ -3346,11 +3370,28 @@ function rAIChat(){
 <div class="ai-model-tabs">
   ${Object.entries(AI_MODELS).map(([k,v])=>`<button class="ai-model-tab${_chatModel===k?' active':''}" onclick="setAIModel('${k}')" style="${_chatModel===k?`background:${v.color};border-color:${v.color}`:''}">${v.icon} ${v.label}</button>`).join('')}
 </div>
-<div style="font-size:11px;color:var(--t3);margin-bottom:12px">${mdl.hint}${hasKey?` ✅`:`　⚠️ APIキー未設定`}</div>
-${!hasKey?`<div class="card" style="margin-bottom:14px;border-left:4px solid var(--amber)">
+${m==='gemini'&&isOAuth?`<div style="font-size:11px;background:var(--gdim);color:var(--green);padding:5px 10px;border-radius:8px;margin-bottom:10px;display:flex;align-items:center;gap:6px">✅ Googleアカウントでログイン済み — APIキー不要で使えます</div>`
+:m==='gemini'&&!isGcalConnected?`<div style="font-size:11px;background:var(--adim);color:var(--amber);padding:5px 10px;border-radius:8px;margin-bottom:10px">⚠️ Googleアカウントでログインするか、APIキーを登録してください</div>`
+:`<div style="font-size:11px;color:var(--t3);margin-bottom:10px">${mdl.hint}${hasKey?' ✅':'　⚠️ APIキー未設定'}</div>`}
+${!hasKey&&m!=='gemini'?`<div class="card" style="margin-bottom:14px;border-left:4px solid var(--amber)">
   <div style="font-weight:700;color:var(--amber);margin-bottom:6px">⚠️ APIキーを設定してください</div>
-  <div style="font-size:13px;color:var(--t2);margin-bottom:10px">${m==='gemini'?'Google AI Studio (<a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--blue)">こちら</a>) でAPIキーを取得してください':'Anthropic Console (<a href="https://console.anthropic.com/" target="_blank" style="color:var(--blue)">こちら</a>) でAPIキーを取得してください'}</div>
+  <div style="font-size:13px;color:var(--t2);margin-bottom:10px">Anthropic Console (<a href="https://console.anthropic.com/" target="_blank" style="color:var(--blue)">こちら</a>) でAPIキーを取得してください</div>
   <button class="btn btn-p btn-sm" onclick="V='settings';render()">⚙️ 設定でAPIキーを登録する</button>
+</div>`:''}
+${!hasKey&&m==='gemini'&&!isGcalConnected?`<div class="card" style="margin-bottom:14px;border-left:4px solid var(--blue)">
+  <div style="font-weight:700;color:var(--blue);margin-bottom:8px">🔑 Geminiの使い方（どちらか選んでください）</div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="background:var(--card2);border-radius:8px;padding:10px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px">① Googleアカウントでログイン（推奨・簡単）</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:8px">サイドバーのGoogleログインボタンからログインするだけで使えます</div>
+      <button class="btn btn-p btn-sm" onclick="signInWithGoogle()">🔑 Googleでログイン</button>
+    </div>
+    <div style="background:var(--card2);border-radius:8px;padding:10px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px">② APIキーを手動登録</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:8px">Google AI Studio (<a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--blue)">こちら</a>) でAPIキーを取得</div>
+      <button class="btn btn-g btn-sm" onclick="V='settings';render()">⚙️ 設定でAPIキーを登録</button>
+    </div>
+  </div>
 </div>`:''}
 <div style="margin-bottom:12px">
   <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--t2)">
@@ -3393,7 +3434,11 @@ async function sendAIMessage(){
   const el=document.getElementById('ai-input');if(!el)return;
   const text=el.value.trim();if(!text)return;
   const key=getAIKey(_chatModel);
-  if(!key){toast('APIキーが設定されていません。設定画面で登録してください','warn');V='settings';render();return;}
+  if(!key){
+    if(_chatModel==='gemini'){toast('GoogleログインまたはAPIキーの登録が必要です','warn');}
+    else{toast('APIキーが設定されていません。設定画面で登録してください','warn');V='settings';render();}
+    return;
+  }
   el.value='';el.style.height='auto';
   _chatHistory.push({role:'user',content:text});
   _chatLoading=true;
@@ -3419,12 +3464,20 @@ async function sendAIMessage(){
 async function callGemini(history,apiKey,ctx){
   const contents=history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
   if(ctx&&contents.length===1){contents[0].parts[0].text=`【アプリ状況】\n${ctx}\n\n${contents[0].parts[0].text}`;}
-  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({contents,generationConfig:{maxOutputTokens:2048}})
-  });
+  const useOAuth=apiKey==='__oauth__';
+  const url=useOAuth
+    ?'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+    :`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const headers={'Content-Type':'application/json'};
+  if(useOAuth)headers['Authorization']=`Bearer ${_gcalToken}`;
+  const res=await fetch(url,{method:'POST',headers,body:JSON.stringify({contents,generationConfig:{maxOutputTokens:2048}})});
   const d=await res.json();
-  if(!res.ok)throw new Error(d.error?.message||`Gemini API error (${res.status})`);
+  if(!res.ok){
+    if(useOAuth&&res.status===403){
+      throw new Error('Google API の権限が不足しています。Google Cloud プロジェクトで「Generative Language API」を有効にするか、設定画面でAPIキーを登録してください。');
+    }
+    throw new Error(d.error?.message||`Gemini API error (${res.status})`);
+  }
   return d.candidates?.[0]?.content?.parts?.[0]?.text||'(応答なし)';
 }
 async function callClaude(history,apiKey,system,ctx){
@@ -4997,7 +5050,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260518-12';
+const APP_VERSION='20260519-1';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
