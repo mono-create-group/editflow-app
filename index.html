@@ -690,6 +690,9 @@ async function fbLoad(){
         return;
       }
       S=Object.assign(defState(),cloud);
+      // nullになった配列フィールドを保護
+      const def=defState();
+      ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
       localStorage.setItem(DB,JSON.stringify(S));
       render();
       toast('☁️ クラウドから同期しました');
@@ -1138,27 +1141,34 @@ function rLockScreen(){
 </div>`;
 }
 function render(){
-  // 19時以降ロックチェック（ジャーナル・習慣ページのみ通過許可）
-  if(checkDailyLock()){
-    // ロック中はジャーナルと習慣トラッカーのみアクセス可
-    if(V!=='journal'&&V!=='habits'){
-      V='dashboard'; // 不正なビューをリセット
-      sessionStorage.setItem('ef_view','dashboard');
-      document.getElementById('view').innerHTML=rLockScreen();
-      renderNav();
-      return;
+  try{
+    // 19時以降ロックチェック（ジャーナル・習慣ページのみ通過許可）
+    if(checkDailyLock()){
+      // ロック中はジャーナルと習慣トラッカーのみアクセス可
+      if(V!=='journal'&&V!=='habits'){
+        V='dashboard'; // 不正なビューをリセット
+        sessionStorage.setItem('ef_view','dashboard');
+        document.getElementById('view').innerHTML=rLockScreen();
+        renderNav();
+        return;
+      }
     }
+    sessionStorage.setItem('ef_view',V);
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat};
+    let html;
+    if(V.startsWith('cp_')){
+      const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
+      html=page?rCustomPage(page):`<div class="empty"><div class="empty-icon">😕</div><div>ページが見つかりません</div></div>`;
+    }else{html=(views[V]||rDash)();}
+    document.getElementById('view').innerHTML=html;
+    renderNav();
+    document.querySelectorAll('.nav-item,.mnav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===V));
+  }catch(e){
+    console.error('render error:',e);
+    const v=document.getElementById('view');
+    if(v)v.innerHTML=`<div style="padding:24px;text-align:center"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="color:var(--red);font-weight:700;margin-bottom:8px">表示エラーが発生しました</div><div style="font-size:12px;color:var(--t2);margin-bottom:16px">${e.message||e}</div><button class="btn btn-p" onclick="V='dashboard';S=load();render()">🔄 再読み込み</button></div>`;
+    try{renderNav();}catch{}
   }
-  sessionStorage.setItem('ef_view',V);
-  const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat};
-  let html;
-  if(V.startsWith('cp_')){
-    const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
-    html=page?rCustomPage(page):`<div class="empty"><div class="empty-icon">😕</div><div>ページが見つかりません</div></div>`;
-  }else{html=(views[V]||rDash)();}
-  document.getElementById('view').innerHTML=html;
-  renderNav();
-  document.querySelectorAll('.nav-item,.mnav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===V));
 }
 function subTabs(tabs,cur,fn){return`<div class="sub-tabs">${tabs.map(([k,l])=>`<div class="stab${cur===k?' act':''}" onclick="${fn}('${k}')">${l}</div>`).join('')}</div>`;}
 function secTitle(t){return`<div class="section-ttl">${t}</div>`;}
@@ -4456,21 +4466,37 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260518-3';
+const APP_VERSION='20260518-4';
 function forceAppUpdate(){
+  const bust='?v='+Date.now();
   if('caches' in window){
     caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).then(()=>{
       if('serviceWorker' in navigator){
-        navigator.serviceWorker.getRegistrations().then(regs=>Promise.all(regs.map(r=>r.unregister()))).then(()=>location.reload());
-      }else{location.reload();}
+        navigator.serviceWorker.getRegistrations().then(regs=>Promise.all(regs.map(r=>r.unregister()))).then(()=>{
+          location.href=location.pathname+bust; // キャッシュバスティングURLで再読み込み
+        });
+      }else{location.href=location.pathname+bust;}
     });
-  }else{location.reload();}
+  }else{location.href=location.pathname+bust;}
 }
 (function(){
   const stored=localStorage.getItem('ef_app_ver');
   if(stored!==APP_VERSION){
     localStorage.setItem('ef_app_ver',APP_VERSION);
-    if(stored){forceAppUpdate();} // 旧バージョンから更新 → 強制リロード
+    if(stored){
+      // ループ防止: sessionStorageで試行回数を管理
+      const attempts=parseInt(sessionStorage.getItem('ef_update_attempts')||'0');
+      if(attempts<3){
+        sessionStorage.setItem('ef_update_attempts',String(attempts+1));
+        forceAppUpdate();
+      }else{
+        // 3回試みても解決しない場合はループを止める
+        sessionStorage.removeItem('ef_update_attempts');
+        console.warn('Update loop detected, skipping forceAppUpdate');
+      }
+    }
+  }else{
+    sessionStorage.removeItem('ef_update_attempts');
   }
 })();
 
