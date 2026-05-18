@@ -666,6 +666,7 @@ const BUILTIN_VIEWS=[
   {id:'revenue',label:'目標達成確認',icon:'💰'},
   {id:'memo',label:'ブレインダンプ',icon:'🧠'},
   {id:'aichat',label:'AIアシスタント',icon:'🤖'},
+  {id:'fitness',label:'フィットネス',icon:'💪'},
 ];
 const DB_OLD='ef_v4';
 const PPM=1.5, SS=7*60, SE=24*60;
@@ -717,7 +718,7 @@ async function fbLoad(){
       S=Object.assign(defState(),cloud);
       // nullになった配列フィールドを保護
       const def=defState();
-      ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+      ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
       localStorage.setItem(DB,JSON.stringify(S));
       render();
       toast('☁️ クラウドから同期しました');
@@ -844,6 +845,23 @@ async function gcalSync(){
   toast(`📅 ${count}件をGoogleカレンダーに同期しました`);
 }
 
+async function gcalAddRecurringInvoice(j){
+  if(!_gcalToken||!j.invoiceDate)return;
+  const event={
+    summary:`🧾 請求書提出: ${j.title}`,
+    description:`案件: ${j.title}\n毎月繰り返し`,
+    start:{date:j.invoiceDate},
+    end:{date:j.invoiceDate},
+    recurrence:['RRULE:FREQ=MONTHLY']
+  };
+  try{
+    await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+      method:'POST',headers:{'Authorization':'Bearer '+_gcalToken,'Content-Type':'application/json'},
+      body:JSON.stringify(event)
+    });
+    toast('📅 請求書提出日を毎月のGoogleカレンダーに登録しました');
+  }catch(e){console.error('gcal invoice error',e);}
+}
 async function gcalImportEvents(){
   if(!_gcalToken){toast('先にGoogleカレンダーと連携してください','warn');return;}
   const td=today();
@@ -896,9 +914,9 @@ let JOB_SORT='default'; // job sort order
 
 function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[],
-  checkIns:[], workouts:[], workers:[], memos:[],
+  checkIns:[], workouts:[], workers:[], memos:[], meals:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
-  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false},
+  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3},
   frogId:null,
   customEx:[],
   navConfig:null,
@@ -1138,7 +1156,13 @@ function checkDailyLock(){
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
-  return !hasMorning||!hasEvening||!habitDone;
+  const gymOk=!S.settings?.gymCommit||gymDoneToday();
+  return !hasMorning||!hasEvening||!habitDone||!gymOk;
+}
+function gymDoneToday(){
+  const td=today();
+  const w=S.workouts.find(w=>w.date===td);
+  return w&&((w.entries||[]).length>0||w.exercises?.length>0);
 }
 function rLockScreen(){
   const td=today();
@@ -1150,6 +1174,8 @@ function rLockScreen(){
   if(!hasMorning)missing.push('🌅 朝のジャーナル');
   if(!hasEvening)missing.push('🌙 夜のジャーナル');
   if(!habitDone)missing.push('✅ 習慣トラッカー');
+  const gymRequired=S.settings?.gymCommit&&!gymDoneToday();
+  if(gymRequired)missing.push('💪 筋トレ記録');
   return`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:40px 20px">
   <div style="font-size:64px;margin-bottom:20px">🔒</div>
   <div style="font-size:22px;font-weight:700;margin-bottom:12px">本日の記録が未完了です</div>
@@ -1161,6 +1187,7 @@ function rLockScreen(){
     ${!hasMorning?`<button class="btn btn-p" onclick="V='journal';JT='morning';render()">🌅 朝のジャーナルを記入する</button>`:''}
     ${!hasEvening?`<button class="btn btn-p" onclick="V='journal';JT='evening';render()">🌙 夜のジャーナルを記入する</button>`:''}
     ${!habitDone?`<button class="btn btn-p" onclick="V='habits';render()">✅ 習慣トラッカーを記入する</button>`:''}
+    ${gymRequired?`<button class="btn btn-p" onclick="V='fitness';render()">💪 筋トレを記録する</button>`:''}
   </div>
   <div style="font-size:12px;color:var(--t3);margin-top:24px">記録完了後、自動的にアプリが開きます</div>
 </div>`;
@@ -1170,7 +1197,7 @@ function render(){
     // 19時以降ロックチェック（ジャーナル・習慣ページのみ通過許可）
     if(checkDailyLock()){
       // ロック中はジャーナルと習慣トラッカーのみアクセス可
-      if(V!=='journal'&&V!=='habits'){
+      if(V!=='journal'&&V!=='habits'&&V!=='fitness'){
         V='dashboard'; // 不正なビューをリセット
         sessionStorage.setItem('ef_view','dashboard');
         document.getElementById('view').innerHTML=rLockScreen();
@@ -1179,7 +1206,7 @@ function render(){
       }
     }
     sessionStorage.setItem('ef_view',V);
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -2429,7 +2456,7 @@ function rGoalCard(g){
   const salesCount=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.date?.startsWith(thisM)).length;
   const salesWon=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.date?.startsWith(thisM)&&l.result==='成約').length;
   const hireCount=S.logs.filter(l=>!l.deleted&&l.type==='hire'&&l.date?.startsWith(thisM)&&l.result==='内定').length;
-  const salesPct=isSales?Math.min(100,Math.round(salesCount/g.targetSalesCount*100)):0;
+  const salesPct=isSales?Math.min(100,Math.round(salesWon/g.targetSalesCount*100)):0;
   const hirePct=isHire?Math.min(100,Math.round(hireCount/g.targetHireCount*100)):0;
   return`<div class="goal-item">
   <div class="goal-hdr">
@@ -2447,9 +2474,9 @@ function rGoalCard(g){
     </div>
   </div>
   ${isSales?`
-  <div style="font-size:12px;color:var(--t2);margin-top:8px">今月の営業 <strong style="color:var(--blue)">${salesCount}件</strong>（成約 <strong style="color:var(--green)">${salesWon}件</strong>） / 目標 ${g.targetSalesCount}件</div>
+  <div style="font-size:12px;color:var(--t2);margin-top:8px">今月の成約 <strong style="color:var(--green)">${salesWon}件</strong>（全営業 ${salesCount}件） / 目標 ${g.targetSalesCount}件</div>
   <div class="prog-wrap"><div class="prog-bar ${salesPct>=100?'done':''}" style="width:${salesPct}%;background:var(--blue)"></div></div>
-  <div style="font-size:12px;color:var(--t2)">${salesPct}% 達成 ${salesCount<g.targetSalesCount?`(残り${g.targetSalesCount-salesCount}件)`:''}</div>`
+  <div style="font-size:12px;color:var(--t2)">${salesPct}% 達成 ${salesWon<g.targetSalesCount?`(残り${g.targetSalesCount-salesWon}件)`:''}</div>`
   :isHire?`
   <div style="font-size:12px;color:var(--t2);margin-top:8px">今月の採用 内定 <strong style="color:var(--purple)">${hireCount}人</strong> / 目標 ${g.targetHireCount}人</div>
   <div class="prog-wrap"><div class="prog-bar ${hirePct>=100?'done':''}" style="width:${hirePct}%;background:var(--purple)"></div></div>
@@ -2622,7 +2649,7 @@ function rRevenue(){
   const salesGoal=S.goals.find(g=>!g.deleted&&g.category==='sales'&&g.targetSalesCount>0);
   const salesCount=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.date?.startsWith(thisM)).length;
   const salesWon=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.date?.startsWith(thisM)&&l.result==='成約').length;
-  const salesPct=salesGoal?Math.min(100,Math.round(salesCount/salesGoal.targetSalesCount*100)):0;
+  const salesPct=salesGoal?Math.min(100,Math.round(salesWon/salesGoal.targetSalesCount*100)):0;
   // Hire goal
   const hireGoal=S.goals.find(g=>!g.deleted&&g.category==='hire'&&g.targetHireCount>0);
   const hireWon=S.logs.filter(l=>!l.deleted&&l.type==='hire'&&l.date?.startsWith(thisM)&&l.result==='内定').length;
@@ -2764,6 +2791,223 @@ function memoToTask(id){
   toast('タスクモーダルにコピーしました');
 }
 // ===SETTINGS===
+// ===FITNESS===
+let FTV='overview'; // fitness tab view
+function rFitness(){
+  const td=today();
+  const tabs=[['overview','📊 概要'],['training','🏋️ 筋トレ'],['meal','🥗 食事'],['goals','🎯 目標']];
+  return`<div class="ph">
+  <div class="ph-title">💪 フィットネス</div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap">
+    ${tabs.map(([k,l])=>`<button class="btn btn-g btn-sm ${FTV===k?'btn-p':''}" onclick="FTV='${k}';render()">${l}</button>`).join('')}
+  </div>
+</div>
+${{overview:rFitnessOverview,training:rFitnessTraining,meal:rFitnessMeal,goals:rFitnessGoals}[FTV]?.()??rFitnessOverview()}`;
+}
+
+function rFitnessOverview(){
+  const td=today();
+  const now=new Date();
+  const weekStart=new Date(now);
+  weekStart.setDate(now.getDate()-now.getDay()+1);
+  const weekDays=Array.from({length:7},(_,i)=>{const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;});
+  const workout=getWorkout(td);
+  const todayDone=(workout.entries||[]).length>0||(workout.exercises||[]).length>0;
+  const weekWorkouts=weekDays.filter(d=>{const w=S.workouts.find(w=>w.date===d);return w&&((w.entries||[]).length>0||(w.exercises||[]).length>0);}).length;
+  const target=S.settings.weeklyWorkoutTarget||3;
+  const todayMeals=S.meals.filter(m=>!m.deleted&&m.date===td);
+  const todayCal=todayMeals.reduce((s,m)=>s+(m.calories||0),0);
+  const calTarget=S.settings.dailyCalorieTarget||0;
+  const gymCommit=S.settings.gymCommit;
+  // 週間カレンダー
+  const weekBar=weekDays.map(d=>{
+    const dLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{weekday:'short'});
+    const w=S.workouts.find(w=>w.date===d);
+    const done=w&&((w.entries||[]).length>0||(w.exercises||[]).length>0);
+    const isToday=d===td;
+    return`<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+      <div style="font-size:10px;color:${isToday?'var(--purple)':'var(--t3)'};">${dLabel}</div>
+      <div style="width:28px;height:28px;border-radius:50%;border:2px solid ${done?'var(--purple)':isToday?'var(--purple)':'var(--border)'};background:${done?'var(--purple)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer" onclick="FTV='training';render()">
+        ${done?'✓':isToday?'💪':''}
+      </div>
+    </div>`;
+  }).join('');
+  return`${gymCommit&&!todayDone?`<div style="background:#ef444420;border:1px solid var(--red);border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+  <span style="font-size:28px">💪</span>
+  <div style="flex:1">
+    <div style="font-weight:700;color:var(--red)">今日はまだ筋トレをしていません！</div>
+    <div style="font-size:12px;color:var(--t2)">19時以降はアプリがロックされます</div>
+  </div>
+  <button class="btn btn-p btn-sm" onclick="FTV='training';render()">記録する →</button>
+</div>`:''}
+<div class="card" style="margin-bottom:14px">
+  <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px">今週の筋トレ</div>
+  <div style="display:flex;gap:4px;margin-bottom:10px">${weekBar}</div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap">
+    <div><div style="font-size:11px;color:var(--t2)">今週の実施</div><div style="font-size:20px;font-weight:700;color:var(--purple)">${weekWorkouts}/${target}回</div></div>
+    <div style="flex:1"><div class="prog-wrap" style="margin-top:10px"><div class="prog-bar ${weekWorkouts>=target?'done':''}" style="width:${Math.min(100,Math.round(weekWorkouts/target*100))}%;background:var(--purple)"></div></div><div style="font-size:11px;color:var(--t2);margin-top:3px">${Math.min(100,Math.round(weekWorkouts/target*100))}%${weekWorkouts>=target?' 🎉 達成！':` (残り${target-weekWorkouts}回)`}</div></div>
+  </div>
+</div>
+<div class="card" style="margin-bottom:14px">
+  <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:8px">今日の食事 ${todayMeals.length}食</div>
+  ${calTarget?`<div style="display:flex;gap:12px;margin-bottom:8px"><div><div style="font-size:11px;color:var(--t2)">摂取カロリー</div><div style="font-size:18px;font-weight:700;color:var(--blue)">${todayCal}kcal</div></div><div><div style="font-size:11px;color:var(--t2)">目標</div><div style="font-size:18px;font-weight:700">${calTarget}kcal</div></div></div>`:''}
+  ${todayMeals.length?`<div style="display:flex;flex-direction:column;gap:4px">${todayMeals.map(m=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="background:var(--pdim);color:var(--purple);padding:1px 7px;border-radius:10px;font-size:10px;white-space:nowrap">${esc(m.type)}</span><span style="flex:1">${esc(m.name)}</span>${m.calories?`<span style="color:var(--blue);font-size:11px">${m.calories}kcal</span>`:''}</div>`).join('')}</div>`:`<div style="color:var(--t3);font-size:12px;text-align:center;padding:8px 0">今日の食事はまだ記録されていません</div>`}
+  <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="FTV='meal';render()">🥗 食事を記録する</button>
+</div>`;
+}
+
+function rFitnessTraining(){
+  const td=today();
+  const workout=getWorkout(td);
+  const todayDone=(workout.entries||[]).length>0||(workout.exercises||[]).length>0;
+  // 過去7日間の記録
+  const pastDays=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-i);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;});
+  const pastHtml=pastDays.slice(1).map(d=>{
+    const w=S.workouts.find(w=>w.date===d);
+    if(!w||(!(w.entries||[]).length&&!(w.exercises||[]).length))return'';
+    const dLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
+    return`<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px">${dLabel}</div>
+      ${(w.entries||[]).map(e=>`<div style="font-size:11px;color:var(--t2);padding:2px 0">${esc(e.name)}${e.sets?` ${e.sets}セット`:''}${e.reps?` ${e.reps}回`:''}${e.weight?` ${e.weight}kg`:''}</div>`).join('')}
+      ${(w.exercises||[]).map(ex=>`<div style="font-size:11px;color:var(--t2);padding:2px 0">✓ ${esc(ex)}</div>`).join('')}
+    </div>`;}).join('');
+  return`${secTitle('💪 今日の筋トレ記録 '+(todayDone?'<span class="badge bg">✓ 完了</span>':'<span class="badge br">未記録</span>'))}
+<div class="card" style="margin-bottom:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;color:var(--t2)">種目を追加して記録しましょう</div>
+    <button class="btn btn-p btn-sm" onclick="openWorkoutEntryModal()">＋ 種目追加</button>
+  </div>
+  ${(workout.entries||[]).length?`<div style="display:flex;flex-direction:column;gap:1px">${(workout.entries||[]).map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+    <span style="flex:1;font-weight:500;font-size:13px">${esc(e.name)}</span>
+    ${e.sets?`<span class="badge bk">${e.sets}セット</span>`:''}
+    ${e.reps?`<span class="badge bb">${e.reps}</span>`:''}
+    ${e.weight?`<span class="badge ba">${e.weight}kg</span>`:''}
+    ${e.note?`<span style="font-size:11px;color:var(--t2)">${esc(e.note)}</span>`:''}
+    <button class="tact" onclick="openWorkoutEntryModal('${e.id}')">✏️</button>
+    <button class="tact del" onclick="delWorkoutEntry('${e.id}')">🗑</button>
+  </div>`).join('')}</div><div style="font-size:12px;color:var(--green);font-weight:600;margin-top:8px">合計 ${(workout.entries||[]).length}種目</div>`
+  :`<div style="color:var(--t3);font-size:12px;text-align:center;padding:12px 0">まだ記録がありません</div>`}
+</div>
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:12px;color:var(--t2);margin-bottom:8px">クイック選択（タップでトグル）</div>
+  <div style="display:flex;flex-wrap:wrap;gap:7px">
+    ${allEx().map(ex=>{const done=(workout.exercises||[]).includes(ex);return`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:${done?'var(--purple)':'var(--card2)'};color:${done?'#fff':'var(--t2)'};border:1px solid ${done?'var(--purple)':'var(--border)'}" onclick="toggleExercise('${esc(ex)}')">${done?'✓ ':''}${esc(ex)}</div>`;}).join('')}
+  </div>
+  ${(workout.exercises||[]).length?`<div style="margin-top:10px;font-size:12px;color:var(--green);font-weight:600">✅ ${workout.exercises.join(' · ')}</div>`:''}
+</div>
+${pastHtml?`${secTitle('📅 過去の記録')}<div>${pastHtml}</div>`:''}`;
+}
+
+function rFitnessMeal(){
+  const td=today();
+  const todayMeals=(S.meals||[]).filter(m=>!m.deleted&&m.date===td).sort((a,b)=>{const order=['朝食','昼食','夕食','間食'];return order.indexOf(a.type)-order.indexOf(b.type);});
+  const calTarget=S.settings.dailyCalorieTarget||0;
+  const todayCal=todayMeals.reduce((s,m)=>s+(m.calories||0),0);
+  return`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+  <div style="font-size:13px;font-weight:700">今日の食事記録</div>
+  <button class="btn btn-p btn-sm" onclick="openMealModal()">＋ 食事を追加</button>
+</div>
+${calTarget?`<div class="card" style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+  <div><div style="font-size:11px;color:var(--t2)">摂取カロリー</div><div style="font-size:20px;font-weight:700;color:${todayCal>calTarget?'var(--red)':'var(--blue)'}">${todayCal}kcal</div></div>
+  <div><div style="font-size:11px;color:var(--t2)">目標</div><div style="font-size:20px;font-weight:700">${calTarget}kcal</div></div>
+  <div style="flex:1;min-width:100px"><div class="prog-wrap"><div class="prog-bar" style="width:${Math.min(100,Math.round(todayCal/calTarget*100))}%;background:${todayCal>calTarget?'var(--red)':'var(--blue)'}"></div></div></div>
+</div>`:''}
+${['朝食','昼食','夕食','間食'].map(type=>{
+  const meals=todayMeals.filter(m=>m.type===type);
+  const typeEmoji={'朝食':'🌅','昼食':'☀️','夕食':'🌙','間食':'🍎'}[type]||'🍽️';
+  return`<div style="margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:13px;font-weight:700">${typeEmoji} ${type}</div>
+      <button class="btn btn-g btn-xs" onclick="openMealModal('${type}')">＋</button>
+    </div>
+    ${meals.length?`<div style="display:flex;flex-direction:column;gap:4px">${meals.map(m=>`<div class="card card-sm" style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">${esc(m.name)}</div>${m.notes?`<div style="font-size:11px;color:var(--t2)">${esc(m.notes)}</div>`:''}</div>
+      ${m.calories?`<span style="font-size:12px;color:var(--blue);font-weight:700">${m.calories}kcal</span>`:''}
+      ${m.protein?`<span class="badge bb">${m.protein}gP</span>`:''}
+      ${m.carbs?`<span class="badge ba">${m.carbs}gC</span>`:''}
+      ${m.fat?`<span class="badge bk">${m.fat}gF</span>`:''}
+      <button class="tact del" onclick="delMeal('${m.id}')">🗑</button>
+    </div>`).join('')}</div>`:`<div style="font-size:12px;color:var(--t3);padding:6px 0">未記録</div>`}
+  </div>`;}).join('')}`;
+}
+
+function rFitnessGoals(){
+  const weekTarget=S.settings.weeklyWorkoutTarget||3;
+  const calTarget=S.settings.dailyCalorieTarget||0;
+  const gymCommit=S.settings.gymCommit||false;
+  // 今月の筋トレ実績
+  const thisM=today().slice(0,7);
+  const monthWorkouts=S.workouts.filter(w=>w.date?.startsWith(thisM)&&((w.entries||[]).length>0||(w.exercises||[]).length>0)).length;
+  return`${secTitle('🎯 フィットネス目標設定')}
+<div class="card" style="margin-bottom:14px">
+  <div class="frow">
+    <div class="fg">
+      <div class="fl">週あたり筋トレ目標（回）</div>
+      <input type="number" id="fit-weekly" value="${weekTarget}" min="1" max="7">
+    </div>
+    <div class="fg">
+      <div class="fl">1日の目標カロリー（kcal）</div>
+      <input type="number" id="fit-cal" value="${calTarget||''}" placeholder="例: 2000">
+    </div>
+  </div>
+  <div class="fg" style="margin-top:8px">
+    <div class="fl">💪 筋トレコミットメント（未完了で19時ロック）</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+      <div class="toggle ${gymCommit?'on':''}" onclick="S.settings.gymCommit=!S.settings.gymCommit;save();render()" style="cursor:pointer;width:40px;height:22px;border-radius:11px;background:${gymCommit?'var(--purple)':'var(--border)'};position:relative;transition:background .2s">
+        <div style="position:absolute;top:3px;left:${gymCommit?'21':'3'}px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s"></div>
+      </div>
+      <span style="font-size:12px;color:var(--t2)">${gymCommit?'ON — 今日筋トレしないとアプリがロックされます':'OFF — ロックなし'}</span>
+    </div>
+  </div>
+  <button class="btn btn-p btn-sm" style="margin-top:12px" onclick="saveFitnessGoals()">保存</button>
+</div>
+${secTitle('📊 今月の実績')}
+<div class="card">
+  <div style="display:flex;gap:20px;flex-wrap:wrap">
+    <div><div style="font-size:11px;color:var(--t2)">今月の筋トレ</div><div style="font-size:24px;font-weight:700;color:var(--purple)">${monthWorkouts}回</div></div>
+    <div><div style="font-size:11px;color:var(--t2)">食事記録（今日）</div><div style="font-size:24px;font-weight:700;color:var(--green)">${(S.meals||[]).filter(m=>!m.deleted&&m.date===today()).length}食</div></div>
+  </div>
+</div>`;
+}
+
+function openMealModal(preType){
+  openModal(`<div class="mhdr"><div class="mtitle">食事を記録</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div class="fg"><div class="fl">食事タイプ</div>
+  <select id="meal-type">
+    ${['朝食','昼食','夕食','間食'].map(t=>`<option${t===(preType||'朝食')?' selected':''}>${t}</option>`).join('')}
+  </select>
+</div>
+<div class="fg"><div class="fl">食事内容 *</div><input id="meal-name" placeholder="例: ご飯、鶏むね肉、サラダ"></div>
+<div class="frow">
+  <div class="fg"><div class="fl">カロリー（kcal）</div><input type="number" id="meal-cal" placeholder="例: 500"></div>
+  <div class="fg"><div class="fl">タンパク質（g）</div><input type="number" id="meal-prot" placeholder="例: 30"></div>
+</div>
+<div class="frow">
+  <div class="fg"><div class="fl">炭水化物（g）</div><input type="number" id="meal-carb" placeholder="例: 60"></div>
+  <div class="fg"><div class="fl">脂質（g）</div><input type="number" id="meal-fat" placeholder="例: 10"></div>
+</div>
+<div class="fg"><div class="fl">メモ</div><input id="meal-notes" placeholder="例: 自炊、外食など"></div>
+<div class="mfooter">
+  <button class="btn btn-g" onclick="closeModal()">キャンセル</button>
+  <button class="btn btn-p" onclick="saveMeal()">保存</button>
+</div>`);
+  document.getElementById('meal-name')?.focus();
+}
+function saveMeal(){
+  const name=document.getElementById('meal-name')?.value.trim();
+  if(!name){toast('食事内容を入力してください','err');return;}
+  if(!S.meals)S.meals=[];
+  S.meals.push({id:uid(),date:today(),type:document.getElementById('meal-type').value,name,calories:parseInt(document.getElementById('meal-cal')?.value)||0,protein:parseInt(document.getElementById('meal-prot')?.value)||0,carbs:parseInt(document.getElementById('meal-carb')?.value)||0,fat:parseInt(document.getElementById('meal-fat')?.value)||0,notes:document.getElementById('meal-notes')?.value.trim()||'',createdAt:new Date().toISOString()});
+  save();closeModal();render();toast('食事を記録しました');
+}
+function delMeal(id){
+  const m=S.meals?.find(m=>m.id===id);if(m)m.deleted=true;save();render();
+}
+function saveFitnessGoals(){
+  S.settings.weeklyWorkoutTarget=parseInt(document.getElementById('fit-weekly')?.value)||3;
+  S.settings.dailyCalorieTarget=parseInt(document.getElementById('fit-cal')?.value)||0;
+  save();render();toast('フィットネス目標を保存しました');
+}
 function rSettings(){
   return`<div class="ph"><div class="ph-title">設定</div></div>
 
@@ -2799,6 +3043,20 @@ ${secTitle('🧠 アイデンティティ')}
   </div>
   <div class="fhint">ダッシュボードに表示され、行動のブレを防ぎます</div>
   <button class="btn btn-p btn-sm" onclick="saveIdentity()">保存</button>
+</div>
+
+${secTitle('💪 筋トレコミットメント')}
+<div class="card" style="margin-bottom:16px">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:13px;font-weight:600">筋トレロック</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:2px">ONにすると、当日の筋トレ記録がないと19時以降アプリがロックされます</div>
+    </div>
+    <div onclick="S.settings.gymCommit=!S.settings.gymCommit;save();render()" style="cursor:pointer;width:44px;height:24px;border-radius:12px;background:${S.settings.gymCommit?'var(--purple)':'var(--border)'};position:relative;transition:background .2s;flex-shrink:0">
+      <div style="position:absolute;top:3px;left:${S.settings.gymCommit?'23':'3'}px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
+    </div>
+  </div>
+  <button class="btn btn-p btn-sm" style="margin-top:10px" onclick="V='fitness';render()">💪 フィットネスページへ</button>
 </div>
 
 ${secTitle('📅 固定タイムスケジュール')}
@@ -2986,26 +3244,22 @@ function saveWorkerModal(id){
   const minFee=parseInt(document.getElementById('wm-minfee')?.value)||0;
   const workConditions=document.getElementById('wm-workcond')?.value.trim();
   const employStatus=document.getElementById('wm-status')?.value||'trial';
+  if(!S.logs)S.logs=[];
   if(id){
     const w=S.workers.find(w=>w.id===id);
     const prevStatus=w?.employStatus||'trial';
     if(w)Object.assign(w,{name,skills,contact,affiliation,minFee,workConditions,employStatus});
-    // トライアル→本採用に変わった瞬間に採用自動記帳
+    // トライアル→本採用に変わった瞬間に採用自動記帳（result:'内定' で目標達成確認にカウント）
     if(prevStatus!=='hired'&&employStatus==='hired'){
-      if(!S.logs)S.logs=[];
-      S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'hired',note:'本採用に変更時に自動記帳',createdAt:new Date().toISOString()});
+      S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'内定',note:'本採用に変更時に自動記帳',createdAt:new Date().toISOString()});
       toast(`👤 ${name} の本採用を目標達成確認に記帳しました`);
     }
-  }
-  else{
+  }else{
     if(!S.workers)S.workers=[];
     S.workers.push({id:uid(),name,skills,contact,affiliation,minFee,workConditions,employStatus,createdAt:new Date().toISOString()});
-    // 最初から本採用で追加された場合も記帳
-    if(employStatus==='hired'){
-      if(!S.logs)S.logs=[];
-      S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'hired',note:'本採用で追加時に自動記帳',createdAt:new Date().toISOString()});
-      toast(`👤 ${name} の本採用を目標達成確認に記帳しました`);
-    }
+    // 新規追加は常に採用目標記録へ（result:'内定' でカウント）
+    S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'内定',note:`ワーカー追加時に自動記帳（${employStatus==='hired'?'本採用':'トライアル'}）`,createdAt:new Date().toISOString()});
+    toast(`👤 ${name} を採用目標記録に記帳しました`);
   }
   save();closeModal();render();toast('ワーカー情報を保存しました');
 }
@@ -3530,6 +3784,9 @@ function saveJob(){
   }
   else S.jobs.unshift({id:uid(),...data,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('案件を保存しました');
+  // 請求書提出日が設定されていればGoogleカレンダーに毎月繰り返しで追加
+  const savedJob=S.jobs.find(j=>j.invoiceDate===data.invoiceDate&&j.title===data.title);
+  if(data.invoiceDate&&_gcalToken&&savedJob){gcalAddRecurringInvoice(savedJob);}
 }
 
 function openHabitModal(id){
@@ -4740,7 +4997,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260518-11';
+const APP_VERSION='20260518-12';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
