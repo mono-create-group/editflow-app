@@ -1442,9 +1442,9 @@ function getGoalActions(){
   });
   // Sales goals
   goals.filter(g=>g.category==='sales'&&g.targetSalesCount>0).forEach(g=>{
-    const cnt=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.date?.startsWith(thisM)).length;
+    const cnt=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.date?.startsWith(thisM)&&l.result==='成約').length;
     const rem=g.targetSalesCount-cnt;
-    if(rem>0) actions.push({icon:'📞',label:'営業目標',text:`今月あと ${rem}件 の営業が必要（目標 ${g.targetSalesCount}件 / 達成 ${cnt}件）`,urgency:cnt/g.targetSalesCount<0.5?'high':'mid',action:"V='revenue';render()"});
+    if(rem>0) actions.push({icon:'📞',label:'営業目標',text:`今月あと ${rem}件 の成約が必要（目標 ${g.targetSalesCount}件 / 成約 ${cnt}件）`,urgency:cnt/g.targetSalesCount<0.5?'high':'mid',action:"V='revenue';render()"});
     else actions.push({icon:'🎉',label:'営業目標',text:`今月の営業目標を達成済み！`,urgency:'done',action:"V='revenue';render()"});
   });
   // Hire goals
@@ -3086,7 +3086,7 @@ ${RV==='sales'?`<div class="rev-card" style="margin-bottom:16px">
   </div>
   ${salesGoal?`
   <div class="prog-wrap"><div class="prog-bar ${salesPct>=100?'done':''}" style="width:${salesPct}%;background:var(--blue)"></div></div>
-  <div style="font-size:12px;color:var(--t2)">${salesPct}% 達成${salesCount<salesGoal.targetSalesCount?` (残り${salesGoal.targetSalesCount-salesCount}件)`:' 🎉'}</div>`
+  <div style="font-size:12px;color:var(--t2)">${salesPct}% 達成${salesWon<salesGoal.targetSalesCount?` (残り${salesGoal.targetSalesCount-salesWon}件)`:' 🎉'}</div>`
   :`<button class="btn btn-g btn-sm" style="margin-top:8px" onclick="V='goals';render()">営業目標を設定する →</button>`}
 </div>`:''}
 
@@ -5424,7 +5424,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-2';
+const APP_VERSION='20260519-3';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
