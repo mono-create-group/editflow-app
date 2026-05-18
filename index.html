@@ -621,8 +621,8 @@ a{color:inherit;text-decoration:none}
 .battle-log p.info{color:var(--amber)}
 .gacha-result{background:linear-gradient(135deg,#0d0d20,#1a0a30);border:1px solid var(--purple);border-radius:16px;padding:20px;text-align:center;position:relative;overflow:hidden}
 .gacha-result::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(124,58,237,.3),transparent 70%);pointer-events:none}
-.story-box{background:rgba(0,0,10,.85);border:2px solid #3344aa;border-radius:10px;padding:16px 20px;position:relative;color:#e8e8f0;line-height:1.8;font-size:14px}
-.story-box .speaker{font-size:11px;color:#88aaff;font-weight:700;letter-spacing:1px;margin-bottom:6px;text-transform:uppercase}
+.story-box{background:rgba(0,0,8,.92);border:2px solid #f59e0b;border-radius:8px;padding:14px 16px;color:#f0f0f0;font-size:13px;line-height:1.8;min-height:72px;position:relative;}
+.story-box .speaker{color:#ffd700;font-weight:700;font-size:13px;margin-bottom:6px;text-shadow:0 0 8px #ffd70080;}
 .story-cursor{display:inline-block;animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 .coin-toast{position:fixed;top:80px;right:20px;background:linear-gradient(135deg,#92400e,#f59e0b);color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:700;z-index:9999;transform:translateY(-20px);opacity:0;transition:all .4s;pointer-events:none}
@@ -632,12 +632,12 @@ a{color:inherit;text-decoration:none}
 .rpg-tab:last-child{border-right:none}
 .rpg-tab.active{background:var(--pdim);color:var(--pl)}
 .rpg-tab:hover:not(.active){color:var(--text);background:var(--card2)}
-.story-bg-sky{background:linear-gradient(180deg,#1a2a5c 0%,#2a4a8c 40%,#4a7a9c 70%,#8aaa6c 100%)}
-.story-bg-dungeon{background:linear-gradient(180deg,#0a0a0a 0%,#1a0a1a 40%,#2a1a0a 100%)}
-.story-bg-castle{background:linear-gradient(180deg,#1a1030 0%,#2a2040 40%,#3a2a50 100%)}
-.story-bg-village{background:linear-gradient(180deg,#1a3020 0%,#2a5030 40%,#4a8040 70%,#6aaa50 100%)}
-.story-bg-final{background:linear-gradient(180deg,#200010 0%,#400020 40%,#600030 70%,#800040 100%)}
-.story-scene-art{border-radius:var(--r);margin-bottom:12px;padding:30px 20px;display:flex;align-items:center;justify-content:center;min-height:120px;position:relative;overflow:hidden}
+.story-bg-village{background:linear-gradient(180deg,#1a3a1a,#0a2010,#1a1a0a)!important;}
+.story-bg-dungeon{background:linear-gradient(180deg,#1a0a1a,#0a0a1a,#100010)!important;}
+.story-bg-castle{background:linear-gradient(180deg,#1a1a3a,#0a0a2a,#101030)!important;}
+.story-bg-sky{background:linear-gradient(180deg,#0a1a3a,#102040,#0a2030)!important;}
+.story-bg-final{background:linear-gradient(180deg,#3a0a0a,#1a0000,#2a0a1a)!important;}
+.story-scene-art{background:linear-gradient(180deg,#1a1a2e,#0a0a1a);border-radius:12px;padding:20px 16px 12px;margin-bottom:12px;min-height:140px;display:flex;align-items:flex-end;justify-content:center;position:relative;overflow:hidden;}
 .star-burst{position:absolute;width:4px;height:4px;background:gold;border-radius:50%;animation:starburst .6s ease-out forwards}
 @keyframes starburst{0%{transform:translate(-50%,-50%) scale(0);opacity:1}100%{transform:translate(var(--tx),var(--ty)) scale(1);opacity:0}}
 .equip-slot{background:var(--card2);border:1px dashed var(--border);border-radius:var(--rs);padding:10px;text-align:center;min-height:60px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--t3);cursor:pointer;transition:all .2s}
@@ -1156,143 +1156,273 @@ const ENEMIES=[
   {id:'daruga',name:'ダルーガ（後回し魔王）',hp:500,maxHp:500,atk:45,def:30,spd:12,xp:500,coins:500,skills:['絶望の一撃','怠惰オーラ','時間停止','魂を砕く後悔'],drops:['crystal_crown','crystal_blade','EditFlowの冠']},
 ];
 const STORY_SCENES=[
-  // Chapter 1: 目覚め
-  {id:'s1',chapter:1,chapterTitle:'第一章：EditFlowクリスタルの輝き',bg:'village',
+  // ═══ 第一章：選ばれし者 ═══
+  {id:'s1',chapter:1,chapterTitle:'第一章：選ばれし者',bg:'village',
    npc:'老賢者ホウワン',npcChar:'sage',
    dialogue:[
-     {speaker:'老賢者ホウワン',text:'……目が覚めたか。若者よ、お前はEditFlowクリスタルに選ばれた勇者だ。'},
-     {speaker:'勇者カリン',text:'え？私が……？でも昨日まで、ただの動画クリエイターで……'},
-     {speaker:'老賢者ホウワン',text:'フフフ……この世界では、現実の世界での行動が力に変わる。タスクを完了するたびに、お前は強くなる。'},
-     {speaker:'勇者カリン',text:'（つまり、仕事をサボると弱くなるってこと……？）ゴクリ。'},
+     {speaker:'老賢者ホウワン',text:'……目が覚めたか。怪我はないか？'},
+     {speaker:'勇者カリン',text:'ここ……は？私、なんで……昨日まで普通に仕事して、ベッドで寝たはずなのに。'},
+     {speaker:'老賢者ホウワン',text:'この世界へ来るのは、夢を通じてのみ。お前が選ばれたからだ、カリンよ。'},
+     {speaker:'勇者カリン',text:'選ばれた？　私が？　なんで私なんですか。締め切りばかり追いかけてる、どこにでもいる動画クリエイターで——'},
+     {speaker:'老賢者ホウワン',text:'（静かに笑う）それだよ。毎日前を向き、諦めずに走り続けている者だけが、EditFlowクリスタルに呼ばれる。'},
+     {speaker:'勇者カリン',text:'……EditFlowクリスタル？'},
+     {speaker:'老賢者ホウワン',text:'現実の世界での行動が、この世界で力になる。タスクをこなすたびに、お前は強くなる。しかし……本当の理由は、まだ教えられない。'},
+     {speaker:'勇者カリン',text:'（え、それめちゃくちゃ気になるんですけど）……わかりました。まず何をすれば？'},
    ],reward:{type:'coins',amount:50}},
-  {id:'s2',chapter:1,chapterTitle:'第一章：EditFlowクリスタルの輝き',bg:'village',
+
+  {id:'s2',chapter:1,chapterTitle:'第一章：選ばれし者',bg:'village',
    npc:'ミラベル',npcChar:'mage',
    dialogue:[
-     {speaker:'ミラベル',text:'あ！ようやく来た！あなたが勇者ね？私はミラベル。魔法使いよ。一緒に旅しましょ。'},
-     {speaker:'勇者カリン',text:'え、いきなり？'},
-     {speaker:'ミラベル',text:'迷ってる暇はないわ。今日だけで村人3人が後回し魔王ダルーガに魂を奪われたの。'},
-     {speaker:'勇者カリン',text:'……後回し魔王？'},
-     {speaker:'ミラベル',text:'そう。「今じゃなくてもいい」という囁きで人々の意志を奪う、最悪の魔王よ。'},
+     {speaker:'ミラベル',text:'あーっ！やっと来た！待ってたんだから！私ミラベル！魔法使い！よろしく！'},
+     {speaker:'勇者カリン',text:'え……いきなり。あなたは？'},
+     {speaker:'ミラベル',text:'だから言ったじゃん、ミラベルって。IQは高いけど空気を読むのが得意じゃない。あなたが勇者でしょ？　顔に書いてある。'},
+     {speaker:'勇者カリン',text:'（そんなことある？）えっと……一緒に旅するってこと？'},
+     {speaker:'ミラベル',text:'当然！後回し魔王ダルーガが人々の魂を奪ってるの。昨日だけで村人5人がやられた。'},
+     {speaker:'ミラベル',text:'「今日じゃなくてもいい」って囁いて、人の意志を根こそぎ奪う最悪の存在。……ねえ、思い当たる節ない？「後でやろう」って先送りにしたこと。'},
+     {speaker:'勇者カリン',text:'（ドキッ……めちゃくちゃある）……行こう！案内して、ミラベル！'},
+     {speaker:'ミラベル',text:'（ニコッ）よし！その返事、好きよ。友達になれそう！'},
    ],reward:{type:'char',charId:'mage'}},
-  {id:'s3',chapter:1,chapterTitle:'第一章：EditFlowクリスタルの輝き',bg:'dungeon',
+
+  {id:'s3',chapter:1,chapterTitle:'第一章：選ばれし者',bg:'dungeon',
    npc:'スライム',npcChar:'slime',isBattle:true,enemyId:'slime',
    dialogue:[
-     {speaker:'ミラベル',text:'スライムが出たわ！手加減してあげて……ちょっとかわいいから。'},
-     {speaker:'スライム',text:'ぷるぷる……（震えている）'},
-     {speaker:'勇者カリン',text:'え、これ倒していいの？'},
-     {speaker:'ミラベル',text:'倒さないと前に進めないわよ。行って！'},
+     {speaker:'ミラベル',text:'最初の試練よ。……あ、でもかわいい。スライム。ぷるぷるしてる。'},
+     {speaker:'スライム',text:'ぷるぷる……（大きな目でこちらをじっと見ている）'},
+     {speaker:'勇者カリン',text:'これ……倒すの？なんか悪いな……'},
+     {speaker:'ミラベル',text:'大丈夫。倒しても消えるだけで苦しまないから。それより剣の構え、教えてあげようか？'},
+     {speaker:'ミラベル',text:'ダメダメ、腰が引けてる。恐れるな——前に出ろ！'},
+     {speaker:'勇者カリン',text:'……よし。行くよ！！'},
    ],reward:{type:'coins',amount:30}},
-  // Chapter 2: 仲間との絆
-  {id:'s4',chapter:2,chapterTitle:'第二章：集いし仲間たち',bg:'castle',
+
+  {id:'s4',chapter:1,chapterTitle:'第一章：選ばれし者',bg:'village',
+   npc:'老賢者ホウワン',npcChar:'sage',
+   dialogue:[
+     {speaker:'ミラベル',text:'（ホウワン老師に向かって）ねえ、カリンが選ばれた「本当の理由」、私にも教えてくれないの？'},
+     {speaker:'老賢者ホウワン',text:'ミラベルよ。お前は賢い。だから余計なことを考えすぎる。'},
+     {speaker:'ミラベル',text:'それ、答えになってない。'},
+     {speaker:'老賢者ホウワン',text:'……カリン。一つだけ聞こう。お前は、誰かを「守りたい」と思ったことがあるか？'},
+     {speaker:'勇者カリン',text:'え……（考える）はい。昔、大切な人がいて……その人が苦しんでいるのに、何もできなかった。だから私は——'},
+     {speaker:'老賢者ホウワン',text:'（目を細めて）……そうか。それだ。お前が選ばれた理由は、強さではない。その「後悔」だ。'},
+     {speaker:'勇者カリン',text:'後悔が……力になるの？'},
+     {speaker:'老賢者ホウワン',text:'前を向き続ける燃料になる。ただし……旅の途中で、その後悔の「正体」に気づくだろう。その時、お前はどうするかな。（意味深に微笑む）'},
+   ],reward:{type:'coins',amount:80}},
+
+  // ═══ 第二章：仲間という名の奇跡 ═══
+  {id:'s5',chapter:2,chapterTitle:'第二章：仲間という名の奇跡',bg:'castle',
    npc:'ガルドス',npcChar:'warrior',
    dialogue:[
-     {speaker:'ガルドス',text:'ふん。お前たちが勇者パーティか。弱そうだな。'},
-     {speaker:'勇者カリン',text:'いきなり失礼じゃないですか！？'},
-     {speaker:'ガルドス',text:'俺は事実を言っているだけだ。……だが、お前の目には光がある。毎日筋トレしているか？'},
-     {speaker:'勇者カリン',text:'え、筋トレ？RPGで筋トレ？'},
-     {speaker:'ガルドス',text:'心の筋肉も身体の筋肉も同じだ。鍛えれば、強くなる。俺もパーティに加わろう。'},
+     {speaker:'ガルドス',text:'……ふん。弱そうだな、お前たち。'},
+     {speaker:'ミラベル',text:'開口一番それ言う？　失礼な人ねー！'},
+     {speaker:'ガルドス',text:'事実を言って何が悪い。……しかし（カリンを見て）お前の目は違う。迷いがない。'},
+     {speaker:'勇者カリン',text:'（迷いはあるんですが）……あなたは？'},
+     {speaker:'ガルドス',text:'ガルドス。ただの戦士だ。ダルーガに村を焼かれた。家族も友も……「後でやればいい」という囁きに負けて逃げ遅れた。'},
+     {speaker:'勇者カリン',text:'（息をのむ）……それは……'},
+     {speaker:'ガルドス',text:'同情はいらない。俺はただダルーガを叩き潰したい。それだけだ。パーティに加えてくれるか？'},
+     {speaker:'ミラベル',text:'（小声でカリンに）なんか、不器用だけどいい人そう……'},
+     {speaker:'勇者カリン',text:'（うなずいて）……一緒に来て、ガルドス。あなたの力が必要だ。'},
    ],reward:{type:'char',charId:'warrior'}},
-  {id:'s5',chapter:2,chapterTitle:'第二章：集いし仲間たち',bg:'sky',
+
+  {id:'s6',chapter:2,chapterTitle:'第二章：仲間という名の奇跡',bg:'sky',
    npc:'ルシア',npcChar:'healer',
    dialogue:[
-     {speaker:'ルシア',text:'……あなたたち、傷だらけね。回復させてあげる。'},
-     {speaker:'勇者カリン',text:'ありがとう……！助かります。あなたは？'},
-     {speaker:'ルシア',text:'ルシア。僧侶よ。人の痛みが見えるの。あなた……最近、無理してない？'},
-     {speaker:'勇者カリン',text:'（ドキッ）え？'},
-     {speaker:'ルシア',text:'休むことも、戦うことと同じくらい大切なの。完璧を目指しすぎないで。'},
+     {speaker:'ルシア',text:'……少し休んで。みんな、心が悲鳴を上げてる。'},
+     {speaker:'勇者カリン',text:'（驚いて）えっ？　いつの間に……あなたは？'},
+     {speaker:'ルシア',text:'ルシア。僧侶よ。人の「心の色」が見えるの。あなたのは今……少し灰色がかってる。無理してない？'},
+     {speaker:'ガルドス',text:'（目をそらして）俺は……平気だ。'},
+     {speaker:'ルシア',text:'（やさしく）ガルドス。あなたの色が一番灰色よ。強がることが、いちばん心を疲弊させるって、わかってる？'},
+     {speaker:'ガルドス',text:'……っ（何も言えない）'},
+     {speaker:'ミラベル',text:'（私は……元気そうよね）ちょっとルシア、いきなりグサグサ刺さること言わないでよ！'},
+     {speaker:'ルシア',text:'ミラベルは……（一瞬、表情が曇る）……大丈夫。あなたはいつも明るいね。（小さく）ごめんなさい。'},
+     {speaker:'勇者カリン',text:'（「ごめんなさい」……なぜ謝ったの？　誰に？）'},
    ],reward:{type:'coins',amount:80}},
-  {id:'s6',chapter:2,chapterTitle:'第二章：集いし仲間たち',bg:'dungeon',
+
+  {id:'s7',chapter:2,chapterTitle:'第二章：仲間という名の奇跡',bg:'dungeon',
+   npc:'カゲロウ',npcChar:'ninja',
+   dialogue:[
+     {speaker:'カゲロウ',text:'……後ろ。'},
+     {speaker:'勇者カリン',text:'えっ！？（振り返ると魔物が消えている）い、今の……あなたが？'},
+     {speaker:'カゲロウ',text:'偶然だ。俺もこの道を通っていた、それだけ。'},
+     {speaker:'ミラベル',text:'（ひそひそ）カリン、この人……闇に近い気配がする。気をつけて。'},
+     {speaker:'ガルドス',text:'（剣に手をかけて）何者だ。'},
+     {speaker:'カゲロウ',text:'忍者。カゲロウ。それ以外に名乗ることは何もない。（カリンを見て、わずかに目を細める）……お前が、勇者か。'},
+     {speaker:'勇者カリン',text:'そう、だけど……（なぜか胸が騒ぐ）あの、なんで私のこと知ってるの？'},
+     {speaker:'カゲロウ',text:'着いてくるかどうかは、お前たちが決めろ。（踵を返す）'},
+     {speaker:'勇者カリン',text:'（なぜだろう……この人、初めて会うはずなのに……なぜこんなに懐かしい感じがするんだろう）'},
+   ],reward:{type:'coins',amount:100}},
+
+  {id:'s8',chapter:2,chapterTitle:'第二章：仲間という名の奇跡',bg:'dungeon',
    npc:'ゴブリン',npcChar:'goblin',isBattle:true,enemyId:'goblin',
    dialogue:[
-     {speaker:'ガルドス',text:'前方に敵影！ゴブリンだ。俺が先頭に立つ。'},
-     {speaker:'ゴブリン',text:'ギャーッ！人間だ！食ってやる！'},
-     {speaker:'ミラベル',text:'うわっ、言葉喋るの？怖い怖い怖い！'},
-     {speaker:'勇者カリン',text:'全員、構えて！'},
+     {speaker:'ゴブリン',text:'ギャーッ！人間だ！パーティごとまとめて食ってやるぅ！'},
+     {speaker:'ミラベル',text:'うわあ怖い！（でも本気で怖い）カリン！'},
+     {speaker:'カゲロウ',text:'（静かに）右から2匹、木の裏に隠れている。合図で出てくる算段だ。'},
+     {speaker:'勇者カリン',text:'（見えてたの！？）みんな、カゲロウの指示通りに！各自、持ち場を守って！'},
+     {speaker:'ミラベル',text:'（カリンにこっそり）ねえ、カリン。カゲロウのこと、気になってる？（ニヤリ）'},
+     {speaker:'勇者カリン',text:'（頬が赤くなる）そんなことより戦いに集中して！！'},
    ],reward:{type:'equip',equipId:'chain_mail'}},
-  // Chapter 3: 裏切り
-  {id:'s7',chapter:3,chapterTitle:'第三章：亀裂と裏切り',bg:'castle',
-   npc:'謎の人物',npcChar:'ninja',
+
+  // ═══ 第三章：亀裂と秘密 ═══
+  {id:'s9',chapter:3,chapterTitle:'第三章：亀裂と秘密',bg:'dungeon',
+   npc:'ミラベル',npcChar:'mage',
    dialogue:[
-     {speaker:'謎の人物',text:'……会いたかったよ、勇者よ。'},
-     {speaker:'勇者カリン',text:'！？あなたは……』'},
-     {speaker:'謎の人物',text:'君たちの旅を、ずっと見ていた。しかし……ダルーガは本当の悪なのか？'},
-     {speaker:'勇者カリン',text:'何が言いたいの？'},
-     {speaker:'謎の人物',text:'後回しにも、理由がある。疲れているから。怖いから。傷ついているから。ダルーガは……人間の心の影なのだ。'},
-   ],reward:{type:'coins',amount:100}},
-  {id:'s8',chapter:3,chapterTitle:'第三章：亀裂と裏切り',bg:'dungeon',
-   npc:'ガルドス（変貌）',npcChar:'warrior',
-   dialogue:[
-     {speaker:'ガルドス',text:'……カリン。俺は少し疲れた。休ませてくれ。'},
-     {speaker:'勇者カリン',text:'ガルドス！？どうしたの、しっかりして！'},
-     {speaker:'ルシア',text:'（小声で）カリン……これはダルーガの呪いよ。心が折れかけている人に憑く。'},
-     {speaker:'ガルドス',text:'俺は弱かった。毎日筋トレしていたのに……心は鍛えられていなかった。'},
-     {speaker:'勇者カリン',text:'バカ言わないで！あなたは弱くない。ただ少し疲れてるだけ。私が守る！'},
+     {speaker:'ミラベル',text:'（朝、カリンを揺り起こして）カリン……カゲロウが、いない。'},
+     {speaker:'勇者カリン',text:'え？（飛び起きる）どういうこと？'},
+     {speaker:'ミラベル',text:'今朝起きたら、荷物も全部なくなってた。……これだけ残して。'},
+     {speaker:'勇者カリン',text:'（紙切れを手に取る）「ここから先は危険すぎる。お前たちには関係ない道だ」……なんで。なんで突然——'},
+     {speaker:'ガルドス',text:'（硬い声で）……そういうことだ。最初から信用するんじゃなかった。忍者なんて、そんなもんだろ。'},
+     {speaker:'ルシア',text:'（静かに、視線を落として）……そう、ね。'},
+     {speaker:'勇者カリン',text:'（ルシアを見る。彼女の顔が……なぜか罪悪感を知っている色をしている）……ルシア？'},
+     {speaker:'ルシア',text:'（ハッとして）……何でもない。行こう、カリン。'},
    ],reward:{type:'coins',amount:120}},
-  {id:'s9',chapter:3,chapterTitle:'第三章：亀裂と裏切り',bg:'dungeon',
-   npc:'怠惰の悪魔',npcChar:'slime',isBattle:true,enemyId:'procra_demon',
+
+  {id:'s10',chapter:3,chapterTitle:'第三章：亀裂と秘密',bg:'dungeon',
+   npc:'仮面の使者',npcChar:'ninja',
    dialogue:[
-     {speaker:'怠惰の悪魔',text:'フフフ……人間よ。「後でやればいい」と思ったことが何度あった？'},
-     {speaker:'勇者カリン',text:'……っ！'},
-     {speaker:'怠惰の悪魔',text:'締め切りを破り、夢を先送りにし、大切な人を傷つけた。全部お前の弱さだ。'},
-     {speaker:'ミラベル',text:'カリン！惑わされないで！過去は変えられないけど、今は変えられる！'},
-     {speaker:'勇者カリン',text:'そうだ……今、ここで、前を向く！行くよ！'},
+     {speaker:'仮面の使者',text:'……勇者よ。止まれ。'},
+     {speaker:'ガルドス',text:'（剣を抜く）貴様——！！'},
+     {speaker:'仮面の使者',text:'剣を収めろ。俺はお前たちを傷つけに来たのではない。警告をしに来た。'},
+     {speaker:'ミラベル',text:'（震える声で）この気配……カゲロウ！？'},
+     {speaker:'仮面の使者',text:'……俺のことは忘れろ。それより聞け。ダルーガを倒してはならない。'},
+     {speaker:'勇者カリン',text:'なんで！？ダルーガは人の心を奪ってるのに——'},
+     {speaker:'仮面の使者',text:'ダルーガを倒せば、その「後悔の魂」は別の誰かに宿る。人の弱さは、消えない。倒すだけでは何も変わらない。'},
+     {speaker:'勇者カリン',text:'（胸が締め付けられる）じゃあ……どうすれば。'},
+     {speaker:'仮面の使者',text:'……それを、お前に教えたい。だから俺はここにいる。（仮面の奥の目が、わずかに揺れた）'},
+   ],reward:{type:'coins',amount:150}},
+
+  {id:'s11',chapter:3,chapterTitle:'第三章：亀裂と秘密',bg:'castle',
+   npc:'ルシア',npcChar:'healer',
+   dialogue:[
+     {speaker:'勇者カリン',text:'ルシア、正直に話して。カゲロウのこと……何か知ってるでしょ。'},
+     {speaker:'ルシア',text:'（長い沈黙の後）……バレてた、か。'},
+     {speaker:'ミラベル',text:'えっ！？ルシア、知ってたの！？'},
+     {speaker:'ルシア',text:'カゲロウは……かつて勇者だった。私の前の世代の。でも旅の途中でダルーガに心を奪われて、消えた。'},
+     {speaker:'ガルドス',text:'（怒りをこらえて）どうして黙っていた。'},
+     {speaker:'ルシア',text:'怖かったの。カゲロウがまた……また誰かを傷つけると思って。でも……彼の目を見た時、わかったの。あの人は、戻ろうとしてるって。'},
+     {speaker:'勇者カリン',text:'（ルシアの手を握る）ありがとう、話してくれて。でも……もう隠さないで。私たちは仲間でしょ。'},
+     {speaker:'ルシア',text:'（涙をこらえながら）……うん。ごめんなさい、みんな。'},
+   ],reward:{type:'coins',amount:150}},
+
+  {id:'s12',chapter:3,chapterTitle:'第三章：亀裂と秘密',bg:'dungeon',
+   npc:'ガルドス',npcChar:'warrior',
+   dialogue:[
+     {speaker:'ガルドス',text:'……（突然立ち止まる）俺は……なぜ戦っているんだ。'},
+     {speaker:'勇者カリン',text:'ガルドス！？しっかりして！'},
+     {speaker:'ガルドス',text:'家族は……もういない。村も焼けた。今さら戦って……何が変わる。「どうせ無駄だ」という声が……止まらない。'},
+     {speaker:'ミラベル',text:'（涙目で）これがダルーガの呪い……精神的に疲弊した人を狙うの。'},
+     {speaker:'ルシア',text:'（ガルドスの前に立つ）ガルドス。あなたが戦ってきたのは、誰かのせいじゃなかった。「もう誰にも同じ後悔をさせたくない」って。それが本物の強さでしょ。'},
+     {speaker:'ガルドス',text:'（わずかに目が戻る）……ルシア。'},
+     {speaker:'勇者カリン',text:'（ガルドスの手を取る）私はあなたが必要なの！一人で抱えないで！'},
+     {speaker:'ガルドス',text:'（ゆっくりと立ち上がる）……弱音を吐いた。恥ずかしいな。（苦笑い）……行くか。'},
+   ],reward:{type:'coins',amount:120}},
+
+  {id:'s13',chapter:3,chapterTitle:'第三章：亀裂と秘密',bg:'dungeon',
+   npc:'怠惰の悪魔',npcChar:'procra_demon',isBattle:true,enemyId:'procra_demon',
+   dialogue:[
+     {speaker:'怠惰の悪魔',text:'フフフ……よく来たな。「後でやればいい」と思ったことが何度あった？'},
+     {speaker:'勇者カリン',text:'（ドキッ）……っ！'},
+     {speaker:'怠惰の悪魔',text:'夢を先送りにして、大切な人を放っておいて……全部お前の弱さだ。どうせ変われない。認めろよ、勇者さん。'},
+     {speaker:'ミラベル',text:'（震えながらも前に出る）ちょっと！カリンを惑わせんじゃない！確かに過去は変えられない。でも——'},
+     {speaker:'ガルドス',text:'（ミラベルの横に並ぶ）今は、変えられる。俺たちはここにいる。'},
+     {speaker:'ルシア',text:'一人じゃなかった。だからここまで来られた。'},
+     {speaker:'勇者カリン',text:'（熱い感情がこみ上げる）ありがとう、みんな。行くよ！今日という日を、ここで変える！！'},
    ],reward:{type:'equip',equipId:'wisdom_gem'}},
-  // Chapter 4: 真実
-  {id:'s10',chapter:4,chapterTitle:'第四章：後回し魔王の真実',bg:'final',
-   npc:'ダルーガの幻影',npcChar:'dragon_boss',
+
+  // ═══ 第四章：後回し魔王の真実 ═══
+  {id:'s14',chapter:4,chapterTitle:'第四章：後回し魔王の真実',bg:'final',
+   npc:'ダルーガの幻影',npcChar:'daruga',
    dialogue:[
-     {speaker:'ダルーガの幻影',text:'……来たか、勇者よ。わざわざご苦労なことだ。'},
+     {speaker:'ダルーガの幻影',text:'……来たか、カリン。長かったな。'},
      {speaker:'勇者カリン',text:'ダルーガ！人々の心を返せ！'},
-     {speaker:'ダルーガの幻影',text:'返す？フフ……私が奪ったのではない。彼らが自ら差し出したのだ。「後でやろう」という言葉と一緒に。'},
-     {speaker:'ミラベル',text:'……なんて言い訳！'},
-     {speaker:'ダルーガの幻影',text:'言い訳？これが真実だ。お前たちも同じだろう。今日やるべきことを、後回しにしたくはないか？'},
+     {speaker:'ダルーガの幻影',text:'返す？フフ……私が「奪った」のではない。彼らが自ら「差し出した」のだ。「後でやろう」という言葉と共に。'},
+     {speaker:'勇者カリン',text:'そんな詭弁——'},
+     {speaker:'ダルーガの幻影',text:'お前には教えてやろう。私の本当の姿を。私はかつて……人間だった。'},
+     {speaker:'勇者カリン',text:'（息をのむ）え……？'},
+     {speaker:'ダルーガの幻影',text:'「いつかやろう」と言い続けて全てを失った者たちの後悔が凝縮したもの。私は人間の「影」だ。倒してみせろ——もしできるなら。'},
+     {speaker:'勇者カリン',text:'（震える声で）それって……倒すだけでは終わらない、ってこと？　じゃあ、私は何を——）'},
    ],reward:{type:'coins',amount:200}},
-  {id:'s11',chapter:4,chapterTitle:'第四章：後回し魔王の真実',bg:'final',
+
+  {id:'s15',chapter:4,chapterTitle:'第四章：後回し魔王の真実',bg:'final',
+   npc:'カゲロウ',npcChar:'ninja',
+   dialogue:[
+     {speaker:'カゲロウ',text:'……来るな、カリン。これ以上近づいてはいけない。'},
+     {speaker:'勇者カリン',text:'（駆け寄ろうとして止まる）どうして。私はあなたのことを——'},
+     {speaker:'カゲロウ',text:'俺は……かつて勇者だった。そしてダルーガに心を奪われた。今でも……その影が消えていない。近くにいれば、お前を傷つける。'},
+     {speaker:'勇者カリン',text:'（涙をこらえて）だったら、私が守る。'},
+     {speaker:'カゲロウ',text:'馬鹿なことを。'},
+     {speaker:'勇者カリン',text:'あなたが私を守ってくれた最初の夜……あの時、あなたの目を見て懐かしかったの。初めて会うはずなのに。'},
+     {speaker:'カゲロウ',text:'（静かに）……それは。お前が、俺の「最後の後悔」だから。'},
+     {speaker:'勇者カリン',text:'えっ……'},
+     {speaker:'カゲロウ',text:'俺が心を奪われたのは……守れなかった人がいたからだ。今のお前と、似た顔をした——（それ以上は、言えなかった）'},
+   ],reward:{type:'char',charId:'ninja'}},
+
+  {id:'s16',chapter:4,chapterTitle:'第四章：後回し魔王の真実',bg:'village',
    npc:'老賢者ホウワン',npcChar:'sage',
    dialogue:[
-     {speaker:'老賢者ホウワン',text:'カリン……ダルーガの言葉は、真実を含んでいる。'},
-     {speaker:'勇者カリン',text:'どういうこと？'},
-     {speaker:'老賢者ホウワン',text:'後回しとは、恐れから生まれる。失敗を恐れ、完璧を求め、傷つくことを避ける心が生み出す影。'},
-     {speaker:'ルシア',text:'つまり……ダルーガを倒すだけでは、また同じことが？'},
-     {speaker:'老賢者ホウワン',text:'そうだ。真の戦いは外にあるのではない。自分自身の心の中にある。それでも前に進めるか？'},
-     {speaker:'勇者カリン',text:'……進むよ。怖くても、未完成でも、今日の一歩を踏み出す！'},
+     {speaker:'勇者カリン',text:'ホウワン老師！カゲロウが「守れなかった人」って……'},
+     {speaker:'老賢者ホウワン',text:'（長い沈黙）……カリン。お前の前世の話を、する時が来たようだ。'},
+     {speaker:'勇者カリン',text:'前世……？'},
+     {speaker:'老賢者ホウワン',text:'EditFlowクリスタルに呼ばれた者の中に、かつての勇者がいた。カゲロウが守ろうとして……守れなかった、少女が。'},
+     {speaker:'ミラベル',text:'（息をのんで）まさか……カリンが、その——'},
+     {speaker:'老賢者ホウワン',text:'だから彼は「似た顔」と言った。お前がカゲロウに懐かしさを感じたのも、偶然ではない。'},
+     {speaker:'勇者カリン',text:'（震える声で）カゲロウが……ずっとその後悔を抱えて。だから私は選ばれたの？'},
+     {speaker:'老賢者ホウワン',text:'それだけではない。お前自身の強さが、お前を呼んだ。しかし……再会する使命も、あった。それだけは確かだ。（遠くを見る目で）'},
    ],reward:{type:'char',charId:'sage'}},
-  {id:'s12',chapter:4,chapterTitle:'第四章：後回し魔王の真実',bg:'dungeon',
-   npc:'闇の騎士',npcChar:'skeleton',isBattle:true,enemyId:'dark_knight',
+
+  {id:'s17',chapter:4,chapterTitle:'第四章：後回し魔王の真実',bg:'dungeon',
+   npc:'闇の騎士',npcChar:'dark_knight',isBattle:true,enemyId:'dark_knight',
    dialogue:[
-     {speaker:'闇の騎士',text:'……この先には通さない。ダルーガ様の命令だ。'},
-     {speaker:'ガルドス',text:'（復活した声で）……俺の出番だな。'},
-     {speaker:'勇者カリン',text:'ガルドス！戻ってきてくれたの！？'},
-     {speaker:'ガルドス',text:'仲間を見捨てるのは、俺の流儀じゃない。行くぞ！'},
-   ],reward:{type:'coins',amount:150}},
-  // Chapter 5: 最終決戦
-  {id:'s13',chapter:5,chapterTitle:'終章：EditFlowクリスタルの奇跡',bg:'final',
+     {speaker:'闇の騎士',text:'……この先には進ませない。ダルーガの意志だ。'},
+     {speaker:'ガルドス',text:'（みんなをかばって前に出る）俺が行く。'},
+     {speaker:'ミラベル',text:'ガルドス！一人じゃ——'},
+     {speaker:'声',text:'……一人じゃない。（影の中から、一人が現れた）'},
+     {speaker:'勇者カリン',text:'（振り返って、声を失う）か、カゲロウ……！'},
+     {speaker:'カゲロウ',text:'（仮面を取り、カリンの目を真っ直ぐ見て）遅れた。……一緒に、行かせてくれ。'},
+     {speaker:'勇者カリン',text:'（涙をこらえて、うなずく）……来てくれたね。'},
+     {speaker:'カゲロウ',text:'（小さく、でも確かに）……ああ。お前の背中が、俺を呼んだ。'},
+   ],reward:{type:'coins',amount:200}},
+
+  // ═══ 終章：EditFlowクリスタルの奇跡 ═══
+  {id:'s18',chapter:5,chapterTitle:'終章：EditFlowクリスタルの奇跡',bg:'final',
    npc:'全パーティ',npcChar:'hero',
    dialogue:[
-     {speaker:'ミラベル',text:'ここが……ダルーガの城。'},
-     {speaker:'ガルドス',text:'空気が重い。全員、気を引き締めろ。'},
-     {speaker:'ルシア',text:'みんな……私、怖いけど、みんなと一緒なら大丈夫。'},
-     {speaker:'勇者カリン',text:'この旅で気づいた。私一人じゃ何もできなかった。でもみんながいてくれたから、ここまで来られた。'},
-     {speaker:'全員',text:'……行こう！'},
+     {speaker:'ミラベル',text:'ここが……ダルーガの城。（声が震えている）怖いけど……来た。'},
+     {speaker:'ガルドス',text:'（前を向いたまま）怖くて当然だ。怖くなくなったら、それはもう人間じゃない。'},
+     {speaker:'ルシア',text:'（ガルドスを見て、驚いた顔をして……それから微笑む）……変わったね、ガルドス。'},
+     {speaker:'ガルドス',text:'（耳まで赤くなって）う、うるさい。'},
+     {speaker:'カゲロウ',text:'（静かにカリンの隣に立つ）……後悔はないか、カリン。'},
+     {speaker:'勇者カリン',text:'（カゲロウを見て、首を振る）ない。今日ここに来るまでの全部が——全部、必要だった。'},
+     {speaker:'全員',text:'……行こう！！'},
    ],reward:{type:'coins',amount:200}},
-  {id:'s14',chapter:5,chapterTitle:'終章：EditFlowクリスタルの奇跡',bg:'final',
-   npc:'ダルーガ（本体）',npcChar:'dragon_boss',isBattle:true,enemyId:'daruga',
+
+  {id:'s19',chapter:5,chapterTitle:'終章：EditFlowクリスタルの奇跡',bg:'final',
+   npc:'ダルーガ（本体）',npcChar:'daruga',isBattle:true,enemyId:'daruga',
    dialogue:[
-     {speaker:'ダルーガ',text:'……よく来た。だが、お前たちに私は倒せぬ。私は人の心の弱さそのものだからだ。'},
-     {speaker:'勇者カリン',text:'確かに弱さはある。でも私は知ってる——弱さを認めることが、本当の強さの始まりだって！'},
-     {speaker:'ダルーガ',text:'戯言をッ！！この世界での行動は、現実の力になる。お前の現実は弱いだろう！！'},
-     {speaker:'勇者カリン',text:'（EditFlowクリスタルが輝く）違う……私は毎日、タスクをこなし、習慣を積み上げ、仕事を完了してきた。その全てが今、ここに！行くぞ！！'},
+     {speaker:'ダルーガ',text:'……来たか。お前たちが「後悔の結晶」である私を倒そうというなら——試してみろ。'},
+     {speaker:'ガルドス',text:'（拳を握る）俺の後悔は、俺が決着をつける！！'},
+     {speaker:'ミラベル',text:'私の魔法、全部ぶつけてやる！！'},
+     {speaker:'ルシア',text:'みんなを守る。絶対に！'},
+     {speaker:'カゲロウ',text:'（カリンの隣で静かに刀を構える）……お前の隣で戦えること、光栄だ。'},
+     {speaker:'勇者カリン',text:'（EditFlowクリスタルが輝く）タスクをこなした日々、習慣を続けた朝、仕事を終えた夜——その全てが今、ここにある！！'},
+     {speaker:'ダルーガ',text:'ぬぅ……この輝き、まさか本当に——！！'},
+     {speaker:'勇者カリン',text:'行くよ、みんな——！！！！'},
    ],reward:{type:'coins',amount:300}},
-  {id:'s15',chapter:5,chapterTitle:'終章：EditFlowクリスタルの奇跡',bg:'village',
-   npc:'老賢者ホウワン',npcChar:'sage',
+
+  {id:'s20',chapter:5,chapterTitle:'終章：EditFlowクリスタルの奇跡',bg:'village',
+   npc:'カゲロウ',npcChar:'ninja',
    dialogue:[
      {speaker:'老賢者ホウワン',text:'……やったぞ、カリン。ダルーガは倒された。'},
-     {speaker:'勇者カリン',text:'でも……また来るかも。後回しの誘惑は、なくならないから。'},
-     {speaker:'老賢者ホウワン',text:'そうだ。だからこそ、毎日EditFlowを開き、今日のタスクと向き合い続ける。それがお前の使命だ。'},
-     {speaker:'ミラベル',text:'大げさ～！でも……うん。毎日続けることって、すごいことよね。'},
-     {speaker:'ガルドス',text:'明日も筋トレするぞ。お前たちも来い。'},
-     {speaker:'ルシア',text:'また新しい旅が始まるの？楽しみ……'},
-     {speaker:'勇者カリン',text:'ありがとう、みんな。そして……今日もEditFlowを開いてくれた、あなたに感謝を。'},
+     {speaker:'カゲロウ',text:'（静かに荷物を手にしている）……俺の使命は終わった。行く。'},
+     {speaker:'勇者カリン',text:'（咄嗟に手を掴む）行かないで。'},
+     {speaker:'カゲロウ',text:'カリン……俺はお前の前世を守れなかった。その罪は消えない。そんな俺が傍にいても——'},
+     {speaker:'勇者カリン',text:'（強く、でも優しく）バカ言わないで。私は「前世の誰か」じゃない。今ここにいる、カリンよ。あなたが守ってくれた、この私が。'},
+     {speaker:'カゲロウ',text:'……（手が止まる）'},
+     {speaker:'勇者カリン',text:'弱くていい。不完全でいい。弱さを認め合える仲間が傍にいること——それが、本当の強さでしょ！'},
+     {speaker:'カゲロウ',text:'（目に光るものが）……馬鹿野郎。（荷物を置く）'},
+     {speaker:'ミラベル',text:'（ガルドスの服をひっぱって）ねえねえ！ついに！！（ニコニコ）'},
+     {speaker:'ガルドス',text:'（赤い顔で）うるさい、黙れ。'},
+     {speaker:'老賢者ホウワン',text:'（穏やかに）カリン。この世界はお前の現実と繋がっている。毎日前を向き、今日のタスクと向き合う——それがこの世界の光を守り続けることになる。'},
+     {speaker:'ルシア',text:'（微笑んで）また旅が始まるの？楽しみ。'},
+     {speaker:'勇者カリン',text:'（カゲロウの手を、今度は離さずに）——ありがとう、みんな。そして……今日も画面を開いてくれた、あなたへ。私たちは、ここにいる。'},
    ],reward:{type:'coins',amount:500}},
 ];
 const DB_OLD='ef_v4';
@@ -5688,7 +5818,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-4';
+const APP_VERSION='20260519-5';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
@@ -5927,7 +6057,7 @@ ${allDone?`<div class="card" style="text-align:center;padding:30px">
 
 <div style="display:flex;gap:8px;justify-content:flex-end">
   ${scene.isBattle&&isLast?
-    `<button class="btn btn-p" onclick="RPG_TAB='battle';render()">⚔️ バトル！</button>`:
+    `<button class="btn btn-p" onclick="rpgStartStoryBattle('${scene.enemyId}')">⚔️ バトル！</button>`:
     isLast?
     `<button class="btn btn-p" onclick="rpgAdvanceScene()">次のシーンへ →</button>`:
     `<button class="btn btn-p" onclick="rpgNextLine()">次へ ▶</button>`
@@ -5971,12 +6101,12 @@ function rRPGBattle(){
   const prog=r.storyProgress||0;
   // Find unlocked battles
   const unlocked=ENEMIES.filter((e,i)=>{
-    if(e.id==='daruga')return prog>=13;
-    if(e.id==='dark_knight')return prog>=11;
-    if(e.id==='procra_demon')return prog>=8;
-    if(e.id==='golem')return prog>=5;
-    if(e.id==='dark_bat')return prog>=4;
-    if(e.id==='skeleton')return prog>=3;
+    if(e.id==='daruga')return prog>=18;
+    if(e.id==='dark_knight')return prog>=14;
+    if(e.id==='procra_demon')return prog>=10;
+    if(e.id==='golem')return prog>=7;
+    if(e.id==='dark_bat')return prog>=5;
+    if(e.id==='skeleton')return prog>=4;
     if(e.id==='goblin')return prog>=2;
     return true; // slime always available
   });
@@ -6000,6 +6130,13 @@ function rRPGBattle(){
       ${done?'<span class="badge bg" style="font-size:10px">✓ 撃破済み</span>':''}
     </div>`;
   }).join('')}`;
+}
+
+function rpgStartStoryBattle(enemyId){
+  const r=ensureRPG();
+  r.battleFromStory=true;
+  RPG_TAB='battle';  // タブを先に切り替えてからバトル開始（二重renderを防ぐ）
+  startBattle(enemyId);
 }
 
 function startBattle(enemyId){
@@ -6146,12 +6283,22 @@ function checkBattleEnd(){
 
 function rpgEndBattle(){
   const r=ensureRPG();const bs=r.battleState;
-  if(bs&&bs.won){
-    // Sync hp/mp back
+  const fromStory=r.battleFromStory;
+  const won=bs&&bs.won;
+  if(bs&&won){
     r.hero.hp=Math.max(1,bs.heroHp);
     r.hero.mp=Math.max(0,bs.heroMp);
   }
   r.battleState=null;
+  r.battleFromStory=false;
+  if(fromStory&&won){
+    RPG_TAB='story';
+    rpgAdvanceScene();  // calls save();render() internally
+    return;
+  }
+  if(fromStory&&!won){
+    RPG_TAB='story';  // 敗北してもストーリーに戻る（再挑戦できる）
+  }
   save();render();
 }
 
