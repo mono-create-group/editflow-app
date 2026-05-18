@@ -1534,15 +1534,28 @@ function rTasksSchedule(){
   // サイドパネル用：未スケジュールタスク（startTimeなし）
   const unscheduled=S.tasks.filter(t=>!t.deleted&&!t.startTime&&(t.dueDate===d||(!t.dueDate&&isToday)));
   const done=unscheduled.filter(t=>t.done),undone=unscheduled.filter(t=>!t.done);
-  const sideItems=[...undone,...done].map(t=>`
-    <div class="sched-side-task${t.done?' done-side':''}" draggable="true"
+  const sideItems=[...undone,...done].map(t=>{
+    const subs=t.subtasks||[];
+    const subsDone=subs.filter(s=>s.done).length;
+    const subsHtml=subs.length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:3px">${subs.map((s,i)=>`
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:400;color:${s.done?'var(--t3)':'var(--t2)'};${s.done?'text-decoration:line-through':''}" onclick="event.stopPropagation();toggleSub('${t.id}',${i})">
+        <div style="width:12px;height:12px;border-radius:3px;border:1.5px solid ${s.done?'var(--purple)':'var(--border)'};background:${s.done?'var(--purple)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+          ${s.done?'<svg width="8" height="8" viewBox="0 0 8 8"><polyline points="1,4 3,6 7,2" stroke="#fff" stroke-width="1.5" fill="none"/></svg>':''}
+        </div>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</span>
+      </div>`).join('')}
+    </div>`:'';
+    const progHtml=subs.length?`<div style="font-size:10px;color:var(--t3);margin-top:3px">${subsDone}/${subs.length} 完了</div>`:'';
+    return`<div class="sched-side-task${t.done?' done-side':''}" draggable="true"
       ondragstart="sideTaskDragStart(event,'${t.id}')"
       ondragend="sideTaskDragEnd(event)"
       onclick="openTaskModal('${t.id}')"
       title="${esc(t.title)}（クリックで編集）">
       <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
       ${t.priority?`<div style="font-size:10px;color:var(--t3);margin-top:2px">${t.priority==='high'?'🔴':'🟡'} ${t.priority==='high'?'高':'中'}優先</div>`:''}
-    </div>`).join('');
+      ${progHtml}
+      ${subsHtml}
+    </div>`;}).join('');
   const sidePanel=`<div class="sched-side-panel" id="sched-side-panel"
     ondragover="schedSideDragOver(event)"
     ondragleave="schedSideDragLeave(event)"
@@ -4532,7 +4545,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260518-6';
+const APP_VERSION='20260518-7';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
