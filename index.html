@@ -199,15 +199,27 @@ a{color:inherit;text-decoration:none}
 .sched-add-hint{font-size:11px;color:var(--t3);text-align:center;margin-top:8px}
 /* ─── SCHEDULE SIDE PANEL ─── */
 .sched-layout{display:flex;gap:12px;align-items:flex-start}
-.sched-side-panel{width:210px;flex-shrink:0;border:1px solid var(--border);border-radius:var(--rs);background:var(--card);overflow-y:auto;max-height:75vh;min-height:120px;transition:border-color .15s}
-.sched-side-panel.drag-over{border-color:var(--purple);background:var(--pdim)}
+.sched-side-panel{width:236px;flex-shrink:0;border:1px solid var(--border);border-radius:var(--rs);background:var(--card);overflow-y:auto;max-height:75vh;min-height:120px;transition:border-color .15s,box-shadow .15s}
+.sched-side-panel.drag-over{border-color:var(--purple);background:var(--pdim);box-shadow:0 0 0 2px var(--purple)40}
 .sched-side-hdr{font-size:12px;font-weight:700;color:var(--t2);padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:2;display:flex;align-items:center;justify-content:space-between}
-.sched-side-task{margin:5px 6px;padding:7px 9px;border-radius:6px;background:var(--card2);border:1px solid var(--border);cursor:grab;font-size:12px;font-weight:600;color:var(--text);transition:background .15s,border-color .15s;user-select:none}
-.sched-side-task:hover{background:var(--pdim);border-color:var(--purple)}
-.sched-side-task.dragging{opacity:.35;cursor:grabbing}
-.sched-side-task.done-side{opacity:.45;text-decoration:line-through}
+/* タスクアイテム */
+.sched-side-task{margin:6px 6px 2px;padding:8px 9px 8px 7px;border-radius:8px;background:var(--card2);border:1px solid var(--border);cursor:grab;font-size:12px;font-weight:600;color:var(--text);transition:background .15s,border-color .15s,box-shadow .15s;user-select:none;display:flex;align-items:flex-start;gap:6px}
+.sched-side-task:hover{background:var(--pdim);border-color:var(--purple);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.sched-side-task.dragging{opacity:.3;cursor:grabbing;box-shadow:none}
+.sched-side-task.done-side{opacity:.45}
+/* サブタスクアイテム */
+.sched-side-sub{margin:0 6px 4px 20px;padding:6px 9px 6px 7px;border-radius:6px;background:var(--surface);border:1px solid var(--border);cursor:grab;font-size:11px;font-weight:500;color:var(--t2);transition:background .15s,border-color .15s,box-shadow .15s;user-select:none;display:flex;align-items:center;gap:6px;position:relative}
+.sched-side-sub::before{content:'';position:absolute;left:-11px;top:50%;width:8px;height:1px;background:var(--border)}
+.sched-side-sub:hover{background:var(--pdim);border-color:var(--purple);color:var(--text);box-shadow:0 1px 5px rgba(0,0,0,.08)}
+.sched-side-sub.dragging{opacity:.3;cursor:grabbing}
+.sched-side-sub.done-sub{opacity:.4;text-decoration:line-through}
+/* ドラッグハンドル */
+.sched-dh{color:var(--t3);font-size:12px;line-height:1;flex-shrink:0;margin-top:1px;letter-spacing:-1px}
+/* タイムラインのサブタスクブロック */
+.sub-blk{background:linear-gradient(135deg,#7c3aedcc,#6d28d9aa)!important;border-left:2px solid #a78bfa!important;font-size:10px!important}
+.sub-blk-label{font-size:9px;opacity:.75;line-height:1;margin-bottom:1px}
 .sched-col{flex:1;min-width:0}
-@media(max-width:700px){.sched-layout{flex-direction:column}.sched-side-panel{width:100%;max-height:200px}}
+@media(max-width:700px){.sched-layout{flex-direction:column}.sched-side-panel{width:100%;max-height:220px}}
 
 /* ─── PROJECT BOARD ─── */
 .board-wrap{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
@@ -1511,17 +1523,37 @@ function rTasksSchedule(){
       <div class="fixed-blk-title" style="color:${f.c}">${esc(f.t)}</div>
       <div class="fixed-blk-time">${f.s}〜${f.e}</div>
     </div>`;}).join('');
-  // 重なりを検出してカラム分け
-  const blks=tasks.map(t=>({t,sm:tMin(t.startTime),em:t.endTime?tMin(t.endTime):tMin(t.startTime)+60,col:0,numCols:1}));
-  blks.sort((a,b)=>a.sm-b.sm);
+  // タスクブロックデータ
+  const taskBlkData=tasks.map(t=>({id:t.id,isSubtask:false,sm:tMin(t.startTime),em:t.endTime?tMin(t.endTime):tMin(t.startTime)+60,task:t,sub:null,subIdx:-1}));
+  // サブタスクブロックデータ（startTimeを持つもの）
+  const subBlkData=[];
+  S.tasks.filter(t=>!t.deleted&&(t.dueDate===d||(!t.dueDate&&isToday))).forEach(t=>{
+    (t.subtasks||[]).forEach((s,i)=>{
+      if(s.startTime)subBlkData.push({id:`${t.id}::${i}`,isSubtask:true,sm:tMin(s.startTime),em:s.endTime?tMin(s.endTime):tMin(s.startTime)+30,task:t,sub:s,subIdx:i});
+    });
+  });
+  // 全ブロック統合してカラム分け
+  const allBlks=[...taskBlkData,...subBlkData].map(b=>({...b,col:0,numCols:1}));
+  allBlks.sort((a,b)=>a.sm-b.sm);
   const colEnds=[];
-  blks.forEach(b=>{let c=colEnds.findIndex(e=>e<=b.sm);if(c<0)c=colEnds.length;colEnds[c]=b.em;b.col=c;});
-  blks.forEach(b=>{const ov=blks.filter(b2=>b2.sm<b.em&&b2.em>b.sm);b.numCols=Math.max(...ov.map(b2=>b2.col+1));});
-  const taskBlocks=blks.map(({t,sm,em,col,numCols})=>{
-    const top=mPos(sm),h=Math.max(24,(em-sm)*PPM);
+  allBlks.forEach(b=>{let c=colEnds.findIndex(e=>e<=b.sm);if(c<0)c=colEnds.length;colEnds[c]=b.em;b.col=c;});
+  allBlks.forEach(b=>{const ov=allBlks.filter(b2=>b2.sm<b.em&&b2.em>b.sm);b.numCols=Math.max(...ov.map(b2=>b2.col+1));});
+  const taskBlocks=allBlks.map(({id,isSubtask,sm,em,col,numCols,task:t,sub:s,subIdx})=>{
+    const top=mPos(sm),h=Math.max(20,(em-sm)*PPM);
     const colW=44/numCols;
     const left=52+col*colW;
     const right=100-(left+colW)+0.5;
+    if(isSubtask){
+      return`<div class="task-blk sub-blk${s.done?' done-blk':''}" draggable="true"
+        style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between"
+        ondragstart="schedDragStart(event,'${id}')"
+        title="↳ ${esc(s.title)} (${esc(t.title)})">
+        <div style="overflow:hidden">
+          <div class="sub-blk-label">↳ ${esc(t.title)}</div>
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</div>
+        </div>
+      </div>`;
+    }
     return`<div class="task-blk ${t.done?'done-blk':''}" draggable="true"
       style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between"
       ondblclick="event.stopPropagation();delTask('${t.id}')"
@@ -1531,41 +1563,58 @@ function rTasksSchedule(){
       ${h>=36?`<div style="display:flex;gap:3px;margin-top:2px"><button onclick="event.stopPropagation();splitSchedTask('${t.id}')" style="font-size:9px;padding:1px 4px;background:rgba(255,255,255,.15);border:none;border-radius:3px;color:#fff;cursor:pointer" title="タスクを分割">✂</button></div>`:''}
     </div>`;}).join('');
   const nowLine=(isToday&&nowM>=SS&&nowM<=SE)?`<div class="now-line" style="top:${nowTop}px"></div>`:'';
-  // サイドパネル用：未スケジュールタスク（startTimeなし）
-  const unscheduled=S.tasks.filter(t=>!t.deleted&&!t.startTime&&(t.dueDate===d||(!t.dueDate&&isToday)));
-  const done=unscheduled.filter(t=>t.done),undone=unscheduled.filter(t=>!t.done);
-  const sideItems=[...undone,...done].map(t=>{
+  // サイドパネル用：未スケジュールのタスク（startTimeなし）
+  const allDay=S.tasks.filter(t=>!t.deleted&&(t.dueDate===d||(!t.dueDate&&isToday)));
+  const unscheduled=allDay.filter(t=>!t.startTime);
+  const undone=unscheduled.filter(t=>!t.done),doneList=unscheduled.filter(t=>t.done);
+  // 未完了数（タスク＋未スケジュールサブタスク）
+  const undoneSubCount=unscheduled.reduce((s,t)=>{
+    const subs=t.subtasks||[];
+    return s+subs.filter(sub=>!sub.done&&!sub.startTime).length;
+  },0);
+  const totalUndone=undone.length+undoneSubCount;
+  const DH=`<span class="sched-dh">⠿</span>`;
+  const sideItems=[...undone,...doneList].map(t=>{
     const subs=t.subtasks||[];
     const subsDone=subs.filter(s=>s.done).length;
-    const subsHtml=subs.length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:3px">${subs.map((s,i)=>`
-      <div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:400;color:${s.done?'var(--t3)':'var(--t2)'};${s.done?'text-decoration:line-through':''}" onclick="event.stopPropagation();toggleSub('${t.id}',${i})">
-        <div style="width:12px;height:12px;border-radius:3px;border:1.5px solid ${s.done?'var(--purple)':'var(--border)'};background:${s.done?'var(--purple)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+    const progHtml=subs.length?`<span style="font-size:10px;color:var(--t3);font-weight:400">${subsDone}/${subs.length}</span>`:'';
+    // サブタスク行（未スケジュールのみ、完了は最後）
+    const undoneSubs=subs.map((s,i)=>({s,i})).filter(({s})=>!s.done&&!s.startTime);
+    const doneSubs=subs.map((s,i)=>({s,i})).filter(({s})=>s.done&&!s.startTime);
+    const subRows=[...undoneSubs,...doneSubs].map(({s,i})=>`
+      <div class="sched-side-sub${s.done?' done-sub':''}" draggable="true"
+        ondragstart="sideTaskDragStart(event,'${t.id}::${i}')"
+        ondragend="sideSubDragEnd(event)"
+        title="↳ ${esc(s.title)}（ドラッグでスケジュールへ）">
+        ${DH}
+        <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</div>
+        <div style="width:12px;height:12px;border-radius:3px;border:1.5px solid ${s.done?'var(--purple)':'var(--border)'};background:${s.done?'var(--purple)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="event.stopPropagation();toggleSub('${t.id}',${i})">
           ${s.done?'<svg width="8" height="8" viewBox="0 0 8 8"><polyline points="1,4 3,6 7,2" stroke="#fff" stroke-width="1.5" fill="none"/></svg>':''}
         </div>
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</span>
-      </div>`).join('')}
-    </div>`:'';
-    const progHtml=subs.length?`<div style="font-size:10px;color:var(--t3);margin-top:3px">${subsDone}/${subs.length} 完了</div>`:'';
+      </div>`).join('');
     return`<div class="sched-side-task${t.done?' done-side':''}" draggable="true"
       ondragstart="sideTaskDragStart(event,'${t.id}')"
       ondragend="sideTaskDragEnd(event)"
-      onclick="openTaskModal('${t.id}')"
-      title="${esc(t.title)}（クリックで編集）">
-      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
-      ${t.priority?`<div style="font-size:10px;color:var(--t3);margin-top:2px">${t.priority==='high'?'🔴':'🟡'} ${t.priority==='high'?'高':'中'}優先</div>`:''}
-      ${progHtml}
-      ${subsHtml}
-    </div>`;}).join('');
+      onclick="openTaskModal('${t.id}')">
+      ${DH}
+      <div style="flex:1;min-width:0">
+        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:2px;flex-wrap:wrap">
+          ${t.priority?`<span style="font-size:10px">${t.priority==='high'?'🔴 高':'🟡 中'}</span>`:''}
+          ${progHtml}
+        </div>
+      </div>
+    </div>${subRows}`;}).join('');
   const sidePanel=`<div class="sched-side-panel" id="sched-side-panel"
     ondragover="schedSideDragOver(event)"
     ondragleave="schedSideDragLeave(event)"
     ondrop="schedSideDrop(event,'${d}')">
     <div class="sched-side-hdr">
-      <span>📋 今日のタスク</span>
-      <span style="font-size:11px;background:var(--border);padding:1px 6px;border-radius:10px">${undone.length}</span>
+      <span>📋 未配置タスク</span>
+      <span style="font-size:11px;background:var(--border);padding:1px 6px;border-radius:10px">${totalUndone}</span>
     </div>
-    ${sideItems||`<div style="font-size:12px;color:var(--t3);text-align:center;padding:16px 8px">未スケジュールの<br>タスクはありません</div>`}
-    <div style="font-size:10px;color:var(--t3);text-align:center;padding:6px 8px 8px;border-top:1px solid var(--border);margin-top:4px">↑ ドラッグでスケジュールに配置</div>
+    ${sideItems||`<div style="font-size:12px;color:var(--t3);text-align:center;padding:16px 8px">未スケジュールの<br>タスクはありません 🎉</div>`}
+    <div style="font-size:10px;color:var(--t3);text-align:center;padding:6px 8px 8px;border-top:1px solid var(--border);margin-top:4px">⠿ をドラッグしてスケジュールへ配置</div>
   </div>`;
   const dateLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'long'});
   return`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -1606,11 +1655,17 @@ function openDayModal(d){
 <button class="btn btn-p btn-sm" onclick="closeModal();openTaskModal(null,'${d}')">＋ この日にタスク追加</button>`);
 }
 // ===SCHEDULE D&D===
+// IDフォーマット: タスク → "taskId" / サブタスク → "taskId::subIdx"
 let _schedDragId=null,_schedDragOffset=0;
+function _parseSchedId(id){
+  if(!id)return{isSub:false,taskId:id,subIdx:-1};
+  const sep=id.indexOf('::');
+  if(sep<0)return{isSub:false,taskId:id,subIdx:-1};
+  return{isSub:true,taskId:id.slice(0,sep),subIdx:parseInt(id.slice(sep+2))};
+}
 function schedDragStart(e,id){
   _schedDragId=id;
   e.dataTransfer.effectAllowed='move';
-  // ドラッグ開始位置（ブロック上端からのオフセット）を記録
   const rect=e.currentTarget.getBoundingClientRect();
   _schedDragOffset=Math.round((e.clientY-rect.top)/PPM/15)*15;
 }
@@ -1623,16 +1678,27 @@ function schedDrop(e,date){
   const main=wrap.querySelector('.sched-main');
   const rect=main.getBoundingClientRect();
   const y=e.clientY-rect.top;
-  // オフセットを引いてブロック上端が基準になるよう補正
   const mins=Math.round(y/PPM/15)*15-_schedDragOffset+SS;
-  const t=S.tasks.find(t=>t.id===_schedDragId);
+  const {isSub,taskId,subIdx}=_parseSchedId(_schedDragId);
+  const t=S.tasks.find(t=>t.id===taskId);
   if(!t)return;
-  const dur=t.endTime?tMin(t.endTime)-tMin(t.startTime):60;
-  t.startTime=mToT(Math.max(SS,Math.min(SE-15,mins)));
-  t.endTime=mToT(Math.max(SS+15,Math.min(SE,mins+dur)));
-  t.dueDate=date;
-  save();render();_schedDragId=null;_schedDragOffset=0;
-  toast('スケジュールを更新しました');
+  if(isSub){
+    const s=(t.subtasks||[])[subIdx];
+    if(!s)return;
+    const dur=s.endTime?tMin(s.endTime)-tMin(s.startTime):30;
+    s.startTime=mToT(Math.max(SS,Math.min(SE-15,mins)));
+    s.endTime=mToT(Math.max(SS+15,Math.min(SE,mins+dur)));
+    t.dueDate=date;
+    save();render();_schedDragId=null;_schedDragOffset=0;
+    toast('サブタスクをスケジュールに配置しました');
+  }else{
+    const dur=t.endTime?tMin(t.endTime)-tMin(t.startTime):60;
+    t.startTime=mToT(Math.max(SS,Math.min(SE-15,mins)));
+    t.endTime=mToT(Math.max(SS+15,Math.min(SE,mins+dur)));
+    t.dueDate=date;
+    save();render();_schedDragId=null;_schedDragOffset=0;
+    toast('スケジュールを更新しました');
+  }
 }
 // ===SCHEDULE SIDE PANEL D&D===
 function sideTaskDragStart(e,id){
@@ -1642,6 +1708,9 @@ function sideTaskDragStart(e,id){
   e.currentTarget.classList.add('dragging');
 }
 function sideTaskDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+}
+function sideSubDragEnd(e){
   e.currentTarget.classList.remove('dragging');
 }
 function schedSideDragOver(e){
@@ -1655,8 +1724,15 @@ function schedSideDrop(e,date){
   e.preventDefault();
   document.getElementById('sched-side-panel')?.classList.remove('drag-over');
   if(!_schedDragId)return;
-  const t=S.tasks.find(t=>t.id===_schedDragId);
-  if(t){t.startTime=null;t.endTime=null;t.dueDate=date;save();render();toast('スケジュールから外しました');}
+  const {isSub,taskId,subIdx}=_parseSchedId(_schedDragId);
+  const t=S.tasks.find(t=>t.id===taskId);
+  if(!t){_schedDragId=null;return;}
+  if(isSub){
+    const s=(t.subtasks||[])[subIdx];
+    if(s){s.startTime=null;s.endTime=null;t.dueDate=date;save();render();toast('サブタスクをスケジュールから外しました');}
+  }else{
+    t.startTime=null;t.endTime=null;t.dueDate=date;save();render();toast('スケジュールから外しました');
+  }
   _schedDragId=null;
 }
 // ===TASK LIST D&D===
@@ -4647,7 +4723,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260518-9';
+const APP_VERSION='20260518-10';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
