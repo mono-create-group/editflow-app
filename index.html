@@ -1699,7 +1699,7 @@ function sortJobs(jobs){
 }
 function rProjects(){
   const clients=S.clients.filter(c=>!c.deleted);
-  const tabs=[['board','📋 ボード'],['list','📄 リスト'],['profit','💰 利益'],['payment','💳 支払い'],['completed','✅ 完了済み'],['worker','👤 編集者別'],['priority','📊 優先度表']];
+  const tabs=[['board','📋 ボード'],['listing','📢 掲載中'],['list','📄 リスト'],['profit','💰 利益'],['payment','💳 支払い'],['completed','✅ 完了済み'],['worker','👤 編集者別'],['priority','📊 優先度表']];
   return`<div class="ph">
   <div class="ph-title">案件管理</div>
   <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
@@ -1761,7 +1761,80 @@ ${(()=>{
   if(!warnings.length)return'';
   return`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px">${warnings.join('')}</div>`;
 })()}
-${{board:rProjBoard,list:()=>rProjList(clients),profit:rProjProfit,payment:rProjPayment,completed:rProjCompleted,worker:rProjWorker,priority:rProjPriority}[PVMT]?.()??rProjBoard()}`;
+${{board:rProjBoard,listing:rProjListing,list:()=>rProjList(clients),profit:rProjProfit,payment:rProjPayment,completed:rProjCompleted,worker:rProjWorker,priority:rProjPriority}[PVMT]?.()??rProjBoard()}`;
+}
+
+function rProjListing(){
+  const jobs=sortJobs(S.jobs.filter(j=>!j.deleted&&j.status==='案件掲載中'));
+  if(!jobs.length)return`<div class="empty">
+    <div class="empty-icon">📢</div>
+    <div class="empty-title">掲載中の案件なし</div>
+    <div style="color:var(--t2);margin-bottom:16px">ステータスが「案件掲載中」の案件がここに表示されます</div>
+    <button class="btn btn-p" onclick="openJobModal(null,'案件掲載中')">＋ 掲載案件を追加</button>
+  </div>`;
+  const totalIn=jobs.reduce((s,j)=>s+jobTotalIn(j),0);
+  const totalOut=jobs.reduce((s,j)=>s+jobTotalOut(j),0);
+  const totalProfit=jobs.reduce((s,j)=>s+jobProfit(j),0);
+  // クライアント別グループ
+  const clientIds=[...new Set(jobs.map(j=>j.clientId||'__none'))];
+  const grouped=clientIds.map(cid=>{
+    const cl=S.clients.find(c=>c.id===cid);
+    const cjobs=jobs.filter(j=>(j.clientId||'__none')===cid);
+    return{cl,cjobs};
+  });
+  return`<div class="card" style="margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+  <div><div style="font-size:11px;color:var(--t2)">掲載中件数</div><div style="font-size:22px;font-weight:700;color:var(--cyan)">${jobs.length}件</div></div>
+  ${totalIn?`<div><div style="font-size:11px;color:var(--t2)">合計単価</div><div style="font-size:20px;font-weight:700;color:var(--blue)">¥${totalIn.toLocaleString()}</div></div>`:''}
+  ${totalOut?`<div><div style="font-size:11px;color:var(--t2)">合計支払</div><div style="font-size:20px;font-weight:700;color:var(--amber)">¥${totalOut.toLocaleString()}</div></div>`:''}
+  ${totalIn?`<div><div style="font-size:11px;color:var(--t2)">見込み利益</div><div style="font-size:20px;font-weight:700;color:${totalProfit>=0?'var(--green)':'var(--red)'}">¥${totalProfit.toLocaleString()}</div></div>`:''}
+  <button class="btn btn-p btn-sm" style="margin-left:auto" onclick="openJobModal(null,'案件掲載中')">＋ 掲載案件を追加</button>
+</div>
+${grouped.map(({cl,cjobs})=>`
+  <div style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:13px;font-weight:700;color:var(--cyan)">📢</span>
+      <span style="font-size:13px;font-weight:700">${cl?esc(cl.name):'クライアント未設定'}</span>
+      <span style="font-size:11px;background:var(--cdim);color:var(--cyan);padding:1px 8px;border-radius:10px">${cjobs.length}件</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${cjobs.map(j=>{
+        const w=S.workers.find(wk=>wk.id===j.workerId);
+        const ti=jobTotalIn(j),to=jobTotalOut(j),pr=jobProfit(j);
+        const subDone=(j.subtasks||[]).filter(s=>s.done).length,subTot=(j.subtasks||[]).length;
+        return`<div class="card card-sm" style="border-left:3px solid var(--cyan);cursor:pointer" onclick="openJobModal('${j.id}')">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;font-size:12px;color:var(--t2)">
+                ${w?`<span>🛠 ${esc(w.name)}</span>`:''}
+                ${j.scope?`<span>📌 ${esc(j.scope)}</span>`:''}
+                ${j.sharedDate?`<span>📤 共有: ${j.sharedDate}</span>`:''}
+                ${j.deliveryDate?`<span class="${urgCls(j.deliveryDate)}">📅 納品: ${j.deliveryDate} (${fmt(j.deliveryDate)})</span>`:''}
+              </div>
+              ${(j.subtasks||[]).length?`<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">${(j.subtasks||[]).map((s,i)=>`
+                <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:${s.done?'var(--t3)':'var(--t2)'};${s.done?'text-decoration:line-through':''}" onclick="event.stopPropagation();toggleJobSub('${j.id}',${i})">
+                  <div style="width:12px;height:12px;border-radius:3px;border:1.5px solid ${s.done?'var(--cyan)':'var(--border)'};background:${s.done?'var(--cyan)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                    ${s.done?'<svg width="8" height="8" viewBox="0 0 8 8"><polyline points="1,4 3,6 7,2" stroke="#fff" stroke-width="1.5" fill="none"/></svg>':''}
+                  </div>
+                  <span>${esc(s.title)}</span>
+                </div>`).join('')}
+              </div>`:''}
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+              ${ti?`<div style="font-size:12px;color:var(--blue)">単価 ¥${ti.toLocaleString()}</div>`:''}
+              ${to?`<div style="font-size:12px;color:var(--amber)">支払 ¥${to.toLocaleString()}</div>`:''}
+              ${ti?`<div style="font-size:13px;font-weight:700;color:${pr>=0?'var(--green)':'var(--red)'}">利益 ¥${pr.toLocaleString()}</div>`:''}
+              ${subTot?`<span class="badge bc">☑ ${subDone}/${subTot}</span>`:''}
+              <div style="display:flex;gap:4px;margin-top:4px">
+                <button class="btn btn-g btn-xs" onclick="event.stopPropagation();quickStatusChange('${j.id}','未着手')" title="未着手に変更">▷ 未着手へ</button>
+                <button class="btn btn-p btn-xs" onclick="event.stopPropagation();quickStatusChange('${j.id}','進行中')" title="進行中に変更">▶ 進行中へ</button>
+              </div>
+            </div>
+          </div>
+          ${j.notes?`<div style="font-size:11px;color:var(--t3);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(j.notes)}</div>`:''}
+        </div>`;}).join('')}
+    </div>
+  </div>`).join('')}`;
 }
 
 function rProjBoard(){
@@ -3552,6 +3625,10 @@ function toggleJobSub(jobId,idx){
   const j=S.jobs.find(j=>j.id===jobId);if(!j?.subtasks)return;
   j.subtasks[idx].done=!j.subtasks[idx].done;save();render();
 }
+function quickStatusChange(jobId,newStatus){
+  const j=S.jobs.find(j=>j.id===jobId);if(!j)return;
+  j.status=newStatus;save();render();toast(`ステータスを「${newStatus}」に変更しました`);
+}
 function resetSchedTimes(date){
   S.tasks.filter(t=>!t.deleted&&t.dueDate===date).forEach(t=>{t.startTime=null;t.endTime=null;});
   save();render();toast('時間をリセットしました');
@@ -4545,7 +4622,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260518-7';
+const APP_VERSION='20260518-8';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
