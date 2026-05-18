@@ -726,122 +726,386 @@ const BUILTIN_VIEWS=[
 // ===RPG DATA===
 // Character SVG renderer — chibi proportions (big head, small body)
 function renderChar(charId,px=48){
-  const C={
-    hero:     {hc:'#f5c842',bc:'#3060d0',wc:'#c0c0c0',hat:'crown',weapon:'sword',blush:true,eye:'hero'},
-    mage:     {hc:'#9055c0',bc:'#2a1a5a',wc:'#a040e0',hat:'wizard',weapon:'staff',blush:true,eye:'calm'},
-    warrior:  {hc:'#8B4513',bc:'#804020',wc:'#d0a000',hat:'helm',weapon:'axe',blush:false,eye:'fierce'},
-    healer:   {hc:'#f0d0a0',bc:'#50a070',wc:'#ffffff',hat:'halo',weapon:'rod',blush:true,eye:'kind'},
-    thief:    {hc:'#302010',bc:'#202020',wc:'#40c070',hat:'cap',weapon:'dagger',blush:false,eye:'sly'},
-    dragon_knight:{hc:'#205020',bc:'#102010',wc:'#ff4020',hat:'dragonhelm',weapon:'lance',blush:false,eye:'fierce'},
-    bard:     {hc:'#f0c060',bc:'#c04080',wc:'#f0c060',hat:'feather',weapon:'lute',blush:true,eye:'calm'},
-    paladin:  {hc:'#f0e8d0',bc:'#e0d0a0',wc:'#ffffff',hat:'helm',weapon:'shield',blush:false,eye:'kind'},
-    ninja:    {hc:'#101010',bc:'#101010',wc:'#404040',hat:'mask',weapon:'shuriken',blush:false,eye:'sly'},
-    sage:     {hc:'#d0d0f0',bc:'#404060',wc:'#8080f0',hat:'scroll',weapon:'book',blush:true,eye:'wise'},
-    summoner: {hc:'#a060c0',bc:'#201030',wc:'#c080ff',hat:'horns',weapon:'orb',blush:true,eye:'wise'},
-    dancer:   {hc:'#ff90b0',bc:'#e03060',wc:'#ff90b0',hat:'flower',weapon:'fan',blush:true,eye:'calm'},
-    slime:    {hc:'#4488ff',bc:'#4488ff',wc:null,hat:'slime',weapon:null,blush:true,eye:'slime'},
-    goblin:   {hc:'#408040',bc:'#304030',wc:'#805020',hat:'ears',weapon:'club',blush:false,eye:'fierce'},
-    skeleton: {hc:'#e8e0d0',bc:'#c0b8a8',wc:'#c0b8a8',hat:'skull',weapon:'bone',blush:false,eye:'skull'},
-    dragon_boss:{hc:'#802000',bc:'#401000',wc:'#ff4000',hat:'dragonhead',weapon:'claws',blush:false,eye:'boss'},
+  // Pixel art (ドット絵) sprite renderer
+  // Each sprite: rows[] of equal-length strings; palette maps char->hex; '.' = transparent
+  const SPRITES={
+    slime:{
+      rows:[
+        '....DDDD....',
+        '...DBBBD....',
+        '..DBBBBBBD..',
+        '.DBBHBBBBD..',
+        '.DBBBBBBBBD.',
+        '.DBBWWBBBBD.',
+        '.DBBwwBBBBD.',
+        '.DBBBBBBSSD.',
+        '..DBBBBSSD..',
+        '...DDDDDD...',
+        '....ssss....',
+        '............',
+      ],
+      palette:{D:'#1a1a2e',B:'#5599ff',H:'#aaccff',b:'#3366cc',W:'#ffffff',w:'#111133',S:'#8ab4ff',s:'#88aaff44'}
+    },
+    goblin:{
+      rows:[
+        '....EEEE....',
+        '..EEeEEEEE..',
+        '.EEeeeeeEEEE',
+        'EEeEEEEEEeEE',
+        'EEeEOOEEeEEE',
+        'EEeEOOEEeEEE',
+        '.EEeEEEEeEE.',
+        '.EEEttEEEEE.',
+        '..ECCCEEE...',
+        '..ECCCEE....',
+        '.ECCCEEE....',
+        '.ECC.CCE....',
+      ],
+      palette:{E:'#1a2e1a',e:'#60a060',O:'#cc2200',C:'#7a5030',t:'#eeeecc',c:'#50804e'}
+    },
+    skeleton:{
+      rows:[
+        '....DDDD....',
+        '..DWWWWWD...',
+        '.DWWWWWWWD..',
+        '.DWW D DWD..',
+        '.DWWDDDWWD..',
+        '.DDWWWWWDD..',
+        '..DWWWWWD...',
+        '..DWDDWWD...',
+        '.DWWDDWWWD..',
+        '.DW.DD.WWD..',
+        '.DW.  .WWD..',
+        '..DD..DD....',
+      ],
+      palette:{D:'#1a1a2e',W:'#ddd8c8',w:'#c0b8a8',' ':'#1a1a2e'}
+    },
+    dragon_boss:{
+      rows:[
+        '..r..RR..r..',
+        '.RrrRRRrrrR.',
+        'DRRRrRRRrRRD',
+        'DRFFRRRRFfRD',
+        'DRRRRooRRRRD',
+        'DRRRRooRRRRD',
+        'DRRRRmmRRRRD',
+        '.DRRRRRRRRD.',
+        'DDRRRRRRRRDD',
+        'DfRRRRRRRfDD',
+        'DffRRRRRffDD',
+        '.DffRRRffDD.',
+      ],
+      palette:{D:'#1a1a2e',R:'#991100',r:'#cc2200',F:'#ff6600',f:'#ff9900',o:'#ff2200',m:'#880000'}
+    },
+    dark_bat:{
+      rows:[
+        'B.....BB....',
+        'BB...BBBB...',
+        'BBBBBBBBBBBB',
+        'BBBBBBBBBbBB',
+        'BBBRRBBRRbBB',
+        'BBBRRBBRRbBB',
+        '.BBBBBBBBbB.',
+        '..BBBBBBb...',
+        '...BBBBB....',
+        '....BBB.....',
+        '.....B......',
+        '............',
+      ],
+      palette:{B:'#1a1030',b:'#2a2040',R:'#cc0000',r:'#ff3300'}
+    },
+    golem:{
+      rows:[
+        '....GGGG....',
+        '..GGGGGGGG..',
+        '.GGGGGGGGGGG',
+        'GGGgGGGgGGGG',
+        'GGGgGGGgGGGG',
+        'GGGGGooGGGGG',
+        'GGGGGooGGGGG',
+        '.GGGGmmGGGG.',
+        '.GGGGGGGGGG.',
+        'GGGGGGGGGGG.',
+        'GGGg..gGGGG.',
+        '.GGG..GGG...',
+      ],
+      palette:{G:'#888888',g:'#555555',o:'#cc8800',m:'#444444'}
+    },
+    dark_knight:{
+      rows:[
+        '...DPPPPD...',
+        '..DPPPPPPdD.',
+        '.DPPppPPppPD',
+        '.DPPppPPppPD',
+        '.DPPPPPPPpPD',
+        '.DPPPrrPPPD.',
+        '..DPPPPPPPD.',
+        '..DPPPPPpD..',
+        '.DPPPPPPPD..',
+        '.DpPPPPPpDD.',
+        '.DpP.PP.pDD.',
+        '..DD.DD.DD..',
+      ],
+      palette:{D:'#1a1a2e',P:'#222244',p:'#3333aa',r:'#aa00cc',d:'#5555bb'}
+    },
+    procra_demon:{
+      rows:[
+        '..VV..VV....',
+        '.VvvVVvvV...',
+        '.VvvVVvvVV..',
+        'DVVVVVVVVvVD',
+        'DVVVhVVhVVVD',
+        'DVVVhVVhVVVD',
+        'DVVVVVVVVvVD',
+        '.DVVVmmVVVD.',
+        '..DVVVVVvD..',
+        '..DVVVVVvD..',
+        '..DV...VDD..',
+        '...D...D....',
+      ],
+      palette:{D:'#1a1a2e',V:'#7722aa',v:'#5511aa',h:'#ddaaff',m:'#ff8800'}
+    },
+    daruga:{
+      rows:[
+        '.r.RRRR.r.r.',
+        'rRRCCRRCRRrr',
+        'RRRCCRRCRRRR',
+        'RRRRffRRRRRR',
+        'RRRRffRRRRRR',
+        'RRRRmmRRRRRR',
+        'fRRRRRRRRRRf',
+        'ffRRRRRRRRff',
+        'fffRRRRRRfff',
+        'RfRRRRRRRfRR',
+        'RffRRRRRffRR',
+        'RfffRRRfffRR',
+      ],
+      palette:{R:'#880000',r:'#cc1100',f:'#ff5500',C:'#ffcc00',m:'#440000'}
+    },
+    hero:{
+      rows:[
+        '....CCCC....',
+        '...CyyyyC...',
+        '..CyyyyyyyC.',
+        '..CyWyWyyC..',
+        '..CyyyyymC..',
+        '..CCCCCCcC..',
+        '..CBBBBBBC..',
+        '.CBBBBBBBBC.',
+        '.CB.BBBBB.C.',
+        '.CB.BBBBB.C.',
+        '...BB...BB..',
+        '...BB...BB..',
+      ],
+      palette:{C:'#1a1a2e',y:'#f5c060',W:'#ffffff',m:'#cc6644',c:'#eeeeee',B:'#3060d0',b:'#2244aa'}
+    },
+    mage:{
+      rows:[
+        '...PPPPPP...',
+        '..PpPPPPPP..',
+        '.PppppPPPP..',
+        '.PpPPPPPpP..',
+        '..PPyyPPP...',
+        '..PPyWyPP...',
+        '..PPyyPPP...',
+        '..PMMMMMP...',
+        '.PMMMMMMMMP.',
+        '.PM.MMMM.MP.',
+        '...MM...MM..',
+        '...MM...MM..',
+      ],
+      palette:{P:'#1a1a2e',p:'#7744bb',y:'#e8c090',W:'#ffffff',M:'#2a1a5a',m:'#4422aa'}
+    },
+    warrior:{
+      rows:[
+        '...HHHHHH...',
+        '..HhHHHHhH..',
+        '.HhHHHHHHhH.',
+        '.HhHEEHHhH..',
+        '..HHEEHHhH..',
+        '..HHHHHhHH..',
+        '..HRRRRRHH..',
+        '.HRRRRRRRH..',
+        '.HR.RRRRRHH.',
+        '.HR.RRRRRHH.',
+        '...RR...RR..',
+        '...RR...RR..',
+      ],
+      palette:{H:'#1a1a2e',h:'#888899',E:'#cc4400',R:'#803010',r:'#aa4422'}
+    },
+    healer:{
+      rows:[
+        '....gggg....',
+        '...gyyyy g..',
+        '..gyyyyyyy g',
+        '..gyWyWyyg..',
+        '..gyyyyymg..',
+        '..ggGggggg..',
+        '..gWWGWWWg..',
+        '.gWWWGWWWWg.',
+        '.gW.WGWWW.g.',
+        '.gW.WGWWW.g.',
+        '...WW...WW..',
+        '...WW...WW..',
+      ],
+      palette:{g:'#1a1a2e',y:'#f0d0a0',W:'#ffffff',G:'#22bb55',m:'#cc8866'}
+    },
+    thief:{
+      rows:[
+        '....DDDD....',
+        '...DkkkkD...',
+        '..DkkkkkkD..',
+        '..DkWkWkkD..',
+        '..DkkkkkDD..',
+        '..DDDDDDdD..',
+        '..DaaaaaDk..',
+        '.DaaaaaaaD..',
+        '.Da.aaaaa.D.',
+        '.Da.aaaaa.D.',
+        '...aa...aa..',
+        '...aa...aa..',
+      ],
+      palette:{D:'#1a1a2e',k:'#201810',W:'#ffffff',d:'#40c070',a:'#252525'}
+    },
+    dragon_knight:{
+      rows:[
+        '....RRRR....',
+        '...RggggR...',
+        '..RggggggR..',
+        '..RgWgWggR..',
+        '..RgggggRR..',
+        '..RRRRRRrR..',
+        '..RDDDDDDR..',
+        '.RDDDDDDDDР.',
+        '.RD.DDDDD.R.',
+        '.RD.DDDDD.R.',
+        '...DD...DD..',
+        '...DD...DD..',
+      ],
+      palette:{R:'#1a1a2e',g:'#205020',W:'#ffffff',r:'#ff4020',D:'#102010',d:'#304030'}
+    },
+    bard:{
+      rows:[
+        '...FFFFFFF..',
+        '..FfFFFFFFF.',
+        '.FfffffffFFF',
+        '.FfFyyyyFfF.',
+        '..FFyWyFFF..',
+        '..FFyyyyFF..',
+        '..FPPPPPPF..',
+        '.FPPPPPPPPF.',
+        '.FP.PPPPP.F.',
+        '.FP.PPPPP.F.',
+        '...PP...PP..',
+        '...PP...PP..',
+      ],
+      palette:{F:'#1a1a2e',f:'#c04080',y:'#f0c060',W:'#ffffff',P:'#c04080',p:'#ff80b0'}
+    },
+    paladin:{
+      rows:[
+        '....AAAA....',
+        '...AyyyyA...',
+        '..AyyyyyyyA.',
+        '..AyWyWyyA..',
+        '..AyyyyymA..',
+        '..AAAAAAAAaA',
+        '..AGGGGGGGA.',
+        '.AGGGGGGGGA.',
+        '.AG.GGGGG.A.',
+        '.AG.GGGGG.A.',
+        '...GG...GG..',
+        '...GG...GG..',
+      ],
+      palette:{A:'#1a1a2e',y:'#f0e8d0',W:'#ffffff',G:'#e0d080',g:'#c0b050',m:'#cc8866',a:'#ffee88'}
+    },
+    ninja:{
+      rows:[
+        '....DDDD....',
+        '...DnnnnD...',
+        '..DnnnnnnD..',
+        '..DnnnnnDD..',
+        '..DDRRDnDD..',
+        '..DDDDDnDD..',
+        '..DnnnnnnD..',
+        '.DnnnnnnnnD.',
+        '.Dn.nnnnD.D.',
+        '.Dn.nnnnn.D.',
+        '...nn...nn..',
+        '...nn...nn..',
+      ],
+      palette:{D:'#1a1a2e',n:'#101010',R:'#cc0000',s:'#606060'}
+    },
+    sage:{
+      rows:[
+        '....BBBB....',
+        '...ByyyyB...',
+        '..BbyyyyyyyB',
+        '..BbWbWbyBB.',
+        '..BbyyyyybB.',
+        '..BBBBBBBbB.',
+        '..BssssssBB.',
+        '.BssssssssB.',
+        '.Bs.ssssB.B.',
+        '.Bs.ssssB.B.',
+        '...ss...ss..',
+        '...ss...ss..',
+      ],
+      palette:{B:'#1a1a2e',y:'#d0d0f0',W:'#ffffff',b:'#8888cc',s:'#404060',S:'#6060aa'}
+    },
+    summoner:{
+      rows:[
+        '....PPPP....',
+        '...PyyyyP...',
+        '..PyyyyyyyP.',
+        '..PyWyWyyP..',
+        '..PyyyyymP..',
+        '..PPPPPPPPP.',
+        '..PVVVVVVVP.',
+        '.PVVVVVVVVP.',
+        '.PV.VVVVV.P.',
+        '.PV.VVVVV.P.',
+        '...VV...VV..',
+        '...VV...VV..',
+      ],
+      palette:{P:'#1a1a2e',y:'#c090d0',W:'#ffffff',V:'#201030',v:'#4a1a7a',m:'#cc88ff'}
+    },
+    dancer:{
+      rows:[
+        '....FFFF....',
+        '...FyyyyF...',
+        '..FyyyyyyyF.',
+        '..FyWyWyyF..',
+        '..FyyyyymF..',
+        '..FFFFFFfFF.',
+        '..FDDDDDDFF.',
+        '.FDDDDDDDDFF',
+        '.FD.DDDDD.F.',
+        '.FD.DDDDD.F.',
+        '...DD...DD..',
+        '...DD...DD..',
+      ],
+      palette:{F:'#1a1a2e',y:'#ff90b0',W:'#ffffff',D:'#e03060',d:'#ff6090',m:'#cc4488',f:'#ff44aa'}
+    },
   };
-  const c=C[charId]||C.hero;
-  const s=px;const h=Math.round(s*0.85);
-  // Build SVG — head is 50% of height, body 40%, legs 10%
-  const hd=Math.round(h*0.44);// head diameter
-  const bh=Math.round(h*0.28);// body height
-  const bw=Math.round(hd*0.75);// body width
-  const lh=Math.round(h*0.12);// leg height
-  const cx=Math.round(s/2);
-  const headY=2;
-  const bodyY=headY+hd+2;
-  const legY=bodyY+bh;
-  const eyeOff=Math.round(hd*0.18);
-  const eyeY=headY+Math.round(hd*0.48);
-  const eyeR=Math.max(2,Math.round(hd*0.08));
-  // Eye variants
-  const eyeL=cx-eyeOff, eyeR2=cx+eyeOff;
-  let eyesSVG='';
-  if(c.eye==='slime'){eyesSVG=`<circle cx="${eyeL}" cy="${eyeY}" r="${eyeR+1}" fill="#fff"/><circle cx="${eyeR2}" cy="${eyeY}" r="${eyeR+1}" fill="#fff"/><circle cx="${eyeL+1}" cy="${eyeY+1}" r="${Math.max(1,eyeR-1)}" fill="#1a1a2a"/><circle cx="${eyeR2+1}" cy="${eyeY+1}" r="${Math.max(1,eyeR-1)}" fill="#1a1a2a"/>`;
-  }else if(c.eye==='skull'){eyesSVG=`<ellipse cx="${eyeL}" cy="${eyeY}" rx="${eyeR+2}" ry="${eyeR+1}" fill="#1a1a2a"/><ellipse cx="${eyeR2}" cy="${eyeY}" rx="${eyeR+2}" ry="${eyeR+1}" fill="#1a1a2a"/>`;
-  }else if(c.eye==='fierce'){eyesSVG=`<ellipse cx="${eyeL}" cy="${eyeY}" rx="${eyeR+1}" ry="${eyeR}" fill="#fff"/><ellipse cx="${eyeR2}" cy="${eyeY}" rx="${eyeR+1}" ry="${eyeR}" fill="#fff"/><circle cx="${eyeL+1}" cy="${eyeY}" r="${eyeR-1}" fill="#c00"/><circle cx="${eyeR2+1}" cy="${eyeY}" r="${eyeR-1}" fill="#c00"/>`;
-  }else if(c.eye==='boss'){eyesSVG=`<ellipse cx="${eyeL}" cy="${eyeY}" rx="${eyeR+2}" ry="${eyeR+1}" fill="#ff2200"/><ellipse cx="${eyeR2}" cy="${eyeY}" rx="${eyeR+2}" ry="${eyeR+1}" fill="#ff2200"/>`;
-  }else if(c.eye==='wise'){eyesSVG=`<circle cx="${eyeL}" cy="${eyeY}" r="${eyeR+1}" fill="#fff"/><circle cx="${eyeR2}" cy="${eyeY}" r="${eyeR+1}" fill="#fff"/><circle cx="${eyeL}" cy="${eyeY}" r="${eyeR-1}" fill="#225599"/><circle cx="${eyeR2}" cy="${eyeY}" r="${eyeR-1}" fill="#225599"/>`;
-  }else if(c.eye==='sly'){eyesSVG=`<ellipse cx="${eyeL}" cy="${eyeY}" rx="${eyeR+1}" ry="${Math.max(1,eyeR-1)}" fill="#fff"/><ellipse cx="${eyeR2}" cy="${eyeY}" rx="${eyeR+1}" ry="${Math.max(1,eyeR-1)}" fill="#fff"/><circle cx="${eyeL+1}" cy="${eyeY}" r="${Math.max(1,eyeR-1)}" fill="#1a1a2a"/><circle cx="${eyeR2+1}" cy="${eyeY}" r="${Math.max(1,eyeR-1)}" fill="#1a1a2a"/>`;
-  }else{// default: kind/hero/calm
-    eyesSVG=`<circle cx="${eyeL}" cy="${eyeY}" r="${eyeR+1}" fill="#fff"/><circle cx="${eyeR2}" cy="${eyeY}" r="${eyeR+1}" fill="#fff"/><circle cx="${eyeL}" cy="${eyeY}" r="${eyeR-1}" fill="#1a1a2a"/><circle cx="${eyeR2}" cy="${eyeY}" r="${eyeR-1}" fill="#1a1a2a"/>`;
-  }
-  // Blush
-  const blushSVG=c.blush?`<ellipse cx="${cx-Math.round(hd*0.32)}" cy="${eyeY+Math.round(hd*0.18)}" rx="${Math.round(hd*0.14)}" ry="${Math.round(hd*0.07)}" fill="#ff8899" opacity=".6"/><ellipse cx="${cx+Math.round(hd*0.32)}" cy="${eyeY+Math.round(hd*0.18)}" rx="${Math.round(hd*0.14)}" ry="${Math.round(hd*0.07)}" fill="#ff8899" opacity=".6"/>`:''
-  // Mouth
-  const mouthY=eyeY+Math.round(hd*0.28);
-  const mouthSVG=`<path d="M${cx-Math.round(hd*0.15)} ${mouthY} Q${cx} ${mouthY+Math.round(hd*0.1)} ${cx+Math.round(hd*0.15)} ${mouthY}" fill="none" stroke="#1a1a2a" stroke-width="1.5" stroke-linecap="round"/>`;
-  // Hat/head decoration
-  let hatSVG='';
-  const hatTop=headY-Math.round(hd*0.1);
-  if(c.hat==='crown'){hatSVG=`<polygon points="${cx-Math.round(hd*.32)},${hatTop} ${cx-Math.round(hd*.2)},${hatTop-Math.round(hd*.2)} ${cx},${hatTop-Math.round(hd*.08)} ${cx+Math.round(hd*.2)},${hatTop-Math.round(hd*.2)} ${cx+Math.round(hd*.32)},${hatTop}" fill="#f5c842" stroke="#c0a000" stroke-width="1"/>`;
-  }else if(c.hat==='wizard'){const brimY=hatTop+Math.round(hd*.1);hatSVG=`<ellipse cx="${cx}" cy="${brimY}" rx="${Math.round(hd*.42)}" ry="${Math.round(hd*.1)}" fill="#4a2080"/><polygon points="${cx-Math.round(hd*.22)},${brimY} ${cx},${hatTop-Math.round(hd*.45)} ${cx+Math.round(hd*.22)},${brimY}" fill="#6030a0"/>`;
-  }else if(c.hat==='helm'||c.hat==='dragonhelm'){const hColor=c.hat==='dragonhelm'?'#208020':'#808090';hatSVG=`<rect x="${cx-Math.round(hd*.3)}" y="${hatTop}" width="${Math.round(hd*.6)}" height="${Math.round(hd*.18)}" rx="3" fill="${hColor}"/>`;
-  }else if(c.hat==='cap'){hatSVG=`<ellipse cx="${cx}" cy="${hatTop+4}" rx="${Math.round(hd*.38)}" ry="${Math.round(hd*.12)}" fill="#303030"/><rect x="${cx-Math.round(hd*.28)}" y="${hatTop-Math.round(hd*.1)}" width="${Math.round(hd*.56)}" height="${Math.round(hd*.2)}" rx="2" fill="#202020"/>`;
-  }else if(c.hat==='halo'){hatSVG=`<ellipse cx="${cx}" cy="${hatTop-2}" rx="${Math.round(hd*.3)}" ry="${Math.round(hd*.07)}" fill="none" stroke="#ffe050" stroke-width="2.5"/>`;
-  }else if(c.hat==='feather'){hatSVG=`<ellipse cx="${cx}" cy="${hatTop+4}" rx="${Math.round(hd*.38)}" ry="${Math.round(hd*.12)}" fill="#c04080"/><path d="M${cx+Math.round(hd*.25)} ${hatTop} Q${cx+Math.round(hd*.5)} ${hatTop-Math.round(hd*.5)} ${cx+Math.round(hd*.3)} ${hatTop-Math.round(hd*.7)}" fill="none" stroke="#f0e060" stroke-width="2"/>`;
-  }else if(c.hat==='mask'){hatSVG=`<rect x="${cx-Math.round(hd*.32)}" y="${headY-2}" width="${Math.round(hd*.64)}" height="${Math.round(hd*.35)}" rx="3" fill="#181818"/>`;
-  }else if(c.hat==='scroll'){hatSVG=`<rect x="${cx-8}" y="${hatTop-Math.round(hd*.15)}" width="16" height="${Math.round(hd*.25)}" rx="3" fill="#c8c0a0"/>`;
-  }else if(c.hat==='horns'){hatSVG=`<polygon points="${cx-Math.round(hd*.25)},${hatTop} ${cx-Math.round(hd*.35)},${hatTop-Math.round(hd*.3)} ${cx-Math.round(hd*.15)},${hatTop}" fill="#c080ff"/><polygon points="${cx+Math.round(hd*.25)},${hatTop} ${cx+Math.round(hd*.35)},${hatTop-Math.round(hd*.3)} ${cx+Math.round(hd*.15)},${hatTop}" fill="#c080ff"/>`;
-  }else if(c.hat==='flower'){hatSVG=`<circle cx="${cx}" cy="${hatTop-2}" r="${Math.round(hd*.15)}" fill="#ff6090"/><circle cx="${cx}" cy="${hatTop-2}" r="${Math.round(hd*.07)}" fill="#ffe060"/>`;
-  }else if(c.hat==='slime'){// No hat for slime — antenna
-    hatSVG=`<circle cx="${cx}" cy="${hatTop-Math.round(hd*.25)}" r="${Math.max(2,Math.round(hd*.08))}" fill="${c.hc}"/><line x1="${cx}" y1="${hatTop}" x2="${cx}" y2="${hatTop-Math.round(hd*.25)}" stroke="${c.hc}" stroke-width="2"/>`;
-  }else if(c.hat==='ears'){hatSVG=`<ellipse cx="${cx-Math.round(hd*.35)}" cy="${hatTop-4}" rx="${Math.round(hd*.12)}" ry="${Math.round(hd*.18)}" fill="#408040"/><ellipse cx="${cx+Math.round(hd*.35)}" cy="${hatTop-4}" rx="${Math.round(hd*.12)}" ry="${Math.round(hd*.18)}" fill="#408040"/>`;
-  }else if(c.hat==='skull'){hatSVG='';// skull eye is the hat
-  }else if(c.hat==='dragonhead'){hatSVG=`<polygon points="${cx},${hatTop-Math.round(hd*.4)} ${cx-Math.round(hd*.35)},${hatTop} ${cx+Math.round(hd*.35)},${hatTop}" fill="#802000"/><circle cx="${cx-Math.round(hd*.15)}" cy="${hatTop-Math.round(hd*.25)}" r="3" fill="#ff4000"/><circle cx="${cx+Math.round(hd*.15)}" cy="${hatTop-Math.round(hd*.25)}" r="3" fill="#ff4000"/>`;
-  }
-  // Weapon (right side of body)
-  let weaponSVG='';
-  const wx=cx+Math.round(bw*0.6);
-  const wy=bodyY+Math.round(bh*0.1);
-  if(c.weapon==='sword'){weaponSVG=`<rect x="${wx}" y="${wy}" width="3" height="${Math.round(bh*.8)}" fill="#c8c8d8" rx="1"/><rect x="${wx-3}" y="${wy+Math.round(bh*.2)}" width="9" height="3" fill="#c0a000" rx="1"/>`;
-  }else if(c.weapon==='staff'){weaponSVG=`<rect x="${wx}" y="${wy-6}" width="2.5" height="${Math.round(bh*1.1)}" fill="#806030" rx="1"/><circle cx="${wx+1}" cy="${wy-8}" r="5" fill="#a040e0" opacity=".8"/>`;
-  }else if(c.weapon==='axe'){weaponSVG=`<rect x="${wx}" y="${wy}" width="3" height="${Math.round(bh*.8)}" fill="#808090" rx="1"/><polygon points="${wx+3},${wy} ${wx+12},${wy+6} ${wx+3},${wy+12}" fill="#c0a000"/>`;
-  }else if(c.weapon==='rod'){weaponSVG=`<rect x="${wx}" y="${wy-4}" width="2.5" height="${Math.round(bh*1.0)}" fill="#e0c060" rx="1"/><polygon points="${wx+1},${wy-4} ${wx+6},${wy-10} ${wx-4},${wy-10}" fill="#ffffff"/>`;
-  }else if(c.weapon==='dagger'){weaponSVG=`<rect x="${wx+1}" y="${wy+4}" width="2" height="${Math.round(bh*.5)}" fill="#909090" rx="1"/><polygon points="${wx+2},${wy+4} ${wx-1},${wy+10} ${wx+5},${wy+10}" fill="#c0c0c0"/>`;
-  }else if(c.weapon==='lance'){weaponSVG=`<rect x="${wx}" y="${wy-6}" width="2.5" height="${Math.round(bh*1.2)}" fill="#405080" rx="1"/><polygon points="${wx+1},${wy-6} ${wx-3},${wy+6} ${wx+5},${wy+6}" fill="#e0e0e0"/>`;
-  }else if(c.weapon==='lute'){weaponSVG=`<ellipse cx="${wx+5}" cy="${wy+Math.round(bh*.3)}" rx="7" ry="9" fill="#c08040"/><rect x="${wx+4}" y="${wy-4}" width="2.5" height="${Math.round(bh*.4)}" fill="#a06030"/>`;
-  }else if(c.weapon==='shield'){weaponSVG=`<path d="M${wx} ${wy} L${wx+12} ${wy} L${wx+12} ${wy+Math.round(bh*.55)} Q${wx+6} ${wy+Math.round(bh*.8)} ${wx} ${wy+Math.round(bh*.55)} Z" fill="#e0d080" stroke="#c0a000" stroke-width="1"/>`;
-  }else if(c.weapon==='shuriken'){weaponSVG=`<polygon points="${wx+5},${wy} ${wx+8},${wy+5} ${wx+5},${wy+10} ${wx+2},${wy+5}" fill="#909090"/><polygon points="${wx+1},${wy+2} ${wx+9},${wy+2} ${wx+9},${wy+8} ${wx+1},${wy+8}" fill="#707070" opacity=".6"/>`;
-  }else if(c.weapon==='book'){weaponSVG=`<rect x="${wx-2}" y="${wy}" width="14" height="11" rx="2" fill="#8080f0"/><rect x="${wx-1}" y="${wy+1}" width="12" height="9" rx="1" fill="#6060d0"/><line x1="${wx+5}" y1="${wy}" x2="${wx+5}" y2="${wy+11}" stroke="#4040a0" stroke-width="1"/>`;
-  }else if(c.weapon==='orb'){weaponSVG=`<circle cx="${wx+6}" cy="${wy+6}" r="7" fill="#c080ff" opacity=".8"/><circle cx="${wx+4}" cy="${wy+4}" r="2" fill="#fff" opacity=".6"/>`;
-  }else if(c.weapon==='fan'){weaponSVG=`<path d="M${wx} ${wy+10} L${wx-4} ${wy} L${wx+4} ${wy-2} L${wx+10} ${wy+2} L${wx+8} ${wy+10}Z" fill="#ff90b0" stroke="#e03060" stroke-width="1"/>`;
-  }else if(c.weapon==='club'){weaponSVG=`<rect x="${wx}" y="${wy+4}" width="3" height="${Math.round(bh*.6)}" fill="#604020" rx="1"/><circle cx="${wx+1}" cy="${wy+4}" r="5" fill="#708050"/>`;
-  }else if(c.weapon==='bone'){weaponSVG=`<rect x="${wx}" y="${wy}" width="3" height="${Math.round(bh*.7)}" fill="#e8e0d0" rx="1"/><circle cx="${wx+1}" cy="${wy}" r="4" fill="#d0c8b8"/><circle cx="${wx+1}" cy="${wy+Math.round(bh*.7)}" r="4" fill="#d0c8b8"/>`;
-  }else if(c.weapon==='claws'){weaponSVG=`<line x1="${wx}" y1="${wy}" x2="${wx+10}" y2="${wy+14}" stroke="#ff4000" stroke-width="2.5" stroke-linecap="round"/><line x1="${wx+4}" y1="${wy}" x2="${wx+14}" y2="${wy+14}" stroke="#ff4000" stroke-width="2.5" stroke-linecap="round"/>`;
-  }
-  // Body shape
-  let bodySVG='';
-  if(charId==='slime'){
-    // Slime: just a big round blob
-    const blobR=Math.round(h*0.38);
-    const blobCy=Math.round(h*0.55);
-    return`<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 ${s} ${s}">
-      <ellipse cx="${cx}" cy="${blobCy+4}" rx="${blobR}" ry="${Math.round(blobR*0.75)}" fill="${c.hc}" opacity=".3"/>
-      <ellipse cx="${cx}" cy="${blobCy}" rx="${blobR}" ry="${Math.round(blobR*0.8)}" fill="${c.hc}"/>
-      <ellipse cx="${cx-Math.round(blobR*.3)}" cy="${blobCy-Math.round(blobR*.4)}" rx="${Math.round(blobR*.12)}" ry="${Math.round(blobR*.08)}" fill="#fff" opacity=".5"/>
-      ${hatSVG}${eyesSVG}${blushSVG}${mouthSVG}
-    </svg>`;
-  }
-  // Normal body rect
-  bodySVG=`<rect x="${cx-Math.round(bw/2)}" y="${bodyY}" width="${bw}" height="${bh}" rx="4" fill="${c.bc}"/>`;
-  // Legs
-  const legW=Math.round(bw*0.3);
-  const legSVG=`<rect x="${cx-Math.round(bw*.28)}" y="${legY}" width="${legW}" height="${lh}" rx="3" fill="${c.bc}"/><rect x="${cx+Math.round(bw*.28)-legW}" y="${legY}" width="${legW}" height="${lh}" rx="3" fill="${c.bc}"/>`;
-  // Shadow
-  const shadowSVG=`<ellipse cx="${cx}" cy="${legY+lh+2}" rx="${Math.round(bw*.55)}" ry="${Math.round(lh*.35)}" fill="#000" opacity=".18"/>`;
-  return`<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 ${s} ${s}">
-    ${shadowSVG}
-    ${legSVG}
-    ${bodySVG}
-    <circle cx="${cx}" cy="${headY+Math.round(hd/2)}" r="${Math.round(hd/2)}" fill="${c.hc}"/>
-    ${hatSVG}${eyesSVG}${blushSVG}${mouthSVG}
-    ${weaponSVG}
-  </svg>`;
+
+  const sprite=SPRITES[charId]||SPRITES.hero;
+  const cols=sprite.rows[0].length;
+  const rows=sprite.rows.length;
+  const cellW=px/cols;
+  const cellH=px/rows;
+
+  let rects='';
+  sprite.rows.forEach((row,y)=>{
+    for(let x=0;x<row.length;x++){
+      const ch=row[x];
+      if(ch==='.')continue;
+      const color=sprite.palette[ch];
+      if(!color)continue;
+      rects+=`<rect x="${(x*cellW).toFixed(1)}" y="${(y*cellH).toFixed(1)}" width="${(cellW+0.5).toFixed(1)}" height="${(cellH+0.5).toFixed(1)}" fill="${color}"/>`;
+    }
+  });
+
+  return`<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 ${px} ${px}" shape-rendering="crispEdges">${rects}</svg>`;
 }
 
 // RPG characters data
@@ -5424,7 +5688,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-3';
+const APP_VERSION='20260519-4';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
@@ -5724,7 +5988,7 @@ function rRPGBattle(){
   <div class="section-ttl" style="margin-bottom:10px">出撃可能な敵 (${unlocked.length})</div>
   ${unlocked.map(e=>{
     const done=(r.completedBattles||[]).includes(e.id);
-    const charId=e.id==='slime'?'slime':e.id==='goblin'?'goblin':e.id==='skeleton'?'skeleton':e.id==='dark_bat'?'slime':e.id==='daruga'?'dragon_boss':e.id==='dark_knight'?'warrior':e.id==='procra_demon'?'slime':'goblin';
+    const charId=e.id==='slime'?'slime':e.id==='goblin'?'goblin':e.id==='skeleton'?'skeleton':e.id==='dark_bat'?'dark_bat':e.id==='golem'?'golem':e.id==='dark_knight'?'dark_knight':e.id==='procra_demon'?'procra_demon':e.id==='daruga'?'daruga':'goblin';
     return`<div class="card card-sm" style="margin-bottom:8px;display:flex;align-items:center;gap:12px">
       ${renderChar(charId,40)}
       <div style="flex:1">
@@ -5756,7 +6020,7 @@ function startBattle(enemyId){
 function rActiveBattle(){
   const r=ensureRPG();const bs=r.battleState;
   const enemy=ENEMIES.find(e=>e.id===bs.enemyId);if(!enemy)return'';
-  const eCharId=bs.enemyId==='daruga'?'dragon_boss':bs.enemyId==='skeleton'?'skeleton':bs.enemyId==='goblin'?'goblin':bs.enemyId==='slime'?'slime':'goblin';
+  const eCharId=bs.enemyId==='slime'?'slime':bs.enemyId==='goblin'?'goblin':bs.enemyId==='skeleton'?'skeleton':bs.enemyId==='dark_bat'?'dark_bat':bs.enemyId==='golem'?'golem':bs.enemyId==='dark_knight'?'dark_knight':bs.enemyId==='procra_demon'?'procra_demon':bs.enemyId==='daruga'?'daruga':'goblin';
   const eHpPct=Math.max(0,Math.round(bs.enemyHp/bs.enemyMaxHp*100));
   const hHpPct=Math.max(0,Math.round(bs.heroHp/bs.heroMaxHp*100));
   const hMpPct=Math.max(0,Math.round(bs.heroMp/bs.heroMaxMp*100));
