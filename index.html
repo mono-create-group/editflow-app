@@ -2024,6 +2024,20 @@ function migrate(d){
   // migrate ef_v4 → ef_v5
   const old=localStorage.getItem(DB_OLD);
   if(old&&!localStorage.getItem(DB)){try{const o=JSON.parse(old);Object.assign(d,o);localStorage.setItem(DB,JSON.stringify(d));localStorage.removeItem(DB_OLD);}catch{}}
+  // migrate v10→v11: 指定ワーカーをトライアルに設定、誤採用ログ削除
+  if(!d.settings._workerTrialMigrated){
+    const trialWorkerNames=['矢田部','菅野','鈴木','松下'];
+    (d.workers||[]).forEach(w=>{
+      if(trialWorkerNames.some(n=>w.name&&w.name.includes(n))){
+        w.employStatus='trial';
+        // 誤った採用ログを削除
+        (d.logs||[]).forEach(l=>{
+          if(l.type==='hire'&&l.result==='内定'&&(l.sourceWorkerId===w.id||l.title===w.name))l.deleted=true;
+        });
+      }
+    });
+    d.settings._workerTrialMigrated=true;
+  }
   // migrate v9→v10: 指定クライアントのトライアル設定・削除・重複除去
   if(!d.settings._clientTrialMigrated){
     const trialNames=['藤原みさき','ゆめみん日和','磯崎良太'];
@@ -4473,10 +4487,13 @@ function saveWorkerModal(id){
     }
   }else{
     if(!S.workers)S.workers=[];
-    S.workers.push({id:uid(),name,skills,contact,affiliation,minFee,workConditions,employStatus,createdAt:new Date().toISOString()});
-    // 新規追加は常に採用目標記録へ（result:'内定' でカウント）
-    S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'内定',note:`ワーカー追加時に自動記帳（${employStatus==='hired'?'本採用':'トライアル'}）`,createdAt:new Date().toISOString()});
-    toast(`👤 ${name} を採用目標記録に記帳しました`);
+    const wid2=uid();
+    S.workers.push({id:wid2,name,skills,contact,affiliation,minFee,workConditions,employStatus,createdAt:new Date().toISOString()});
+    // 本採用で追加した場合のみ採用目標に記帳（トライアルは記帳しない）
+    if(employStatus==='hired'){
+      S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'内定',note:'本採用で追加時に自動記帳',sourceWorkerId:wid2,createdAt:new Date().toISOString()});
+      toast(`👤 ${name} の本採用を目標に記帳しました`);
+    }
   }
   save();closeModal();render();toast('ワーカー情報を保存しました');
 }
@@ -4485,10 +4502,9 @@ function addWorker(){
   if(!n){toast('担当者名を入力してください','err');return;}
   if(!S.workers)S.workers=[];
   const wid=uid();
-  S.workers.push({id:wid,name:n,createdAt:new Date().toISOString()});
-  if(!S.logs)S.logs=[];
-  S.logs.push({id:uid(),type:'hire',date:today(),title:n,result:'内定',note:'担当者追加時に自動記帳',sourceWorkerId:wid,createdAt:new Date().toISOString()});
-  save();render();toast(`${n} を追加し、採用目標に記帳しました`);
+  // 設定の簡易追加はデフォルトでトライアル扱い（採用目標には記帳しない）
+  S.workers.push({id:wid,name:n,employStatus:'trial',createdAt:new Date().toISOString()});
+  save();render();toast(`${n} をトライアルで追加しました（本採用時にワーカー管理から変更してください）`);
 }
 
 function backfillGoalsData(){
@@ -4496,14 +4512,18 @@ function backfillGoalsData(){
   if(!S.logs)S.logs=[];
   let hireN=0,salesN=0,revN=0;
 
-  // 1. 既存ワーカー → 採用ログ
-  (S.workers||[]).forEach(w=>{
-    const already=S.logs.find(l=>!l.deleted&&l.type==='hire'&&(l.sourceWorkerId===w.id||(l.title===w.name&&l.result==='内定')));
+  // 1. 既存ワーカー → 採用ログ（本採用のみ。トライアルは除外）
+  (S.workers||[]).filter(w=>w.employStatus==='hired').forEach(w=>{
+    const already=S.logs.find(l=>!l.deleted&&l.type==='hire'&&l.result==='内定'&&(l.sourceWorkerId===w.id||(l.title===w.name)));
     if(!already){
       const dt=(w.createdAt||new Date().toISOString()).slice(0,10);
       S.logs.push({id:uid(),type:'hire',date:dt,title:w.name,result:'内定',note:'過去データ一括登録',sourceWorkerId:w.id,createdAt:new Date().toISOString()});
       hireN++;
     }
+  });
+  // トライアルワーカーの誤った採用ログを削除
+  (S.workers||[]).filter(w=>w.employStatus!=='hired').forEach(w=>{
+    S.logs.filter(l=>!l.deleted&&l.type==='hire'&&l.result==='内定'&&(l.sourceWorkerId===w.id||l.title===w.name)).forEach(l=>{l.deleted=true;cleanN++;});
   });
 
   // 2. 既存クライアント → 営業（成約）ログ（トライアルは除外）
@@ -6361,7 +6381,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-10';
+const APP_VERSION='20260519-11';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
