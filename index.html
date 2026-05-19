@@ -1667,7 +1667,7 @@ fbAuth.onAuthStateChanged(user=>{
 let _gcalToken=null;
 let _gcalTokenClient=null;
 let _gcalUpcomingEvents=[];
-const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/generativelanguage https://www.googleapis.com/auth/spreadsheets.readonly';
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets.readonly';
 const GCAL_CLIENT_ID='422987578809-sr1p6f6l2tvlsgc6fqqramfsphrg8q5j.apps.googleusercontent.com';
 
 function getGcalClientId(){
@@ -6494,7 +6494,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260520-1';
+const APP_VERSION='20260520-2';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
