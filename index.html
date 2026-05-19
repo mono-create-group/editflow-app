@@ -602,6 +602,11 @@ a{color:inherit;text-decoration:none}
 /* ─── RPG SYSTEM ─── */
 .rpg-card{background:var(--card);border:2px solid var(--border);border-radius:var(--r);padding:12px;transition:all .2s;cursor:pointer;position:relative}
 .rpg-card:hover{border-color:var(--purple);transform:translateY(-1px)}
+.char-idle{display:inline-block;animation:charBob 1.4s ease-in-out infinite;}
+.char-enemy{display:inline-block;animation:charBob 1.8s ease-in-out infinite 0.4s;}
+@keyframes charBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.char-story{display:inline-block;animation:charBob 2s ease-in-out infinite;}
+@keyframes charPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.4)}}
 .rarity-1{border-color:#6b7280}
 .rarity-2{border-color:#10b981}
 .rarity-3{border-color:#3b82f6}
@@ -726,380 +731,531 @@ const BUILTIN_VIEWS=[
 // ===RPG DATA===
 // Character SVG renderer — chibi proportions (big head, small body)
 function renderChar(charId,px=48){
-  // Pixel art (ドット絵) sprite renderer
-  // Each sprite: rows[] of equal-length strings; palette maps char->hex; '.' = transparent
+  const k='#1a1a2e';  // outline/shadow
   const SPRITES={
+    // ─── MONSTERS ───
     slime:{
+      w:12,h:14,
+      p:{k,B:'#5599ff',L:'#99ccff',D:'#2255aa',w:'#ffffff',p:'#2244ee',s:'#ff6699'},
       rows:[
-        '....DDDD....',
-        '...DBBBD....',
-        '..DBBBBBBD..',
-        '.DBBHBBBBD..',
-        '.DBBBBBBBBD.',
-        '.DBBWWBBBBD.',
-        '.DBBwwBBBBD.',
-        '.DBBBBBBSSD.',
-        '..DBBBBSSD..',
-        '...DDDDDD...',
-        '....ssss....',
-        '............',
-      ],
-      palette:{D:'#1a1a2e',B:'#5599ff',H:'#aaccff',b:'#3366cc',W:'#ffffff',w:'#111133',S:'#8ab4ff',s:'#88aaff44'}
+        '.....B......',
+        '....kBk.....',
+        '...kkkkk....',
+        '..kBBBBBk...',
+        '.kBBLBBBBk..',
+        'kBBBBBBBBBBk',
+        'kBBBBBBBBBBk',
+        'kBBwpBBBwpBk',
+        'kBBBBBBBBBBk',
+        'kBBBsBBsBBBk',
+        '.kBBBBBBBBk.',
+        '..kBBBBBBk..',
+        '...kDDDDk...',
+        '....kkkk....',
+      ]
     },
     goblin:{
+      w:14,h:14,
+      p:{k,G:'#44aa44',g:'#228822',L:'#88cc88',w:'#ffffff',r:'#cc2222',t:'#ffcc88',y:'#cc8800'},
       rows:[
-        '....EEEE....',
-        '..EEeEEEEE..',
-        '.EEeeeeeEEEE',
-        'EEeEEEEEEeEE',
-        'EEeEOOEEeEEE',
-        'EEeEOOEEeEEE',
-        '.EEeEEEEeEE.',
-        '.EEEttEEEEE.',
-        '..ECCCEEE...',
-        '..ECCCEE....',
-        '.ECCCEEE....',
-        '.ECC.CCE....',
-      ],
-      palette:{E:'#1a2e1a',e:'#60a060',O:'#cc2200',C:'#7a5030',t:'#eeeecc',c:'#50804e'}
+        '.kk........kk.',
+        'kGGk......kGGk',
+        'kGGGkkkkkGGGGk',
+        '.kGGGtttGGGGk.',
+        '.kGttttttttGk.',
+        '.kGtrrttrrtGk.',
+        '.kGttttttttGk.',
+        '..kGGyyyyGGk..',
+        '..kGGGGGGGGk..',
+        '...kGggGGgk...',
+        '....kGGGGk....',
+        '....kk..kk....',
+        '....kk..kk....',
+        '..............',
+      ]
     },
     skeleton:{
+      w:12,h:16,
+      p:{k,W:'#e8e0d0',w:'#ffffff',D:'#c0b8a8',B:'#303030'},
       rows:[
-        '....DDDD....',
-        '..DWWWWWD...',
-        '.DWWWWWWWD..',
-        '.DWW D DWD..',
-        '.DWWDDDWWD..',
-        '.DDWWWWWDD..',
-        '..DWWWWWD...',
-        '..DWDDWWD...',
-        '.DWWDDWWWD..',
-        '.DW.DD.WWD..',
-        '.DW.  .WWD..',
-        '..DD..DD....',
-      ],
-      palette:{D:'#1a1a2e',W:'#ddd8c8',w:'#c0b8a8',' ':'#1a1a2e'}
-    },
-    dragon_boss:{
-      rows:[
-        '..r..RR..r..',
-        '.RrrRRRrrrR.',
-        'DRRRrRRRrRRD',
-        'DRFFRRRRFfRD',
-        'DRRRRooRRRRD',
-        'DRRRRooRRRRD',
-        'DRRRRmmRRRRD',
-        '.DRRRRRRRRD.',
-        'DDRRRRRRRRDD',
-        'DfRRRRRRRfDD',
-        'DffRRRRRffDD',
-        '.DffRRRffDD.',
-      ],
-      palette:{D:'#1a1a2e',R:'#991100',r:'#cc2200',F:'#ff6600',f:'#ff9900',o:'#ff2200',m:'#880000'}
+        '....kWWWk...',
+        '...kWWWWWk..',
+        '..kWWWWWWWk.',
+        '.kWWBBkBBWWk',
+        '.kWBBkkBBkWk',
+        '.kWWWkkWWWWk',
+        '.kWWWWWWWWWk',
+        '..kWkkkkWk..',
+        '...kWWWWk...',
+        '..kWkWkWWk..',
+        '.kWkWkWkWWk.',
+        '.kWWWWWWWWk.',
+        '..kDkkkkkk..',
+        '...kWkkWk...',
+        '....kWkWk...',
+        '....k...k...',
+      ]
     },
     dark_bat:{
+      w:16,h:12,
+      p:{k,B:'#111122',b:'#222244',P:'#440066',r:'#ff2200',w:'#ccaaff'},
       rows:[
-        'B.....BB....',
-        'BB...BBBB...',
-        'BBBBBBBBBBBB',
-        'BBBBBBBBBbBB',
-        'BBBRRBBRRbBB',
-        'BBBRRBBRRbBB',
-        '.BBBBBBBBbB.',
-        '..BBBBBBb...',
-        '...BBBBB....',
-        '....BBB.....',
-        '.....B......',
-        '............',
-      ],
-      palette:{B:'#1a1030',b:'#2a2040',R:'#cc0000',r:'#ff3300'}
+        'kk..........kk..',
+        'kBkk......kkBk..',
+        'kBBBkkkkkkBBBk..',
+        'kBBBBBBBBBBBBk..',
+        'kBBBBBBBBBBBBBk.',
+        '.kBBwrrBBrrwBBk.',
+        '..kBBBBBBBBBBk..',
+        '...kBbBBBBbBk...',
+        '....kBBBBBBk....',
+        '.....kBBBBk.....',
+        '......kBBk......',
+        '.......kk.......',
+      ]
     },
     golem:{
+      w:14,h:16,
+      p:{k,G:'#888880',g:'#666658',L:'#aaaaaa',D:'#444440',r:'#ff3300'},
       rows:[
-        '....GGGG....',
-        '..GGGGGGGG..',
-        '.GGGGGGGGGGG',
-        'GGGgGGGgGGGG',
-        'GGGgGGGgGGGG',
-        'GGGGGooGGGGG',
-        'GGGGGooGGGGG',
-        '.GGGGmmGGGG.',
-        '.GGGGGGGGGG.',
-        'GGGGGGGGGGG.',
-        'GGGg..gGGGG.',
-        '.GGG..GGG...',
-      ],
-      palette:{G:'#888888',g:'#555555',o:'#cc8800',m:'#444444'}
+        '..kkkkkkkkkk..',
+        '.kGGGGGGGGGGk.',
+        'kGGLGGGGGGGGGk',
+        'kGGGGGGGGGGGGk',
+        'kGGrkkGGrkkGGk',
+        'kGGGkkGGGkkGGk',
+        'kGGGGGGGGGGGGk',
+        'kGGGGGGGGGGGGk',
+        'kGGGGGGGGGGGGk',
+        'kGGgkGGGGkgGGk',
+        '.kGGGGGGGGGGk.',
+        'kGGkk....kkGGk',
+        'kGGGk....kGGGk',
+        'kGGGk....kGGGk',
+        '.kGGk....kGGk.',
+        '..kk......kk..',
+      ]
     },
     dark_knight:{
+      w:14,h:18,
+      p:{k,N:'#111133',n:'#222255',S:'#8888aa',r:'#ff2200',y:'#ffcc00'},
       rows:[
-        '...DPPPPD...',
-        '..DPPPPPPdD.',
-        '.DPPppPPppPD',
-        '.DPPppPPppPD',
-        '.DPPPPPPPpPD',
-        '.DPPPrrPPPD.',
-        '..DPPPPPPPD.',
-        '..DPPPPPpD..',
-        '.DPPPPPPPD..',
-        '.DpPPPPPpDD.',
-        '.DpP.PP.pDD.',
-        '..DD.DD.DD..',
-      ],
-      palette:{D:'#1a1a2e',P:'#222244',p:'#3333aa',r:'#aa00cc',d:'#5555bb'}
+        '....kkkkkk....',
+        '...kNNNNNNk...',
+        '..kNNNNNNNNk..',
+        '.kNNNNNNNNNNk.',
+        'kNNNrrrrrrNNNk',
+        'kNNNNNNNNNNNNk',
+        'kNNNNNNNNNNNNk',
+        '.kNNNNNNNNNNk.',
+        '.kNNNNNNNNNNk.',
+        'kNNNNNNNNNNNNk',
+        'kNNNkSkSkNNNNk',
+        'kNNNkSkSkNNNNk',
+        'kNNNNNNNNNNNNk',
+        'kNNNNNNNNNNNNk',
+        '.kNNkk..kkNNk.',
+        '.kNNNk..kNNNk.',
+        '..kNNk..kNNk..',
+        '...kk....kk...',
+      ]
     },
     procra_demon:{
+      w:14,h:16,
+      p:{k,P:'#7733cc',p:'#5522aa',L:'#aa66ff',w:'#ffffff',r:'#ff3300',y:'#ffcc00',d:'#332244'},
       rows:[
-        '..VV..VV....',
-        '.VvvVVvvV...',
-        '.VvvVVvvVV..',
-        'DVVVVVVVVvVD',
-        'DVVVhVVhVVVD',
-        'DVVVhVVhVVVD',
-        'DVVVVVVVVvVD',
-        '.DVVVmmVVVD.',
-        '..DVVVVVvD..',
-        '..DVVVVVvD..',
-        '..DV...VDD..',
-        '...D...D....',
-      ],
-      palette:{D:'#1a1a2e',V:'#7722aa',v:'#5511aa',h:'#ddaaff',m:'#ff8800'}
+        '...kk....kk...',
+        '..kPk....kPk..',
+        '.kPPk....kPPk.',
+        'kPPPkkkkkPPPPk',
+        'kPPPPPPPPPPPPk',
+        'kPLLPPPPPPLLPk',
+        'kPPwrPPPPwrPPk',
+        'kPPPPPPPPPPPPk',
+        'kPPPPyPyPPPPPk',
+        'kPPPPPPPPPPPPk',
+        '.kPPPPPPPPPPk.',
+        '.kPPPPPPPPPPk.',
+        'kPPkk....kkPPk',
+        'kPPPk....kPPPk',
+        '.kPPk....kPPk.',
+        '..kk......kk..',
+      ]
     },
     daruga:{
+      w:16,h:20,
+      p:{k,R:'#cc2200',r:'#882200',D:'#440000',F:'#ff6600',y:'#ffcc00',w:'#ffffff',W:'#ffaaaa'},
       rows:[
-        '.r.RRRR.r.r.',
-        'rRRCCRRCRRrr',
-        'RRRCCRRCRRRR',
-        'RRRRffRRRRRR',
-        'RRRRffRRRRRR',
-        'RRRRmmRRRRRR',
-        'fRRRRRRRRRRf',
-        'ffRRRRRRRRff',
-        'fffRRRRRRfff',
-        'RfRRRRRRRfRR',
-        'RffRRRRRffRR',
-        'RfffRRRfffRR',
-      ],
-      palette:{R:'#880000',r:'#cc1100',f:'#ff5500',C:'#ffcc00',m:'#440000'}
+        '..kk..kyyy.k.kk.',
+        '.kRRk.kyykkRRRk.',
+        'kRRRkkkkkkkkRRRk',
+        'kRRRRRRRRRRRRRRk',
+        'kRRwwkRRRkwwRRRk',
+        'kRRwwkRRRkwwRRRk',
+        'kRRRRkFFFkRRRRRk',
+        'kRRRRRRRRRRRRRRk',
+        'kRRRRRRRRRRRRRRk',
+        'kDRRRRRRRRRRRRDk',
+        'kDDRRRRRRRRRDDDk',
+        'kDDRRRkRkRRRRDDk',
+        'kDDRRRkRkRRRRDDk',
+        'kDDRRRRRRRRRRDDk',
+        'kDDDRRRRRRRRDDDk',
+        '.kDDkk....kkDDk.',
+        '.kDDRk....kRDDk.',
+        '..kDRk....kRDk..',
+        '...kRk....kRk...',
+        '....k......k....',
+      ]
     },
+    // ─── HERO CHARACTERS ───
     hero:{
+      w:14,h:20,
+      p:{k,y:'#ffcc00',Y:'#ff9900',s:'#ffddaa',B:'#3355cc',b:'#2244aa',H:'#ff7722',w:'#ffffff',r:'#cc3322'},
       rows:[
-        '....CCCC....',
-        '...CyyyyC...',
-        '..CyyyyyyyC.',
-        '..CyWyWyyC..',
-        '..CyyyyymC..',
-        '..CCCCCCcC..',
-        '..CBBBBBBC..',
-        '.CBBBBBBBBC.',
-        '.CB.BBBBB.C.',
-        '.CB.BBBBB.C.',
-        '...BB...BB..',
-        '...BB...BB..',
-      ],
-      palette:{C:'#1a1a2e',y:'#f5c060',W:'#ffffff',m:'#cc6644',c:'#eeeeee',B:'#3060d0',b:'#2244aa'}
+        '....kykyky....',
+        '...kyyyyyyy...',
+        '...kyyyyyyyk..',
+        '..kssssssssk..',
+        '.kssssssssssk.',
+        'kssswksswksssk',
+        'ksssssssssssk.',
+        '.ksssssssssk..',
+        '..kkHHHHHkk...',
+        '..kBBBBBBBBk..',
+        '.kBBBBBBBBBBk.',
+        'kBBBBBBBBBBBBk',
+        'kBBBBBBBBBBBBk',
+        'kBBBBBBBBBBBBk',
+        '.kBbBBBBBBbBk.',
+        '..kBBkk..kBBk.',
+        '..kBBBk..kBBBk',
+        '..kBBBk..kBBBk',
+        '...kbBk..kBbk.',
+        '....kk....kk..',
+      ]
     },
     mage:{
+      w:14,h:22,
+      p:{k,P:'#8833cc',p:'#6622aa',L:'#cc88ff',s:'#ffddaa',w:'#ffffff',r:'#aa44ff',B:'#441166'},
       rows:[
-        '...PPPPPP...',
-        '..PpPPPPPP..',
-        '.PppppPPPP..',
-        '.PpPPPPPpP..',
-        '..PPyyPPP...',
-        '..PPyWyPP...',
-        '..PPyyPPP...',
-        '..PMMMMMP...',
-        '.PMMMMMMMMP.',
-        '.PM.MMMM.MP.',
-        '...MM...MM..',
-        '...MM...MM..',
-      ],
-      palette:{P:'#1a1a2e',p:'#7744bb',y:'#e8c090',W:'#ffffff',M:'#2a1a5a',m:'#4422aa'}
+        '.......k......',
+        '......kPk.....',
+        '.....kPPPk....',
+        '....kPPPPPk...',
+        '...kPPPPPPPk..',
+        '..kPPPPPPPPPk.',
+        '.kPPPpppppPPPk',
+        '..ksssssssk...',
+        '.ksssssssssk..',
+        'ksswkssswksssk',
+        'ksssssssssssk.',
+        '.ksssssssssk..',
+        '..kkksskkk....',
+        '..kBBBBBBBBk..',
+        '.kBBBBBBBBBBk.',
+        'kBBBBBBBBBBBBk',
+        'kBBBBBBBBBBBBk',
+        '.kBBkk..kkBBk.',
+        '..kBBk..kBBk..',
+        '..kBBk..kBBk..',
+        '...kBk..kBk...',
+        '....k....k....',
+      ]
     },
     warrior:{
+      w:14,h:20,
+      p:{k,A:'#cc4400',a:'#883300',S:'#888890',s:'#ffddaa',G:'#cc9900',w:'#ffffff'},
       rows:[
-        '...HHHHHH...',
-        '..HhHHHHhH..',
-        '.HhHHHHHHhH.',
-        '.HhHEEHHhH..',
-        '..HHEEHHhH..',
-        '..HHHHHhHH..',
-        '..HRRRRRHH..',
-        '.HRRRRRRRH..',
-        '.HR.RRRRRHH.',
-        '.HR.RRRRRHH.',
-        '...RR...RR..',
-        '...RR...RR..',
-      ],
-      palette:{H:'#1a1a2e',h:'#888899',E:'#cc4400',R:'#803010',r:'#aa4422'}
+        '....kSSSSSk...',
+        '...kSSSSSSSk..',
+        '..kSSSSSSSSSSk.',
+        '.kSSSSSSSSSSSSk',
+        '.kSSwkSSwkSSSSk',
+        '.kSSSSSSSSSSSSk',
+        '..kSSSSSSSSSk..',
+        '...kksssskkk...',
+        '..ksssssssssk..',
+        '.kssssssssssk..',
+        'kAAAAAAAAAAAAk.',
+        'kAAAAAAAAAAAAk.',
+        'kAAGkGGGkGAAk.',
+        'kAAAAAAAAAAAAk.',
+        'kAAAAAAAAAAAAk.',
+        '.kAAkk..kkAAk.',
+        '..kAAk..kAAk..',
+        '..kAAk..kAAk..',
+        '...kak..kak...',
+        '....k....k....',
+      ]
     },
     healer:{
+      w:14,h:20,
+      p:{k,W:'#eeeeff',w:'#ffffff',G:'#44aa66',g:'#338855',s:'#ffddaa',y:'#ffee88',H:'#ffe0f0'},
       rows:[
-        '....gggg....',
-        '...gyyyy g..',
-        '..gyyyyyyy g',
-        '..gyWyWyyg..',
-        '..gyyyyymg..',
-        '..ggGggggg..',
-        '..gWWGWWWg..',
-        '.gWWWGWWWWg.',
-        '.gW.WGWWW.g.',
-        '.gW.WGWWW.g.',
-        '...WW...WW..',
-        '...WW...WW..',
-      ],
-      palette:{g:'#1a1a2e',y:'#f0d0a0',W:'#ffffff',G:'#22bb55',m:'#cc8866'}
+        '.....kyyyk....',
+        '....kyyyyyy...',
+        '....kyyyyyy...',
+        '..ksssssssk...',
+        '.kssssssssssk.',
+        'kssswkssswsssk',
+        'ksssssssssssk.',
+        '.ksssssssssk..',
+        '..kHHHHHHk....',
+        '..kWWWWWWWWk..',
+        '.kWWWWWWWWWWk.',
+        'kWWWGkkkGWWWWk',
+        'kWWWkWWWkWWWWk',
+        'kWWWGkkkGWWWWk',
+        'kWWWWWWWWWWWWk',
+        '.kWWkk..kkWWk.',
+        '..kWWk..kWWk..',
+        '..kgWk..kWgk..',
+        '...kgk..kgk...',
+        '....k....k....',
+      ]
     },
     thief:{
+      w:12,h:18,
+      p:{k,D:'#222222',d:'#333333',G:'#338833',s:'#ffddaa',w:'#ffffff',r:'#dd2222'},
       rows:[
-        '....DDDD....',
-        '...DkkkkD...',
-        '..DkkkkkkD..',
-        '..DkWkWkkD..',
-        '..DkkkkkDD..',
-        '..DDDDDDdD..',
-        '..DaaaaaDk..',
-        '.DaaaaaaaD..',
-        '.Da.aaaaa.D.',
-        '.Da.aaaaa.D.',
-        '...aa...aa..',
-        '...aa...aa..',
-      ],
-      palette:{D:'#1a1a2e',k:'#201810',W:'#ffffff',d:'#40c070',a:'#252525'}
+        '....kDDDDk..',
+        '...kDDDDDDk.',
+        '..kDDDDDDDDk',
+        '..kDssssssDk',
+        '.kDsssssssDk',
+        'kDDssDkssDDk',
+        'kDDsssssssDk',
+        '.kDssssssDk.',
+        '..kkDDDDkk..',
+        '..kGGGGGGk..',
+        '.kGGGGGGGGk.',
+        'kGGGGGGGGGGk',
+        'kGGGGGGGGGGk',
+        '.kGGkk.kGGk.',
+        '..kGk...kGk.',
+        '..kDk...kDk.',
+        '..kDk...kDk.',
+        '...k.....k..',
+      ]
     },
     dragon_knight:{
+      w:14,h:20,
+      p:{k,G:'#225522',g:'#114411',L:'#44aa44',s:'#ffddaa',r:'#ff4400',y:'#ffaa00',S:'#888888'},
       rows:[
-        '....RRRR....',
-        '...RggggR...',
-        '..RggggggR..',
-        '..RgWgWggR..',
-        '..RgggggRR..',
-        '..RRRRRRrR..',
-        '..RDDDDDDR..',
-        '.RDDDDDDDDР.',
-        '.RD.DDDDD.R.',
-        '.RD.DDDDD.R.',
-        '...DD...DD..',
-        '...DD...DD..',
-      ],
-      palette:{R:'#1a1a2e',g:'#205020',W:'#ffffff',r:'#ff4020',D:'#102010',d:'#304030'}
+        '..kkrrkk..kk..',
+        '.kGGrrGGk.kk..',
+        'kGGGGGGGGk....',
+        'kGGGGGGGGGk...',
+        '.kGssssssGk...',
+        'kGssswkssGGk..',
+        'kGsssssssGGk..',
+        '.kGsssssGGk...',
+        '..kGGGGGGk....',
+        '..kGGGGGGGGk..',
+        '.kGGGGGGGGGGk.',
+        'kGGGGGGGGGGGGk',
+        'kGGGGGGGGGGGGk',
+        'kGGykkGGkkGGGk',
+        'kGGGGGGGGGGGGk',
+        '.kGGkk..kkGGk.',
+        '..kGGk..kGGk..',
+        '..kGGk..kGGk..',
+        '...kgk..kgk...',
+        '....k....k....',
+      ]
     },
     bard:{
+      w:14,h:20,
+      p:{k,P:'#dd3388',p:'#bb2266',y:'#ffee44',s:'#ffddaa',B:'#4488cc',w:'#ffffff'},
       rows:[
-        '...FFFFFFF..',
-        '..FfFFFFFFF.',
-        '.FfffffffFFF',
-        '.FfFyyyyFfF.',
-        '..FFyWyFFF..',
-        '..FFyyyyFF..',
-        '..FPPPPPPF..',
-        '.FPPPPPPPPF.',
-        '.FP.PPPPP.F.',
-        '.FP.PPPPP.F.',
-        '...PP...PP..',
-        '...PP...PP..',
-      ],
-      palette:{F:'#1a1a2e',f:'#c04080',y:'#f0c060',W:'#ffffff',P:'#c04080',p:'#ff80b0'}
+        '....kykyky....',
+        '...kPPPPPPPk..',
+        '..kPPPPPPPPPk.',
+        '..ksssssssssk.',
+        '.kssssssssssk.',
+        'kssswkssswsssk',
+        'ksssssssssssk.',
+        '.ksssssssssk..',
+        '..kPPPPPPk....',
+        '..kPPPPPPPPk..',
+        '.kPPPPPPPPPPk.',
+        'kPPPPPPPPPPPPk',
+        'kPyPPPPPPPyPPk',
+        'kPPPPPPPPPPPPk',
+        '.kPPkk..kkPPk.',
+        '..kPPk..kPPk..',
+        '..kpPk..kPpk..',
+        '...kpk..kpk...',
+        '....k....k....',
+        '..............',
+      ]
     },
     paladin:{
+      w:14,h:20,
+      p:{k,W:'#eeeecc',w:'#ffffff',y:'#ffee44',G:'#ddcc44',s:'#ffddaa',B:'#8888aa'},
       rows:[
-        '....AAAA....',
-        '...AyyyyA...',
-        '..AyyyyyyyA.',
-        '..AyWyWyyA..',
-        '..AyyyyymA..',
-        '..AAAAAAAAaA',
-        '..AGGGGGGGA.',
-        '.AGGGGGGGGA.',
-        '.AG.GGGGG.A.',
-        '.AG.GGGGG.A.',
-        '...GG...GG..',
-        '...GG...GG..',
-      ],
-      palette:{A:'#1a1a2e',y:'#f0e8d0',W:'#ffffff',G:'#e0d080',g:'#c0b050',m:'#cc8866',a:'#ffee88'}
+        '...kyyGyyyk...',
+        '..kGGGGGGGGk..',
+        '.kGGGGGGGGGGk.',
+        '..ksssssssk...',
+        '.kssssssssssk.',
+        'kssswkssswsssk',
+        'ksssssssssssk.',
+        '.ksssssssssk..',
+        '..kWWWWWWk....',
+        '..kWWWWWWWWk..',
+        '.kWWWWWWWWWWk.',
+        'kWWWWyyyyyyWWk',
+        'kWWWyWWWWWyWWk',
+        'kWWWWyyyyyyWWk',
+        'kWWWWWWWWWWWWk',
+        '.kWWkk..kkWWk.',
+        '..kWWk..kWWk..',
+        '..kBWk..kWBk..',
+        '...kBk..kBk...',
+        '....k....k....',
+      ]
     },
     ninja:{
+      w:12,h:18,
+      p:{k,N:'#111122',n:'#222233',r:'#ff2200',w:'#ffddaa'},
       rows:[
-        '....DDDD....',
-        '...DnnnnD...',
-        '..DnnnnnnD..',
-        '..DnnnnnDD..',
-        '..DDRRDnDD..',
-        '..DDDDDnDD..',
-        '..DnnnnnnD..',
-        '.DnnnnnnnnD.',
-        '.Dn.nnnnD.D.',
-        '.Dn.nnnnn.D.',
-        '...nn...nn..',
-        '...nn...nn..',
-      ],
-      palette:{D:'#1a1a2e',n:'#101010',R:'#cc0000',s:'#606060'}
+        '....kNNNNk..',
+        '...kNNNNNNk.',
+        '..kNNNNNNNNk',
+        '..kNNNNNNNNk',
+        '.kNNNNNNNNNk',
+        'kNNNNrrNNNNk',
+        'kNNNNrrNNNNk',
+        '.kNNNNNNNNk.',
+        '..kNNNNNNk..',
+        '..kNNNNNNk..',
+        '.kNNNNNNNNk.',
+        'kNNNNNNNNNNk',
+        'kNNNNNNNNNNk',
+        '.kNNkk.kNNk.',
+        '..kNk...kNk.',
+        '..kNk...kNk.',
+        '..knk...knk.',
+        '...k.....k..',
+      ]
     },
     sage:{
+      w:14,h:20,
+      p:{k,B:'#4455cc',b:'#334499',L:'#8899ff',s:'#e8d8c0',w:'#ffffff',y:'#ffee88',W:'#ccddff'},
       rows:[
-        '....BBBB....',
-        '...ByyyyB...',
-        '..BbyyyyyyyB',
-        '..BbWbWbyBB.',
-        '..BbyyyyybB.',
-        '..BBBBBBBbB.',
-        '..BssssssBB.',
-        '.BssssssssB.',
-        '.Bs.ssssB.B.',
-        '.Bs.ssssB.B.',
-        '...ss...ss..',
-        '...ss...ss..',
-      ],
-      palette:{B:'#1a1a2e',y:'#d0d0f0',W:'#ffffff',b:'#8888cc',s:'#404060',S:'#6060aa'}
+        '....kyyyyy....',
+        '...kWWWWWWk...',
+        '..kWBBBBBBWk..',
+        '..kssssssssk..',
+        '.kssssssssssk.',
+        'kssswkssswsssk',
+        'ksssssssssssk.',
+        '.ksssssssssk..',
+        '..kBBBBBBk....',
+        '..kBBBBBBBBk..',
+        '.kBBBBBBBBBBk.',
+        'kBBBLkkkLBBBBk',
+        'kBBBkBBBkBBBBk',
+        'kBBBLkkkLBBBBk',
+        'kBBBBBBBBBBBBk',
+        '.kBBkk..kkBBk.',
+        '..kBBk..kBBk..',
+        '..kbBk..kBbk..',
+        '...kbk..kbk...',
+        '....k....k....',
+      ]
     },
     summoner:{
+      w:14,h:20,
+      p:{k,P:'#553388',p:'#442266',L:'#9966ff',s:'#ffddaa',O:'#ff8800',w:'#ffffff',y:'#ffcc66'},
       rows:[
-        '....PPPP....',
-        '...PyyyyP...',
-        '..PyyyyyyyP.',
-        '..PyWyWyyP..',
-        '..PyyyyymP..',
-        '..PPPPPPPPP.',
-        '..PVVVVVVVP.',
-        '.PVVVVVVVVP.',
-        '.PV.VVVVV.P.',
-        '.PV.VVVVV.P.',
-        '...VV...VV..',
-        '...VV...VV..',
-      ],
-      palette:{P:'#1a1a2e',y:'#c090d0',W:'#ffffff',V:'#201030',v:'#4a1a7a',m:'#cc88ff'}
+        '....kOOOOk....',
+        '...kOOOOOOk...',
+        '...kOOOOOOk...',
+        '..kssssssssk..',
+        '.kssssssssssk.',
+        'kssswkssswsssk',
+        'ksssssssssssk.',
+        '.ksssssssssk..',
+        '..kPPPPPPk....',
+        '..kPPPPPPPPk..',
+        '.kPPPPPPPPPPk.',
+        'kPPPPPOOOPPPPk',
+        'kPPPPOyyyOPPPk',
+        'kPPPPPOOOPPPPk',
+        'kPPPPPPPPPPPPk',
+        '.kPPkk..kkPPk.',
+        '..kPPk..kPPk..',
+        '..kpPk..kPpk..',
+        '...kpk..kpk...',
+        '....k....k....',
+      ]
     },
     dancer:{
+      w:14,h:20,
+      p:{k,R:'#ee3366',r:'#cc2255',P:'#ff99cc',s:'#ffddaa',y:'#ffee88',w:'#ffffff'},
       rows:[
-        '....FFFF....',
-        '...FyyyyF...',
-        '..FyyyyyyyF.',
-        '..FyWyWyyF..',
-        '..FyyyyymF..',
-        '..FFFFFFfFF.',
-        '..FDDDDDDFF.',
-        '.FDDDDDDDDFF',
-        '.FD.DDDDD.F.',
-        '.FD.DDDDD.F.',
-        '...DD...DD..',
-        '...DD...DD..',
-      ],
-      palette:{F:'#1a1a2e',y:'#ff90b0',W:'#ffffff',D:'#e03060',d:'#ff6090',m:'#cc4488',f:'#ff44aa'}
+        '....kyPPPyk...',
+        '...kPPPPPPPk..',
+        '..kPPPPPPPPPk.',
+        '..ksssssssssk.',
+        '.kssssssssssk.',
+        'kssswkssswsssk',
+        'ksssssssssssk.',
+        '.ksssssssssk..',
+        '..kRRRRRRk....',
+        '..kRRRRRRRRk..',
+        '.kRRRRRRRRRRk.',
+        'kRRRRRRRRRRRRk',
+        'kRPRRRRRRRPRRk',
+        'kRRPPRRRPPRRRk',
+        'kRRRRRRRRRRRRk',
+        '.kRRkk..kkRRk.',
+        '..kRRk..kRRk..',
+        '..krRk..kRrk..',
+        '...krk..krk...',
+        '....k....k....',
+      ]
+    },
+    dragon_boss:{
+      w:16,h:18,
+      p:{k,R:'#882200',r:'#441100',F:'#ff6600',y:'#ffaa00',w:'#ffaaaa',D:'#220000'},
+      rows:[
+        '.kk..kyyyyk.kk..',
+        'kRRkkyyykkRRRk..',
+        'kRRRkkkkkRRRRk..',
+        '.kRRRRRRRRRRk...',
+        '.kRwwkRRkwwRk...',
+        '.kRRRFFFFRRRk...',
+        '.kRRRRRRRRRRk...',
+        '.kRRRRRRRRRRk...',
+        'kRRRkRRRRkRRRk..',
+        'kRRRRRRRRRRRRk..',
+        'kDRRRRRRRRRRRDk.',
+        'kDDRRRRRRRRRDDk.',
+        '.kDDRkkkkkRDDk..',
+        '..kDRRRRRRRDk...',
+        '..kDkk...kkDk...',
+        '...kDk...kDk....',
+        '....kk...kk.....',
+        '................',
+      ]
     },
   };
 
   const sprite=SPRITES[charId]||SPRITES.hero;
-  const cols=sprite.rows[0].length;
-  const rows=sprite.rows.length;
-  const cellW=px/cols;
-  const cellH=px/rows;
+  const {w,h,rows,p:palette}=sprite;
+  const cellW=px/w;
+  const cellH=px/h;
 
   let rects='';
-  sprite.rows.forEach((row,y)=>{
+  rows.forEach((row,y)=>{
     for(let x=0;x<row.length;x++){
       const ch=row[x];
-      if(ch==='.')continue;
-      const color=sprite.palette[ch];
+      if(ch==='.'||ch===' ')continue;
+      const color=palette[ch];
       if(!color)continue;
       rects+=`<rect x="${(x*cellW).toFixed(1)}" y="${(y*cellH).toFixed(1)}" width="${(cellW+0.5).toFixed(1)}" height="${(cellH+0.5).toFixed(1)}" fill="${color}"/>`;
     }
@@ -1508,7 +1664,7 @@ fbAuth.onAuthStateChanged(user=>{
 // ===GOOGLE CALENDAR===
 let _gcalToken=null;
 let _gcalTokenClient=null;
-const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/generativelanguage';
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/generativelanguage https://www.googleapis.com/auth/spreadsheets.readonly';
 const GCAL_CLIENT_ID='422987578809-sr1p6f6l2tvlsgc6fqqramfsphrg8q5j.apps.googleusercontent.com';
 
 function getGcalClientId(){
@@ -1653,6 +1809,170 @@ async function gcalImportEvents(){
   toast(`📅 ${n}件取り込み${nTimed?`（うち時刻付き ${nTimed}件）`:''}`);
 }
 
+// ===GOOGLE SHEETS===
+async function sheetsRead(range){
+  if(!_gcalToken){toast('先にGoogleと連携してください','warn');return null;}
+  const sid=(S.settings.sheetsId||'').trim();
+  if(!sid){toast('スプレッドシートIDを設定で入力してください','warn');return null;}
+  try{
+    const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sid)}/values/${encodeURIComponent(range)}`,{
+      headers:{'Authorization':'Bearer '+_gcalToken}
+    });
+    if(!res.ok){const err=await res.json();console.error('sheets error',err);toast('スプレッドシートの読み込みに失敗しました: '+((err.error&&err.error.message)||res.status),'err');return null;}
+    const data=await res.json();
+    return data.values||[];
+  }catch(e){console.error('sheetsRead error',e);toast('スプレッドシート読み込みエラー','err');return null;}
+}
+
+function sheetRowToJob(row,childRows){
+  // col: A=0案件名, B=1ステータス, C=2担当編集者, D=3編集共有日, E=4編集者初稿提出日
+  //      F=5クライアント初稿確認日, G=6納品日, H=7報酬額, I=8素材リンク, J=9参考動画リンク
+  //      K=10プロマネ, L=11備考
+  const get=(r,i)=>(r[i]||'').trim();
+  const parseDate=(s)=>{
+    if(!s)return'';
+    // MM/DD or YYYY/MM/DD or M月D日
+    s=s.replace(/\s/g,'');
+    const m1=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if(m1)return`${m1[1]}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
+    const m2=s.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+    if(m2){const y=new Date().getFullYear();return`${y}-${m2[1].padStart(2,'0')}-${m2[2].padStart(2,'0')}`;}
+    const m3=s.match(/^(\d{1,2})月(\d{1,2})日?$/);
+    if(m3){const y=new Date().getFullYear();return`${y}-${m3[1].padStart(2,'0')}-${m3[2].padStart(2,'0')}`;}
+    return'';
+  };
+  const parsePrice=(s)=>{
+    if(!s)return 0;
+    const n=parseInt(s.replace(/[¥,￥\s]/g,''));
+    return isNaN(n)?0:n;
+  };
+  // Worker lookup by name
+  const workerName=get(row,2);
+  const worker=workerName?(S.workers||[]).find(w=>w.name===workerName||w.name.includes(workerName)||workerName.includes(w.name)):null;
+  // Client lookup by name (プロマネ欄 = clientId)
+  const clientName=get(row,10);
+  const client=clientName?(S.clients||[]).find(c=>c.name===clientName||c.name.includes(clientName)||clientName.includes(c.name)):null;
+  // Notes from I, J, L
+  const notesParts=[];
+  const matLink=get(row,8);const refLink=get(row,9);const備考=get(row,11);
+  if(matLink)notesParts.push('素材: '+matLink);
+  if(refLink)notesParts.push('参考: '+refLink);
+  if(備考)notesParts.push(備考);
+  // Subtasks from child rows
+  const subtasks=childRows.map((cr,i)=>({
+    id:uid(),title:get(cr,0).replace(/^[└├│\s]+/,'').trim(),
+    status:'案件掲載中',done:false,
+    workerId:null,unitPrice:0,workerPay:0,
+    sharedDate:parseDate(get(cr,3)),
+    editorDraftDate:parseDate(get(cr,4)),
+    clientDraftDate:parseDate(get(cr,5)),
+    deliveryDate:parseDate(get(cr,6))
+  })).filter(s=>s.title);
+  return{
+    id:uid(),
+    title:get(row,0),
+    status:'案件掲載中',
+    workerId:worker?worker.id:null,
+    clientId:client?client.id:null,
+    scope:'',
+    unitPrice:parsePrice(get(row,7)),
+    profit:0,
+    workerPay:0,
+    sharedDate:parseDate(get(row,3)),
+    editorDraftDate:parseDate(get(row,4)),
+    clientDraftDate:parseDate(get(row,5)),
+    deliveryDate:parseDate(get(row,6)),
+    invoiceDate:'',paymentDate:'',payoutDate:'',
+    notes:notesParts.join('\n'),
+    subtasks,
+    createdAt:new Date().toISOString()
+  };
+}
+
+async function sheetsImportModal(){
+  if(!_gcalToken){
+    toast('先にGoogleと連携してください（設定からGoogleカレンダー連携）','warn');return;
+  }
+  toast('スプレッドシートを読み込み中…');
+  const rows=await sheetsRead('A:L');
+  if(!rows)return;
+  // Skip header row (row 0), collect data rows
+  const dataRows=rows.slice(1).filter(r=>(r[0]||'').trim());
+  if(!dataRows.length){toast('スプレッドシートにデータがありません','warn');return;}
+  // Group parent rows and child rows (child = starts with └ or ├)
+  const groups=[];
+  let current=null;
+  for(const r of dataRows){
+    const name=(r[0]||'').trim();
+    if(/^[└├│]/.test(name)){
+      if(current)current.children.push(r);
+    }else{
+      current={row:r,children:[]};
+      groups.push(current);
+    }
+  }
+  // Build preview jobs
+  const previews=groups.map(g=>({preview:sheetRowToJob(g.row,g.children),group:g}));
+  // Check which are already imported (by title match)
+  const existingTitles=new Set((S.jobs||[]).filter(j=>!j.deleted).map(j=>j.title));
+  // Render modal
+  const html=`<div class="modal-overlay" id="sheets-modal" onclick="if(event.target.id==='sheets-modal')closeModal()">
+  <div class="modal" style="max-width:560px;max-height:80vh;overflow-y:auto">
+    <div class="modal-hdr"><div class="modal-title">📊 スプレッドシートから取り込む</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div style="padding:16px">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:12px">${previews.length}件の案件が見つかりました。取り込む案件を選択してください。</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-g btn-sm" onclick="document.querySelectorAll('.sheets-chk').forEach(c=>c.checked=true)">全選択</button>
+        <button class="btn btn-g btn-sm" onclick="document.querySelectorAll('.sheets-chk').forEach(c=>c.checked=false)">全解除</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${previews.map((p,i)=>{
+          const j=p.preview;
+          const already=existingTitles.has(j.title);
+          return`<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid ${already?'var(--amber)':'var(--border)'};background:var(--card);cursor:pointer">
+            <input type="checkbox" class="sheets-chk" data-idx="${i}" ${already?'':'checked'} style="margin-top:3px;flex-shrink:0">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--t2);margin-top:3px">
+                ${j.unitPrice?`<span>¥${j.unitPrice.toLocaleString()}</span>`:''}
+                ${j.clientId?(S.clients.find(c=>c.id===j.clientId)?`<span>👤 ${esc(S.clients.find(c=>c.id===j.clientId).name)}</span>`:''): ''}
+                ${j.workerId?(S.workers.find(w=>w.id===j.workerId)?`<span>🛠 ${esc(S.workers.find(w=>w.id===j.workerId).name)}</span>`:''):''}
+                ${j.deliveryDate?`<span>📅 ${j.deliveryDate}</span>`:''}
+                ${j.subtasks.length?`<span>📋 子${j.subtasks.length}件</span>`:''}
+                ${already?`<span style="color:var(--amber)">⚠️ 同名あり</span>`:''}
+              </div>
+            </div>
+          </label>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+        <button class="btn btn-g btn-sm" onclick="closeModal()">キャンセル</button>
+        <button class="btn btn-p btn-sm" onclick="sheetsDoImport(${JSON.stringify(previews.map(p=>p.preview)).replace(/</g,'\\u003c')})">✅ 取り込む</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+  // Store previews for import
+  window._sheetsPreviews=previews.map(p=>p.preview);
+}
+
+function sheetsDoImport(allJobs){
+  // Get checked indices
+  const checked=[...document.querySelectorAll('.sheets-chk')].filter(c=>c.checked).map(c=>parseInt(c.dataset.idx));
+  if(!checked.length){toast('取り込む案件を選択してください','warn');return;}
+  const toImport=allJobs||window._sheetsPreviews||[];
+  let n=0;
+  for(const i of checked){
+    const j=toImport[i];
+    if(!j)continue;
+    if(!j.title)continue;
+    S.jobs.push(j);n++;
+  }
+  save();render();closeModal();
+  toast(`📊 ${n}件の案件を取り込みました`);
+}
+
 const LOG_TYPE_LBL={revenue:'💰 収益',sales:'📞 営業',hire:'👤 採用'};
 const GOAL_CATS=[{v:'revenue',l:'💰 収益'},{v:'skill',l:'📚 スキル'},{v:'habit',l:'🔥 習慣'},{v:'project',l:'🎬 案件'},{v:'sales',l:'📞 営業'},{v:'hire',l:'👤 採用'}];
 const GOAL_HORIZONS=[{v:'this_month',l:'今月の目標',icon:'📅'},{v:'next_month',l:'来月の目標',icon:'🗓'},{v:'monthly',l:'月毎の目標',icon:'📆'},{v:'year1',l:'1年間の目標',icon:'🌱'},{v:'year5',l:'5年後の目標',icon:'🚀'},{v:'year10',l:'10年後の目標',icon:'🌟'}];
@@ -1684,7 +2004,7 @@ function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[],
   checkIns:[], workouts:[], workers:[], memos:[], meals:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
-  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3},
+  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs'},
   frogId:null,
   customEx:[],
   navConfig:null,
@@ -2750,7 +3070,10 @@ function rProjListing(){
   ${(totalJobIn+subIn)?`<div><div style="font-size:11px;color:var(--t2)">合計単価</div><div style="font-size:20px;font-weight:700;color:var(--blue)">¥${(totalJobIn+subIn).toLocaleString()}</div></div>`:''}
   ${(totalJobOut+subOut)?`<div><div style="font-size:11px;color:var(--t2)">合計支払</div><div style="font-size:20px;font-weight:700;color:var(--amber)">¥${(totalJobOut+subOut).toLocaleString()}</div></div>`:''}
   ${(totalJobIn+subIn)?`<div><div style="font-size:11px;color:var(--t2)">見込み利益</div><div style="font-size:20px;font-weight:700;color:${(totalJobProfit+(subIn-subOut))>=0?'var(--green)':'var(--red)'}">¥${(totalJobProfit+(subIn-subOut)).toLocaleString()}</div></div>`:''}
-  <button class="btn btn-p btn-sm" style="margin-left:auto" onclick="openJobModal(null,'案件掲載中')">＋ 掲載案件を追加</button>
+  <div style="display:flex;gap:6px;margin-left:auto">
+    <button class="btn btn-sm" style="background:var(--gdim);color:var(--green);border:1px solid var(--green)" onclick="sheetsImportModal()">📊 スプレから取り込む</button>
+    <button class="btn btn-p btn-sm" onclick="openJobModal(null,'案件掲載中')">＋ 掲載案件を追加</button>
+  </div>
 </div>
 ${listingJobs.length?`<div style="font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:8px">📢 掲載中の案件 (${listingJobs.length}件)</div>
 <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
@@ -3861,6 +4184,17 @@ ${secTitle('📅 固定タイムスケジュール')}
   </div>
 </div>
 
+${secTitle('📊 Googleスプレッドシート連携')}
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:12px;color:var(--t2);margin-bottom:10px">案件掲載中ページの「📊 スプレから取り込む」ボタンで使用するスプレッドシートIDを設定します。GoogleカレンダーとのGoogle連携が必要です。</div>
+  <div class="fg" style="margin-bottom:10px">
+    <div class="fl">スプレッドシートID</div>
+    <input id="set-sheets-id" value="${esc(S.settings.sheetsId||'')}" placeholder="スプレッドシートIDを入力">
+    <div style="font-size:11px;color:var(--t3);margin-top:4px">URLの /spreadsheets/d/<strong>ここの部分</strong>/edit から取得できます</div>
+  </div>
+  <button class="btn btn-p btn-sm" onclick="saveSheetsId()">保存</button>
+</div>
+
 ${secTitle('👤 担当者管理')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:10px">案件管理の担当者選択に使われます</div>
@@ -4064,6 +4398,7 @@ function savePomoSettings(){
   save();resetPomo();toast('ポモドーロ設定を保存しました');
 }
 function saveTarget(){S.settings.target=parseInt(document.getElementById('set-target').value)||0;save();toast('目標を保存しました');}
+function saveSheetsId(){const v=document.getElementById('set-sheets-id')?.value.trim();if(!v){toast('スプレッドシートIDを入力してください','err');return;}S.settings.sheetsId=v;save();toast('📊 スプレッドシートIDを保存しました');}
 function saveIdentity(){S.settings.identity=document.getElementById('set-identity').value.trim();save();toast('アイデンティティを保存しました');}
 function saveFS(){save();toast('スケジュールを保存しました');}
 
@@ -5818,7 +6153,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-5';
+const APP_VERSION='20260519-6';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
@@ -5900,7 +6235,16 @@ function getEquipBonus(){
 
 function heroTotalStats(){
   const r=ensureRPG();const b=getEquipBonus();
-  return{atk:(r.hero.atk||12)+b.atk,def:(r.hero.def||8)+b.def,spd:(r.hero.spd||10)+b.spd};
+  let atk=(r.hero.atk||12)+b.atk,def=(r.hero.def||8)+b.def,spd=(r.hero.spd||10)+b.spd;
+  // Party bonus
+  const party=r.party||[];
+  party.forEach(charId=>{
+    const ch=CHARS.find(c=>c.id===charId);
+    if(!ch)return;
+    const bonus=ch.rarity>=5?{atk:10,def:10,spd:7}:ch.rarity>=4?{atk:6,def:6,spd:4}:{atk:3,def:3,spd:2};
+    atk+=bonus.atk;def+=bonus.def;spd+=bonus.spd;
+  });
+  return{atk,def,spd};
 }
 
 // ─── MAIN RPG PAGE ─────────────────────────────────────────────────────────
@@ -5929,7 +6273,7 @@ function rRPGStatus(){
   return`
 <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px">
   <div style="text-align:center">
-    ${renderChar('hero',80)}
+    <div class="char-idle">${renderChar('hero',80)}</div>
     <div style="font-size:13px;font-weight:700;margin-top:4px">${esc(h.name)}</div>
     <div style="font-size:11px;color:var(--pl)">Lv.${h.level} 勇者</div>
   </div>
@@ -5996,6 +6340,14 @@ ${party.length?`<div style="margin-bottom:16px">
     <div>🎬 案件完了 → <span style="color:var(--amber)">+200コイン / +100EXP</span></div>
     <div>🌅 デイリーボーナス → <span style="color:var(--amber)">+50コイン</span></div>
   </div>
+</div>
+
+<div style="margin-top:20px;padding-top:12px;border-top:1px solid var(--border)">
+  <div class="section-ttl" style="margin-bottom:8px;color:var(--red)">⚠️ データ管理</div>
+  <button class="btn btn-sm" style="background:var(--rdim);color:var(--red);border:1px solid var(--red)"
+    onclick="if(confirm('RPGデータをすべてリセットしますか？この操作は取り消せません。')){S.rpg=null;RPG_TAB='story';save();render();toast('RPGデータをリセットしました');}">
+    🗑 RPGデータをリセット
+  </button>
 </div>`;
 }
 
@@ -6040,11 +6392,11 @@ ${allDone?`<div class="card" style="text-align:center;padding:30px">
 `<div class="story-scene-art ${bgClass}">
   <div style="display:flex;align-items:flex-end;justify-content:center;gap:20px;width:100%">
     <div style="text-align:center">
-      ${renderChar(scene.npcChar||'hero',56)}
+      <div class="char-story">${renderChar(scene.npcChar||'hero',56)}</div>
       <div style="font-size:10px;color:rgba(255,255,255,.7);margin-top:4px">${esc(scene.npc)}</div>
     </div>
     <div style="text-align:center">
-      ${renderChar('hero',48)}
+      <div class="char-story">${renderChar('hero',48)}</div>
       <div style="font-size:10px;color:rgba(255,255,255,.7);margin-top:4px">勇者カリン</div>
     </div>
   </div>
@@ -6164,13 +6516,13 @@ function rActiveBattle(){
   return`
 <div class="battle-scene">
   <div style="text-align:center">
-    ${renderChar(eCharId,64)}
+    <div class="char-enemy">${renderChar(eCharId,64)}</div>
     <div style="font-size:12px;font-weight:700;margin-top:4px">${esc(enemy.name)}</div>
     <div style="font-size:10px;color:var(--t2)">HP ${bs.enemyHp}/${bs.enemyMaxHp}</div>
     <div class="rpg-bar" style="margin-top:4px"><div class="rpg-bar-fill rpg-bar-hp" style="width:${eHpPct}%"></div></div>
   </div>
   <div style="text-align:center">
-    ${renderChar('hero',56)}
+    <div class="char-idle">${renderChar('hero',56)}</div>
     <div style="font-size:12px;font-weight:700;margin-top:4px">${esc(r.hero.name)}</div>
     <div style="font-size:10px;color:var(--t2)">HP ${bs.heroHp}/${bs.heroMaxHp}</div>
     <div class="rpg-bar" style="margin-top:4px"><div class="rpg-bar-fill rpg-bar-hp" style="width:${hHpPct}%"></div></div>
@@ -6178,6 +6530,17 @@ function rActiveBattle(){
     <div class="rpg-bar"><div class="rpg-bar-fill rpg-bar-mp" style="width:${hMpPct}%"></div></div>
   </div>
 </div>
+${(r.party||[]).length>0?`
+<div style="display:flex;justify-content:center;gap:8px;margin-top:6px;padding:4px;background:rgba(0,0,0,.3);border-radius:8px">
+  ${(r.party||[]).slice(0,4).map(charId=>{
+    const ch=CHARS.find(c=>c.id===charId);
+    return ch?`<div style="text-align:center;opacity:.85">
+      <div class="char-idle">${renderChar(charId,28)}</div>
+      <div style="font-size:8px;color:var(--t2);margin-top:1px">${ch.name.slice(0,3)}</div>
+    </div>`:'';
+  }).join('')}
+  <div style="font-size:9px;color:var(--t3);display:flex;align-items:center;padding-left:4px">仲間が支援中</div>
+</div>`:''}
 
 <div class="battle-log">
   ${(bs.log||[]).slice(-4).map(l=>`<p class="${l.includes('ダメージ')?'dmg':l.includes('回復')||l.includes('HP')?'heal':'info'}">${esc(l)}</p>`).join('')}
@@ -6187,7 +6550,7 @@ ${bs.ended?`
 <div style="text-align:center;padding:16px;background:${bs.won?'var(--gdim)':'var(--rdim)'};border-radius:var(--r);margin-bottom:12px">
   <div style="font-size:24px;margin-bottom:8px">${bs.won?'🏆':'💀'}</div>
   <div style="font-size:16px;font-weight:700;color:${bs.won?'var(--green)':'var(--red)'}">${bs.won?'勝利！':'敗北…'}</div>
-  ${bs.won?`<div style="font-size:13px;color:var(--t2);margin-top:6px">+${enemy.coins}コイン / +${enemy.xp}EXP 獲得！</div>`:''}
+  ${bs.won?`<div style="font-size:13px;color:var(--t2);margin-top:6px">+${enemy.xp}EXP 獲得！</div>`:''}
   ${bs.dropName?`<div style="font-size:12px;color:var(--amber);margin-top:4px">🎁 ${bs.dropName} を手に入れた！</div>`:''}
 </div>
 <div style="display:flex;gap:8px;justify-content:center">
@@ -6241,9 +6604,8 @@ function battleAction(type){
   if(bs.enemyHp<=0){
     bs.ended=true;bs.won=true;bs.active=false;
     log.push(`${enemy.name}を倒した！`);
-    earnCoins(enemy.coins,'敵撃破');earnXP(enemy.xp);
+    earnXP(enemy.xp);  // XPのみ (コインはバトルでは獲得しない)
     if(!r.completedBattles.includes(enemy.id))r.completedBattles.push(enemy.id);
-    // Drop chance
     if(enemy.drops&&enemy.drops.length&&Math.random()<0.4){
       const dropId=enemy.drops[Math.floor(Math.random()*enemy.drops.length)];
       const eq=EQUIPS.find(e=>e.id===dropId);
@@ -6253,7 +6615,15 @@ function battleAction(type){
         log.push(`🎁 ${eq.name}を手に入れた！`);
       }
     }
-    bs.log.push(...log);save();render();return;
+    bs.log.push(...log);
+    // ストーリーバトルなら即座にシーン進行
+    if(r.battleFromStory){
+      r.battleState=null;r.battleFromStory=false;
+      RPG_TAB='story';
+      rpgAdvanceScene();
+      return;
+    }
+    save();render();return;
   }
 
   // Enemy turn
