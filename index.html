@@ -3295,21 +3295,68 @@ ${Object.entries(byWorker).length?Object.entries(byWorker).map(([wid,es])=>{
 function rProjWorker(){
   const workers=S.workers||[];
   const allJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
+  // サブタスクを持つジョブも含めて全件取得（完了・キャンセル以外）
+  const allJobsForSubs=S.jobs.filter(j=>!j.deleted);
+
+  // ワーカーIDに紐づくサブタスク一覧を構築
+  function subsForWorker(wid){
+    const result=[];
+    allJobsForSubs.forEach(j=>{
+      (j.subtasks||[]).forEach((s,i)=>{
+        if(s.done)return;
+        if(s.workerId===wid)result.push({job:j,sub:s,idx:i});
+      });
+    });
+    return result;
+  }
+
+  function rSubItem({job,sub,idx}){
+    const uc=urgCls(sub.deliveryDate||sub.editorDraftDate);
+    return`<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;background:var(--cdim);border:1px solid var(--cyan);margin:4px 0;cursor:pointer" onclick="openJobModal('${job.id}')">
+      <span style="font-size:11px;color:var(--cyan);flex-shrink:0;margin-top:2px">└</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--t3)">${esc(job.title)}</span>
+          <span style="color:var(--t3);font-size:11px">›</span>
+          <span style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sub.title)}</span>
+          ${sub.status?`<span class="badge ${SCOLBG[sub.status]||'bc'}" style="font-size:10px">${sub.status}</span>`:''}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:3px;font-size:11px;color:var(--t2)">
+          ${sub.editorDraftDate?`<span>✏️ 初稿: <span class="${urgCls(sub.editorDraftDate)}">${sub.editorDraftDate}</span></span>`:''}
+          ${sub.deliveryDate?`<span>📅 納品: <span class="${uc}">${sub.deliveryDate}</span></span>`:''}
+          ${sub.unitPrice?`<span style="color:var(--blue)">¥${sub.unitPrice.toLocaleString()}</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  }
+
   const groups=[];
   workers.forEach(w=>{
-    groups.push({label:w.name,id:w.id,jobs:sortJobs(allJobs.filter(j=>j.workerId===w.id))});
+    const jobs=sortJobs(allJobs.filter(j=>j.workerId===w.id));
+    const subs=subsForWorker(w.id);
+    groups.push({label:w.name,id:w.id,jobs,subs});
   });
   const selfJobs=sortJobs(allJobs.filter(j=>j.workerId===SELF_WID));
-  if(selfJobs.length)groups.unshift({label:'自分',id:SELF_WID,jobs:selfJobs});
+  const selfSubs=subsForWorker(SELF_WID);
+  if(selfJobs.length||selfSubs.length)groups.unshift({label:'自分',id:SELF_WID,jobs:selfJobs,subs:selfSubs});
   const noWorker=sortJobs(allJobs.filter(j=>!j.workerId||(!workers.find(w=>w.id===j.workerId)&&j.workerId!==SELF_WID)));
-  groups.push({label:'担当なし',id:null,jobs:noWorker});
+  const noWorkerSubs=subsForWorker(null);
+  groups.push({label:'担当なし',id:null,jobs:noWorker,subs:[]});
   if(!allJobs.length)return`<div class="empty"><div class="empty-icon">👤</div><div class="empty-title">進行中の案件なし</div></div>`;
-  return groups.filter(g=>g.jobs.length||g.id===null).map(g=>`<div class="client-card" style="margin-bottom:14px">
+  return groups.filter(g=>g.jobs.length||g.subs.length||(g.id===null&&noWorker.length)).map(g=>`<div class="client-card" style="margin-bottom:14px">
   <div class="client-hdr">
-    <div class="client-name">👤 ${esc(g.label)} <span style="font-size:13px;color:var(--t2);font-weight:400">(${g.jobs.length}件)</span></div>
+    <div class="client-name">👤 ${esc(g.label)}
+      <span style="font-size:13px;color:var(--t2);font-weight:400">
+        ${g.jobs.length?`${g.jobs.length}件`:''}${g.subs.length?`${g.jobs.length?' · ':''}サブタスク${g.subs.length}件`:''}
+      </span>
+    </div>
   </div>
   ${g.jobs.map(j=>rJobItem(j)).join('')}
-  ${!g.jobs.length?`<div style="font-size:12px;color:var(--t3);padding:6px 0">担当案件なし</div>`:''}
+  ${g.subs.length?`<div style="margin-top:${g.jobs.length?'8':'0'}px">
+    ${g.jobs.length?`<div style="font-size:11px;color:var(--t3);font-weight:700;margin:6px 0 4px;padding-top:6px;border-top:1px solid var(--border)">📋 サブタスク</div>`:''}
+    ${g.subs.map(s=>rSubItem(s)).join('')}
+  </div>`:''}
+  ${!g.jobs.length&&!g.subs.length?`<div style="font-size:12px;color:var(--t3);padding:6px 0">担当案件なし</div>`:''}
 </div>`).join('');
 }
 // ===PRIORITY VIEW===
@@ -6153,7 +6200,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-6';
+const APP_VERSION='20260519-7';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
