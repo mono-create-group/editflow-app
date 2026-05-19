@@ -1629,11 +1629,12 @@ async function fbLoad(){
         toast('☁️ ローカルデータを同期中…');
         return;
       }
-      S=Object.assign(defState(),cloud);
+      S=migrate(Object.assign(defState(),cloud));
       // nullになった配列フィールドを保護
       const def=defState();
       ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
       localStorage.setItem(DB,JSON.stringify(S));
+      fbSave(); // マイグレーション後の状態をクラウドにも保存
       render();
       toast('☁️ クラウドから同期しました');
     } else {
@@ -2025,7 +2026,7 @@ function migrate(d){
   const old=localStorage.getItem(DB_OLD);
   if(old&&!localStorage.getItem(DB)){try{const o=JSON.parse(old);Object.assign(d,o);localStorage.setItem(DB,JSON.stringify(d));localStorage.removeItem(DB_OLD);}catch{}}
   // migrate v10→v11: 指定ワーカーをトライアルに設定、誤採用ログ削除
-  if(!d.settings._workerTrialMigrated){
+  if(!d.settings._workerTrialMigrated2){
     const trialWorkerNames=['矢田部','菅野','鈴木','松下'];
     (d.workers||[]).forEach(w=>{
       if(trialWorkerNames.some(n=>w.name&&w.name.includes(n))){
@@ -2036,10 +2037,10 @@ function migrate(d){
         });
       }
     });
-    d.settings._workerTrialMigrated=true;
+    d.settings._workerTrialMigrated2=true;
   }
   // migrate v9→v10: 指定クライアントのトライアル設定・削除・重複除去
-  if(!d.settings._clientTrialMigrated){
+  if(!d.settings._clientTrialMigrated2){
     const trialNames=['藤原みさき','ゆめみん日和','磯崎良太'];
     const deleteNames=['なな','優樹'];
     // トライアルに設定
@@ -2058,7 +2059,7 @@ function migrate(d){
     (d.logs||[]).forEach(l=>{
       if(l.type==='sales'&&l.result==='成約'&&badClients.some(c=>c.id===l.sourceClientId||c.name===l.title))l.deleted=true;
     });
-    d.settings._clientTrialMigrated=true;
+    d.settings._clientTrialMigrated2=true;
   }
   // migrate v8→v9: 進行中 + 外注担当者あり → 編集者進行中
   if(!d.settings)d.settings={};
@@ -6418,7 +6419,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-12';
+const APP_VERSION='20260519-13';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
