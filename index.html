@@ -3419,35 +3419,72 @@ function rProjWorker(){
 }
 // ===PRIORITY VIEW===
 function rProjPriority(){
-  const jobs=sortJobs(S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル')).sort((a,b)=>{
-    const da=a.clientDraftDate||a.deliveryDate||'9999';
-    const db=b.clientDraftDate||b.deliveryDate||'9999';
-    return da>db?1:-1;
+  const activeJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
+  // 案件行
+  const jobRows=activeJobs.map(j=>({
+    type:'job',job:j,
+    sortDate:j.clientDraftDate||j.editorDraftDate||j.deliveryDate||'9999'
+  }));
+  // サブタスク行（未完了のもの）
+  const subRows=[];
+  activeJobs.forEach(j=>{
+    (j.subtasks||[]).filter(s=>!s.done).forEach(s=>{
+      subRows.push({
+        type:'sub',job:j,sub:s,
+        sortDate:s.clientDraftDate||s.editorDraftDate||s.deliveryDate||'9999'
+      });
+    });
   });
-  if(!jobs.length)return`<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">案件なし</div></div>`;
+  const allRows=[...jobRows,...subRows].sort((a,b)=>a.sortDate>b.sortDate?1:a.sortDate<b.sortDate?-1:0);
+  if(!allRows.length)return`<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">案件なし</div></div>`;
   return`<div class="card" style="padding:0;overflow:auto">
 <table style="width:100%;border-collapse:collapse;font-size:12px">
 <thead><tr style="background:var(--card2);font-weight:700;color:var(--t2)">
   <th style="padding:8px 12px;text-align:left">案件名</th>
   <th style="padding:8px 10px;text-align:left">ステータス</th>
-  <th style="padding:8px 10px;text-align:left">初稿日</th>
+  <th style="padding:8px 10px;text-align:left">クライアント初稿</th>
   <th style="padding:8px 10px;text-align:left">編集者初稿</th>
   <th style="padding:8px 10px;text-align:left">納品日</th>
   <th style="padding:8px 10px;text-align:left">担当</th>
 </tr></thead>
 <tbody>
-${jobs.map(j=>{
-  const w=S.workers.find(wk=>wk.id===j.workerId);
-  const wName=j.workerId===SELF_WID?'自分':w?esc(w.name):'-';
-  const uc=urgCls(j.deliveryDate);
-  return`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="openJobModal('${j.id}')">
-    <td style="padding:8px 12px;font-weight:600">${esc(j.title)}</td>
-    <td style="padding:8px 10px"><span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span></td>
-    <td style="padding:8px 10px;color:var(--t2)">${j.clientDraftDate||'-'}</td>
-    <td style="padding:8px 10px;color:var(--t2)">${j.editorDraftDate||'-'}</td>
-    <td style="padding:8px 10px;color:${uc==='urgent'?'var(--red)':uc==='soon'?'var(--amber)':'var(--t2)'}">${j.deliveryDate||'-'}</td>
-    <td style="padding:8px 10px;color:var(--t2)">${wName}</td>
-  </tr>`;}).join('')}
+${allRows.map(row=>{
+  if(row.type==='job'){
+    const j=row.job;
+    const w=S.workers.find(wk=>wk.id===j.workerId);
+    const wName=j.workerId===SELF_WID?'自分':w?esc(w.name):'-';
+    const uc=urgCls(j.deliveryDate);
+    return`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="openJobModal('${j.id}')">
+      <td style="padding:8px 12px;font-weight:600">${esc(j.title)}</td>
+      <td style="padding:8px 10px"><span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span></td>
+      <td style="padding:8px 10px;color:var(--t2)">${j.clientDraftDate||'-'}</td>
+      <td style="padding:8px 10px;color:var(--t2)">${j.editorDraftDate||'-'}</td>
+      <td style="padding:8px 10px;color:${uc==='urgent'?'var(--red)':uc==='soon'?'var(--amber)':'var(--t2)'}">${j.deliveryDate||'-'}</td>
+      <td style="padding:8px 10px;color:var(--t2)">${wName}</td>
+    </tr>`;
+  }else{
+    const {job:j,sub:s}=row;
+    const w=S.workers.find(wk=>wk.id===s.workerId);
+    const wName=s.workerId===SELF_WID?'自分':w?esc(w.name):'-';
+    const uc=urgCls(s.deliveryDate);
+    const subSt=s.status||'未着手';
+    return`<tr style="border-bottom:1px solid var(--border);background:var(--cdim);cursor:pointer" onclick="openJobModal('${j.id}')">
+      <td style="padding:6px 12px">
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="color:var(--cyan);font-size:11px;flex-shrink:0">└</span>
+          <span style="font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px">${esc(j.title)}</span>
+          <span style="color:var(--t3);font-size:10px">›</span>
+          <span style="font-weight:600;color:var(--text)">${esc(s.title)}</span>
+        </div>
+      </td>
+      <td style="padding:6px 10px"><span class="badge ${SCOLBG[subSt]||'bc'}" style="font-size:10px">${subSt}</span></td>
+      <td style="padding:6px 10px;color:var(--t2)">${s.clientDraftDate||'-'}</td>
+      <td style="padding:6px 10px;color:var(--t2)">${s.editorDraftDate||'-'}</td>
+      <td style="padding:6px 10px;color:${uc==='urgent'?'var(--red)':uc==='soon'?'var(--amber)':'var(--t2)'}">${s.deliveryDate||'-'}</td>
+      <td style="padding:6px 10px;color:var(--t2)">${wName||'-'}</td>
+    </tr>`;
+  }
+}).join('')}
 </tbody>
 </table></div>`;
 }
@@ -6381,7 +6418,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-11';
+const APP_VERSION='20260519-12';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
