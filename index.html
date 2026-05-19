@@ -4428,16 +4428,43 @@ ${secTitle('📅 Google Calendar連携')}
 function rWorkers(){
   const workers=S.workers||[];
   const activeJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'&&j.status!=='案件掲載中');
+  const allJobs=S.jobs.filter(j=>!j.deleted);
+  function subsForWorker(wid){
+    const result=[];
+    allJobs.forEach(j=>{
+      (j.subtasks||[]).forEach((s,i)=>{
+        if(s.done||s.status==='完了'||s.status==='キャンセル')return;
+        if(s.workerId===wid)result.push({job:j,sub:s,idx:i});
+      });
+    });
+    return result;
+  }
+  function rWorkerSubItem({job,sub}){
+    return`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-radius:8px;background:var(--cdim);border:1px solid var(--cyan);margin:4px 0;cursor:pointer" onclick="openJobModal('${job.id}')">
+      <span style="font-size:11px;color:var(--cyan);flex-shrink:0;margin-top:2px">└</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--t3)">${esc(job.title)}</span>
+          <span style="color:var(--t3);font-size:11px">›</span>
+          <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(sub.title)}</span>
+          ${sub.status?`<span class="badge ${SCOLBG[sub.status]||'bc'}" style="font-size:10px">${sub.status}</span>`:''}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:3px;font-size:11px;color:var(--t2)">
+          ${sub.editorDraftDate?`<span>✏️ 初稿: ${sub.editorDraftDate}</span>`:''}
+          ${sub.deliveryDate?`<span>📅 納品: ${sub.deliveryDate}</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  }
   return`<div class="ph">
   <div class="ph-title">ワーカー管理</div>
   <button class="btn btn-p" onclick="openAddWorkerModal()">＋ ワーカー追加</button>
 </div>
 ${!workers.length?`<div class="empty"><div class="empty-icon">👥</div><div class="empty-title">ワーカーがいません</div><div style="color:var(--t2)">案件モーダルや設定から担当者を追加してください</div></div>`
 :workers.map(w=>{
-  const myJobs=activeJobs.filter(j=>{
-    if(j.workerId===w.id)return true;
-    return(j.subtasks||[]).some(s=>s.workerId===w.id&&s.status!=='完了'&&s.status!=='キャンセル');
-  });
+  const myJobs=activeJobs.filter(j=>j.workerId===w.id);
+  const mySubs=subsForWorker(w.id);
+  const totalCount=myJobs.length+mySubs.length;
   const pastPaid=S.jobs.filter(j=>!j.deleted&&j.workerId===w.id&&j.payoutDate).reduce((s,j)=>s+jobTotalOut(j),0);
   return`<div class="card" style="margin-bottom:12px">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
@@ -4452,11 +4479,14 @@ ${!workers.length?`<div class="empty"><div class="empty-icon">👥</div><div cla
     </div>
   </div>
   <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
-    <div><div style="font-size:11px;color:var(--t2)">担当中</div><div style="font-size:18px;font-weight:700;color:var(--blue)">${myJobs.length}件</div></div>
+    <div><div style="font-size:11px;color:var(--t2)">担当中</div><div style="font-size:18px;font-weight:700;color:var(--blue)">${totalCount}件</div></div>
     ${w.minFee?`<div><div style="font-size:11px;color:var(--t2)">最低依頼料</div><div style="font-size:18px;font-weight:700;color:var(--green)">¥${Number(w.minFee).toLocaleString()}</div></div>`:''}
     ${pastPaid?`<div><div style="font-size:11px;color:var(--t2)">支払い累計</div><div style="font-size:18px;font-weight:700;color:var(--amber)">¥${pastPaid.toLocaleString()}</div></div>`:''}
   </div>
-  ${myJobs.length?`<div style="margin-top:10px">${myJobs.map(j=>`<div class="job-item" onclick="openJobModal('${j.id}')"><span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span><span class="job-title">${esc(j.title)}</span>${j.deliveryDate?`<span style="font-size:11px;color:var(--t2)">📅 ${j.deliveryDate}</span>`:''}</div>`).join('')}</div>`:''}
+  ${totalCount?`<div style="margin-top:10px">
+    ${myJobs.map(j=>`<div class="job-item" onclick="openJobModal('${j.id}')"><span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span><span class="job-title">${esc(j.title)}</span>${j.deliveryDate?`<span style="font-size:11px;color:var(--t2)">📅 ${j.deliveryDate}</span>`:''}</div>`).join('')}
+    ${mySubs.length?`${myJobs.length?`<div style="font-size:11px;color:var(--t3);font-weight:700;margin:6px 0 4px;padding-top:6px;border-top:1px solid var(--border)">📋 サブタスク</div>`:''}${mySubs.map(s=>rWorkerSubItem(s)).join('')}`:''}
+  </div>`:''}
 </div>`;}).join('')}`;
 }
 function workerAffiliationDatalist(){
@@ -6422,7 +6452,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-14';
+const APP_VERSION='20260519-15';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
