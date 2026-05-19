@@ -4186,6 +4186,17 @@ ${secTitle('💰 月間収益目標')}
   <button class="btn btn-p btn-sm" onclick="saveTarget()">保存</button>
 </div>
 
+${secTitle('📊 目標データ一括登録')}
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:12px;color:var(--t2);margin-bottom:10px">既存のワーカー・クライアント・完了案件を目標達成記録に一括登録します。重複は自動スキップされます。</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--t2);margin-bottom:10px">
+    <span>👤 採用目標: ワーカー ${(S.workers||[]).length}人</span>
+    <span>📞 営業目標: クライアント ${(S.clients||[]).length}社</span>
+    <span>💰 収益目標: 完了案件 ${(S.jobs||[]).filter(j=>!j.deleted&&j.status==='完了').length}件</span>
+  </div>
+  <button class="btn btn-p btn-sm" onclick="backfillGoalsData()">📥 過去データを目標に一括登録</button>
+</div>
+
 ${secTitle('🧠 アイデンティティ')}
 <div class="card" style="margin-bottom:16px">
   <div class="fg">
@@ -4429,8 +4440,53 @@ function addWorker(){
   const n=document.getElementById('new-worker-name')?.value.trim();
   if(!n){toast('担当者名を入力してください','err');return;}
   if(!S.workers)S.workers=[];
-  S.workers.push({id:uid(),name:n});
-  save();render();toast(`${n} を追加しました`);
+  const wid=uid();
+  S.workers.push({id:wid,name:n,createdAt:new Date().toISOString()});
+  if(!S.logs)S.logs=[];
+  S.logs.push({id:uid(),type:'hire',date:today(),title:n,result:'内定',note:'担当者追加時に自動記帳',sourceWorkerId:wid,createdAt:new Date().toISOString()});
+  save();render();toast(`${n} を追加し、採用目標に記帳しました`);
+}
+
+function backfillGoalsData(){
+  if(!confirm('既存のワーカー・クライアント・完了案件のデータを目標達成記録に一括登録します。重複は自動スキップされます。よろしいですか？'))return;
+  if(!S.logs)S.logs=[];
+  let hireN=0,salesN=0,revN=0;
+
+  // 1. 既存ワーカー → 採用ログ
+  (S.workers||[]).forEach(w=>{
+    const already=S.logs.find(l=>!l.deleted&&l.type==='hire'&&(l.sourceWorkerId===w.id||(l.title===w.name&&l.result==='内定')));
+    if(!already){
+      const dt=(w.createdAt||new Date().toISOString()).slice(0,10);
+      S.logs.push({id:uid(),type:'hire',date:dt,title:w.name,result:'内定',note:'過去データ一括登録',sourceWorkerId:w.id,createdAt:new Date().toISOString()});
+      hireN++;
+    }
+  });
+
+  // 2. 既存クライアント → 営業（成約）ログ
+  (S.clients||[]).forEach(c=>{
+    const already=S.logs.find(l=>!l.deleted&&l.type==='sales'&&l.result==='成約'&&(l.sourceClientId===c.id||(l.title===c.name)));
+    if(!already){
+      const dt=(c.createdAt||new Date().toISOString()).slice(0,10);
+      S.logs.push({id:uid(),type:'sales',date:dt,title:c.name,result:'成約',note:'過去データ一括登録',sourceClientId:c.id,createdAt:new Date().toISOString()});
+      salesN++;
+    }
+  });
+
+  // 3. 完了案件 → 収益ログ
+  (S.jobs||[]).filter(j=>!j.deleted&&j.status==='完了').forEach(j=>{
+    const already=S.logs.find(l=>!l.deleted&&l.sourceJobId===j.id&&l.type==='revenue');
+    if(!already){
+      const amount=(j.unitPrice||0)-(j.workerPay||0);
+      if(amount<=0)return;
+      const dt=j.paymentDate||j.deliveryDate||(j.createdAt||new Date().toISOString()).slice(0,10);
+      const client=S.clients?.find(c=>c.id===j.clientId);
+      S.logs.push({id:uid(),type:'revenue',date:dt,title:j.title,clientId:j.clientId||null,amount,sourceJobId:j.id,note:'過去データ一括登録',createdAt:new Date().toISOString()});
+      revN++;
+    }
+  });
+
+  save();render();
+  toast(`✅ 採用 ${hireN}件・営業 ${salesN}件・収益 ${revN}件 を登録しました`);
 }
 function addCustomEx(){
   const n=document.getElementById('new-ex-name')?.value.trim();
@@ -6200,7 +6256,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-7';
+const APP_VERSION='20260519-8';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
