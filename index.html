@@ -4427,14 +4427,17 @@ ${secTitle('📅 Google Calendar連携')}
 }
 function rWorkers(){
   const workers=S.workers||[];
-  const activeJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
+  const activeJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'&&j.status!=='案件掲載中');
   return`<div class="ph">
   <div class="ph-title">ワーカー管理</div>
   <button class="btn btn-p" onclick="openAddWorkerModal()">＋ ワーカー追加</button>
 </div>
 ${!workers.length?`<div class="empty"><div class="empty-icon">👥</div><div class="empty-title">ワーカーがいません</div><div style="color:var(--t2)">案件モーダルや設定から担当者を追加してください</div></div>`
 :workers.map(w=>{
-  const myJobs=activeJobs.filter(j=>j.workerId===w.id);
+  const myJobs=activeJobs.filter(j=>{
+    if(j.workerId===w.id)return true;
+    return(j.subtasks||[]).some(s=>s.workerId===w.id&&s.status!=='完了'&&s.status!=='キャンセル');
+  });
   const pastPaid=S.jobs.filter(j=>!j.deleted&&j.workerId===w.id&&j.payoutDate).reduce((s,j)=>s+jobTotalOut(j),0);
   return`<div class="card" style="margin-bottom:12px">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
@@ -6419,7 +6422,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260519-13';
+const APP_VERSION='20260519-14';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
