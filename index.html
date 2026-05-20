@@ -1763,7 +1763,7 @@ function _gcalInitAndAuth(clientId){
       gcalSync();
     }
   });
-  _gcalTokenClient.requestAccessToken();
+  _gcalTokenClient.requestAccessToken({prompt:'select_account'});
 }
 
 function gcalDisconnect(){
@@ -6494,7 +6494,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260520-2';
+const APP_VERSION='20260520-3';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
