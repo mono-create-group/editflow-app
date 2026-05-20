@@ -1667,7 +1667,8 @@ fbAuth.onAuthStateChanged(user=>{
 let _gcalToken=null;
 let _gcalTokenClient=null;
 let _gcalUpcomingEvents=[];
-const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets.readonly';
+let _gcalCalendarList=[];
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/spreadsheets.readonly';
 const GCAL_CLIENT_ID='422987578809-sr1p6f6l2tvlsgc6fqqramfsphrg8q5j.apps.googleusercontent.com';
 
 function getGcalClientId(){
@@ -1697,6 +1698,8 @@ function renderGcalUI(){
       ${tmrEvs.length?`<div style="color:var(--t3);font-size:10px;font-weight:700;margin:5px 0 2px">明日</div>${tmrEvs.map(evRow).join('')}`:''}
     </div>`;
   }
+  const selCalId=S.settings?.gcalCalendarId||'primary';
+  const calPicker=_gcalCalendarList.length>1?`<select onchange="gcalSelectCalendar(this.value)" style="width:100%;margin-top:5px;background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:3px 6px;font-size:11px;color:var(--text)">${_gcalCalendarList.map(c=>`<option value="${esc(c.id)}" ${c.id===selCalId||(!S.settings?.gcalCalendarId&&c.primary)?'selected':''}>${esc(c.summary)}${c.primary?' (メイン)':''}</option>`).join('')}</select>`:'';
   const html=_gcalToken
     ?`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px">
       <div style="display:flex;align-items:center;gap:7px">
@@ -1705,6 +1708,7 @@ function renderGcalUI(){
         <button onclick="gcalFetchUpcoming()" style="color:var(--blue);font-size:11px;padding:2px 6px;background:var(--pdim);border-radius:5px;border:none;cursor:pointer">更新</button>
         <button onclick="gcalDisconnect()" style="color:var(--t3);font-size:11px;padding:0;background:none;border:none;cursor:pointer">✕</button>
       </div>
+      ${calPicker}
       ${evHtml}
     </div>`
     :`<button onclick="gcalConnect()" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);display:flex;align-items:center;gap:7px;cursor:pointer">
@@ -1714,6 +1718,24 @@ function renderGcalUI(){
   const el=document.getElementById('gcal-ui');if(el)el.innerHTML=html;
   const mob=document.getElementById('mob-gcal-ui');if(mob)mob.innerHTML=html;
 }
+async function gcalFetchCalendarList(){
+  if(!_gcalToken)return;
+  try{
+    const res=await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader',{
+      headers:{'Authorization':'Bearer '+_gcalToken}
+    });
+    if(!res.ok)return;
+    const json=await res.json();
+    _gcalCalendarList=json.items||[];
+    renderGcalUI();
+  }catch(e){console.error('gcalFetchCalendarList error',e);}
+}
+function gcalSelectCalendar(id){
+  if(!S.settings)S.settings={};
+  S.settings.gcalCalendarId=id;
+  save();
+  gcalFetchUpcoming();
+}
 async function gcalFetchUpcoming(){
   if(!_gcalToken)return;
   const td=today();
@@ -1722,8 +1744,9 @@ async function gcalFetchUpcoming(){
   // ローカル日付の0時をUTCに変換して使用
   const timeMin=new Date(td+'T00:00:00').toISOString();
   const timeMax=new Date(tMax+'T00:00:00').toISOString();
+  const calId=encodeURIComponent(S.settings?.gcalCalendarId||'primary');
   try{
-    const res=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=30`,{
+    const res=await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calId}/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=30`,{
       headers:{'Authorization':'Bearer '+_gcalToken}
     });
     if(!res.ok){_gcalUpcomingEvents=[];renderGcalUI();return;}
@@ -1759,6 +1782,7 @@ function _gcalInitAndAuth(clientId){
       if(resp.error){toast('Googleカレンダーの連携に失敗しました: '+resp.error,'err');return;}
       _gcalToken=resp.access_token;
       toast('📅 Googleカレンダーと連携しました！');
+      gcalFetchCalendarList();
       gcalFetchUpcoming();
       gcalSync();
     }
@@ -1771,6 +1795,8 @@ function gcalDisconnect(){
     google.accounts.oauth2.revoke(_gcalToken,()=>{});
   }
   _gcalToken=null;
+  _gcalCalendarList=[];
+  _gcalUpcomingEvents=[];
   renderGcalUI();
   toast('Googleカレンダーの連携を解除しました');
 }
@@ -6558,7 +6584,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260520-5';
+const APP_VERSION='20260520-6';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
