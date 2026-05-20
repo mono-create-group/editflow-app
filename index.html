@@ -2347,9 +2347,11 @@ document.addEventListener('input',e=>{
 function checkDailyLock(){
   const now=new Date();
   const hour=now.getHours();
-  if(hour<19)return false; // 19時前はロックしない
   const td=today();
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
+  // 朝8時以降で朝のジャーナルが未完了 → 朝ロック
+  if(hour>=8&&hour<19&&!hasMorning)return true;
+  if(hour<19)return false; // 8時前または朝ジャーナル済みなら夜ロックチェックのみ
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
@@ -2362,8 +2364,24 @@ function gymDoneToday(){
   return w&&((w.entries||[]).length>0||w.exercises?.length>0);
 }
 function rLockScreen(){
+  const now=new Date();
+  const hour=now.getHours();
   const td=today();
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
+  // 朝ロック（8〜18時・朝ジャーナル未完了）
+  if(hour>=8&&hour<19&&!hasMorning){
+    return`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:40px 20px">
+  <div style="font-size:64px;margin-bottom:20px">🌅</div>
+  <div style="font-size:22px;font-weight:700;margin-bottom:12px">朝のジャーナルが未完了です</div>
+  <div style="font-size:14px;color:var(--t2);margin-bottom:24px;line-height:1.7">8時を過ぎたため、朝のジャーナルが完了するまで<br>アプリが使えません。</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 28px;margin-bottom:28px;text-align:left">
+    <div style="font-size:15px;padding:6px 0;color:var(--red)">❌ 🌅 朝のジャーナル</div>
+  </div>
+  <button class="btn btn-p" onclick="V='journal';JT='morning';render()">🌅 朝のジャーナルを記入する</button>
+  <div style="font-size:12px;color:var(--t3);margin-top:24px">記録完了後、自動的にアプリが開きます</div>
+</div>`;
+  }
+  // 夜ロック（19時以降）
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
@@ -2391,11 +2409,15 @@ function rLockScreen(){
 }
 function render(){
   try{
-    // 19時以降ロックチェック（ジャーナル・習慣ページのみ通過許可）
+    // ロックチェック（朝8時以降・朝ジャーナル未完了、または19時以降・夜の記録未完了）
     if(checkDailyLock()){
-      // ロック中はジャーナルと習慣トラッカーのみアクセス可
-      if(V!=='journal'&&V!=='habits'&&V!=='fitness'){
-        V='dashboard'; // 不正なビューをリセット
+      const _lh=new Date().getHours();
+      const _morningLock=_lh>=8&&_lh<19; // 朝ロック中かどうか
+      // 朝ロック：ジャーナルのみ通過許可
+      // 夜ロック：ジャーナル・習慣トラッカー・フィットネスのみ通過許可
+      const _pass=_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness');
+      if(!_pass){
+        V='dashboard';
         sessionStorage.setItem('ef_view','dashboard');
         document.getElementById('view').innerHTML=rLockScreen();
         renderNav();
@@ -6494,7 +6516,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260520-3';
+const APP_VERSION='20260520-4';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
