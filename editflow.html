@@ -1667,7 +1667,8 @@ fbAuth.onAuthStateChanged(user=>{
 let _gcalToken=null;
 let _gcalTokenClient=null;
 let _gcalUpcomingEvents=[];
-const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets.readonly';
+let _gcalCalendarList=[];
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/spreadsheets.readonly';
 const GCAL_CLIENT_ID='422987578809-sr1p6f6l2tvlsgc6fqqramfsphrg8q5j.apps.googleusercontent.com';
 
 function getGcalClientId(){
@@ -1697,6 +1698,8 @@ function renderGcalUI(){
       ${tmrEvs.length?`<div style="color:var(--t3);font-size:10px;font-weight:700;margin:5px 0 2px">明日</div>${tmrEvs.map(evRow).join('')}`:''}
     </div>`;
   }
+  const selCalId=S.settings?.gcalCalendarId||'primary';
+  const calPicker=_gcalCalendarList.length>1?`<select onchange="gcalSelectCalendar(this.value)" style="width:100%;margin-top:5px;background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:3px 6px;font-size:11px;color:var(--text)">${_gcalCalendarList.map(c=>`<option value="${esc(c.id)}" ${c.id===selCalId||(!S.settings?.gcalCalendarId&&c.primary)?'selected':''}>${esc(c.summary)}${c.primary?' (メイン)':''}</option>`).join('')}</select>`:'';
   const html=_gcalToken
     ?`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px">
       <div style="display:flex;align-items:center;gap:7px">
@@ -1705,6 +1708,7 @@ function renderGcalUI(){
         <button onclick="gcalFetchUpcoming()" style="color:var(--blue);font-size:11px;padding:2px 6px;background:var(--pdim);border-radius:5px;border:none;cursor:pointer">更新</button>
         <button onclick="gcalDisconnect()" style="color:var(--t3);font-size:11px;padding:0;background:none;border:none;cursor:pointer">✕</button>
       </div>
+      ${calPicker}
       ${evHtml}
     </div>`
     :`<button onclick="gcalConnect()" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);display:flex;align-items:center;gap:7px;cursor:pointer">
@@ -1714,6 +1718,24 @@ function renderGcalUI(){
   const el=document.getElementById('gcal-ui');if(el)el.innerHTML=html;
   const mob=document.getElementById('mob-gcal-ui');if(mob)mob.innerHTML=html;
 }
+async function gcalFetchCalendarList(){
+  if(!_gcalToken)return;
+  try{
+    const res=await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader',{
+      headers:{'Authorization':'Bearer '+_gcalToken}
+    });
+    if(!res.ok)return;
+    const json=await res.json();
+    _gcalCalendarList=json.items||[];
+    renderGcalUI();
+  }catch(e){console.error('gcalFetchCalendarList error',e);}
+}
+function gcalSelectCalendar(id){
+  if(!S.settings)S.settings={};
+  S.settings.gcalCalendarId=id;
+  save();
+  gcalFetchUpcoming();
+}
 async function gcalFetchUpcoming(){
   if(!_gcalToken)return;
   const td=today();
@@ -1722,8 +1744,9 @@ async function gcalFetchUpcoming(){
   // ローカル日付の0時をUTCに変換して使用
   const timeMin=new Date(td+'T00:00:00').toISOString();
   const timeMax=new Date(tMax+'T00:00:00').toISOString();
+  const calId=encodeURIComponent(S.settings?.gcalCalendarId||'primary');
   try{
-    const res=await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=30`,{
+    const res=await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calId}/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=30`,{
       headers:{'Authorization':'Bearer '+_gcalToken}
     });
     if(!res.ok){_gcalUpcomingEvents=[];renderGcalUI();return;}
@@ -1759,6 +1782,7 @@ function _gcalInitAndAuth(clientId){
       if(resp.error){toast('Googleカレンダーの連携に失敗しました: '+resp.error,'err');return;}
       _gcalToken=resp.access_token;
       toast('📅 Googleカレンダーと連携しました！');
+      gcalFetchCalendarList();
       gcalFetchUpcoming();
       gcalSync();
     }
@@ -1771,6 +1795,8 @@ function gcalDisconnect(){
     google.accounts.oauth2.revoke(_gcalToken,()=>{});
   }
   _gcalToken=null;
+  _gcalCalendarList=[];
+  _gcalUpcomingEvents=[];
   renderGcalUI();
   toast('Googleカレンダーの連携を解除しました');
 }
@@ -1818,6 +1844,23 @@ async function gcalAddRecurringInvoice(j){
     });
     toast('📅 請求書提出日を毎月のGoogleカレンダーに登録しました');
   }catch(e){console.error('gcal invoice error',e);}
+}
+async function gcalAddRecurringDelivery(j){
+  if(!_gcalToken||!j.deliveryDate)return;
+  const event={
+    summary:`📋 提出: ${j.title}`,
+    description:`案件: ${j.title}\n毎月繰り返し`,
+    start:{date:j.deliveryDate},
+    end:{date:j.deliveryDate},
+    recurrence:['RRULE:FREQ=MONTHLY']
+  };
+  try{
+    await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+      method:'POST',headers:{'Authorization':'Bearer '+_gcalToken,'Content-Type':'application/json'},
+      body:JSON.stringify(event)
+    });
+    toast('📅 提出日を毎月のGoogleカレンダーに登録しました');
+  }catch(e){console.error('gcal delivery error',e);}
 }
 async function gcalImportEvents(){
   if(!_gcalToken){toast('先にGoogleカレンダーと連携してください','warn');return;}
@@ -2347,9 +2390,11 @@ document.addEventListener('input',e=>{
 function checkDailyLock(){
   const now=new Date();
   const hour=now.getHours();
-  if(hour<19)return false; // 19時前はロックしない
   const td=today();
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
+  // 朝8時以降で朝のジャーナルが未完了 → 朝ロック
+  if(hour>=8&&hour<19&&!hasMorning)return true;
+  if(hour<19)return false; // 8時前または朝ジャーナル済みなら夜ロックチェックのみ
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
@@ -2362,8 +2407,24 @@ function gymDoneToday(){
   return w&&((w.entries||[]).length>0||w.exercises?.length>0);
 }
 function rLockScreen(){
+  const now=new Date();
+  const hour=now.getHours();
   const td=today();
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
+  // 朝ロック（8〜18時・朝ジャーナル未完了）
+  if(hour>=8&&hour<19&&!hasMorning){
+    return`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:40px 20px">
+  <div style="font-size:64px;margin-bottom:20px">🌅</div>
+  <div style="font-size:22px;font-weight:700;margin-bottom:12px">朝のジャーナルが未完了です</div>
+  <div style="font-size:14px;color:var(--t2);margin-bottom:24px;line-height:1.7">8時を過ぎたため、朝のジャーナルが完了するまで<br>アプリが使えません。</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 28px;margin-bottom:28px;text-align:left">
+    <div style="font-size:15px;padding:6px 0;color:var(--red)">❌ 🌅 朝のジャーナル</div>
+  </div>
+  <button class="btn btn-p" onclick="V='journal';JT='morning';render()">🌅 朝のジャーナルを記入する</button>
+  <div style="font-size:12px;color:var(--t3);margin-top:24px">記録完了後、自動的にアプリが開きます</div>
+</div>`;
+  }
+  // 夜ロック（19時以降）
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
@@ -2391,11 +2452,15 @@ function rLockScreen(){
 }
 function render(){
   try{
-    // 19時以降ロックチェック（ジャーナル・習慣ページのみ通過許可）
+    // ロックチェック（朝8時以降・朝ジャーナル未完了、または19時以降・夜の記録未完了）
     if(checkDailyLock()){
-      // ロック中はジャーナルと習慣トラッカーのみアクセス可
-      if(V!=='journal'&&V!=='habits'&&V!=='fitness'){
-        V='dashboard'; // 不正なビューをリセット
+      const _lh=new Date().getHours();
+      const _morningLock=_lh>=8&&_lh<19; // 朝ロック中かどうか
+      // 朝ロック：ジャーナルのみ通過許可
+      // 夜ロック：ジャーナル・習慣トラッカー・フィットネスのみ通過許可
+      const _pass=_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness');
+      if(!_pass){
+        V='dashboard';
         sessionStorage.setItem('ef_view','dashboard');
         document.getElementById('view').innerHTML=rLockScreen();
         renderNav();
@@ -2525,6 +2590,8 @@ ${secTitle('今日のタスク')}
 ${[...overdueT.slice(0,3).map(t=>miniTask(t,true)),...todayT.slice(0,5).map(t=>miniTask(t,false))].join('')||
   `<div class="card card-sm" style="color:var(--t2);text-align:center">今日のタスクはありません 🎉</div>`}
 
+${(()=>{const gcEvs=_gcalUpcomingEvents.filter(e=>(e.start?.date||e.start?.dateTime?.slice(0,10))===td).sort((a,b)=>(a.start?.dateTime||'')>(b.start?.dateTime||'')?1:-1);return gcEvs.length?`${secTitle('📅 今日のカレンダー')}${gcEvs.map(e=>rGcalEventItem(e)).join('')}`:'';})()}
+
 ${secTitle('進行中案件')}
 ${activeJ.slice(0,4).map(j=>{
   const cl=S.clients.find(c=>c.id===j.clientId);
@@ -2637,16 +2704,34 @@ function rTasksToday(){
   const todays=S.tasks.filter(t=>!t.deleted&&!t.done&&t.dueDate===td);
   const done=S.tasks.filter(t=>!t.deleted&&t.done&&t.doneDate===td);
   const no=S.tasks.filter(t=>!t.deleted&&!t.done&&!t.dueDate);
+  const gcalToday=_gcalUpcomingEvents.filter(e=>(e.start?.date||e.start?.dateTime?.slice(0,10))===td)
+    .sort((a,b)=>(a.start?.dateTime||'00:00')>(b.start?.dateTime||'00:00')?1:-1);
   return`
 <div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
 ${over.length?`${secTitle(`⚠️ 期限超過 (${over.length}件)`)}${over.map(t=>rTaskItem(t,true)).join('')}`:''}
 ${secTitle(`📋 今日のタスク (${todays.length}件)`)}
 ${todays.length?todays.map(t=>rTaskItem(t,true)).join(''):`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">今日のタスクはありません 🎉</div>`}
+${gcalToday.length?`${secTitle(`📅 Googleカレンダー (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${no.length?`${secTitle('📦 期限なし')}${no.map(t=>rTaskItem(t,true)).join('')}`:''}
 </div>
 ${done.length?`${secTitle(`✅ 今日完了 (${done.length}件)`)}${done.map(t=>rTaskItem(t)).join('')}`:''}`;
 }
 
+function rGcalEventItem(e){
+  const startDt=e.start?.dateTime;
+  const endDt=e.end?.dateTime;
+  const isAllDay=!startDt;
+  const timeLbl=isAllDay?'終日':(new Date(startDt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+(endDt?'〜'+new Date(endDt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):''));
+  const desc=(e.description||'').replace(/<[^>]+>/g,'').trim().substring(0,80);
+  return`<div class="task-item" style="border-left:3px solid var(--blue);opacity:.95">
+  <div style="font-size:18px;flex-shrink:0;margin-right:2px">📅</div>
+  <div class="task-body">
+    <div class="task-ttl">${esc(e.summary||'(タイトルなし)')}</div>
+    ${desc?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(desc)}</div>`:''}
+    <div class="task-meta"><span class="badge bb">🕐 ${timeLbl}</span></div>
+  </div>
+</div>`;
+}
 function rTaskItem(t,draggable=false){
   const isOver=t.dueDate&&t.dueDate<today()&&!t.done;
   const isFrog=t.id===S.frogId;
@@ -5279,9 +5364,14 @@ function saveJob(){
   }
   else S.jobs.unshift({id:uid(),...data,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('案件を保存しました');
-  // 請求書提出日が設定されていればGoogleカレンダーに毎月繰り返しで追加
-  const savedJob=S.jobs.find(j=>j.invoiceDate===data.invoiceDate&&j.title===data.title);
-  if(data.invoiceDate&&_gcalToken&&savedJob){gcalAddRecurringInvoice(savedJob);}
+  // 請求日・提出日が設定されていればGoogleカレンダーに毎月繰り返しで追加
+  if(_gcalToken){
+    const savedJob=EID?S.jobs.find(j=>j.id===EID):S.jobs[0];
+    if(savedJob){
+      if(data.invoiceDate)gcalAddRecurringInvoice(savedJob);
+      if(data.deliveryDate)gcalAddRecurringDelivery(savedJob);
+    }
+  }
 }
 
 function openHabitModal(id){
@@ -6494,7 +6584,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260520-3';
+const APP_VERSION='20260520-6';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
