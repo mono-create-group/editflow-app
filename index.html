@@ -1819,6 +1819,23 @@ async function gcalAddRecurringInvoice(j){
     toast('📅 請求書提出日を毎月のGoogleカレンダーに登録しました');
   }catch(e){console.error('gcal invoice error',e);}
 }
+async function gcalAddRecurringDelivery(j){
+  if(!_gcalToken||!j.deliveryDate)return;
+  const event={
+    summary:`📋 提出: ${j.title}`,
+    description:`案件: ${j.title}\n毎月繰り返し`,
+    start:{date:j.deliveryDate},
+    end:{date:j.deliveryDate},
+    recurrence:['RRULE:FREQ=MONTHLY']
+  };
+  try{
+    await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{
+      method:'POST',headers:{'Authorization':'Bearer '+_gcalToken,'Content-Type':'application/json'},
+      body:JSON.stringify(event)
+    });
+    toast('📅 提出日を毎月のGoogleカレンダーに登録しました');
+  }catch(e){console.error('gcal delivery error',e);}
+}
 async function gcalImportEvents(){
   if(!_gcalToken){toast('先にGoogleカレンダーと連携してください','warn');return;}
   const td=today();
@@ -2547,6 +2564,8 @@ ${secTitle('今日のタスク')}
 ${[...overdueT.slice(0,3).map(t=>miniTask(t,true)),...todayT.slice(0,5).map(t=>miniTask(t,false))].join('')||
   `<div class="card card-sm" style="color:var(--t2);text-align:center">今日のタスクはありません 🎉</div>`}
 
+${(()=>{const gcEvs=_gcalUpcomingEvents.filter(e=>(e.start?.date||e.start?.dateTime?.slice(0,10))===td).sort((a,b)=>(a.start?.dateTime||'')>(b.start?.dateTime||'')?1:-1);return gcEvs.length?`${secTitle('📅 今日のカレンダー')}${gcEvs.map(e=>rGcalEventItem(e)).join('')}`:'';})()}
+
 ${secTitle('進行中案件')}
 ${activeJ.slice(0,4).map(j=>{
   const cl=S.clients.find(c=>c.id===j.clientId);
@@ -2659,16 +2678,34 @@ function rTasksToday(){
   const todays=S.tasks.filter(t=>!t.deleted&&!t.done&&t.dueDate===td);
   const done=S.tasks.filter(t=>!t.deleted&&t.done&&t.doneDate===td);
   const no=S.tasks.filter(t=>!t.deleted&&!t.done&&!t.dueDate);
+  const gcalToday=_gcalUpcomingEvents.filter(e=>(e.start?.date||e.start?.dateTime?.slice(0,10))===td)
+    .sort((a,b)=>(a.start?.dateTime||'00:00')>(b.start?.dateTime||'00:00')?1:-1);
   return`
 <div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
 ${over.length?`${secTitle(`⚠️ 期限超過 (${over.length}件)`)}${over.map(t=>rTaskItem(t,true)).join('')}`:''}
 ${secTitle(`📋 今日のタスク (${todays.length}件)`)}
 ${todays.length?todays.map(t=>rTaskItem(t,true)).join(''):`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">今日のタスクはありません 🎉</div>`}
+${gcalToday.length?`${secTitle(`📅 Googleカレンダー (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${no.length?`${secTitle('📦 期限なし')}${no.map(t=>rTaskItem(t,true)).join('')}`:''}
 </div>
 ${done.length?`${secTitle(`✅ 今日完了 (${done.length}件)`)}${done.map(t=>rTaskItem(t)).join('')}`:''}`;
 }
 
+function rGcalEventItem(e){
+  const startDt=e.start?.dateTime;
+  const endDt=e.end?.dateTime;
+  const isAllDay=!startDt;
+  const timeLbl=isAllDay?'終日':(new Date(startDt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+(endDt?'〜'+new Date(endDt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):''));
+  const desc=(e.description||'').replace(/<[^>]+>/g,'').trim().substring(0,80);
+  return`<div class="task-item" style="border-left:3px solid var(--blue);opacity:.95">
+  <div style="font-size:18px;flex-shrink:0;margin-right:2px">📅</div>
+  <div class="task-body">
+    <div class="task-ttl">${esc(e.summary||'(タイトルなし)')}</div>
+    ${desc?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(desc)}</div>`:''}
+    <div class="task-meta"><span class="badge bb">🕐 ${timeLbl}</span></div>
+  </div>
+</div>`;
+}
 function rTaskItem(t,draggable=false){
   const isOver=t.dueDate&&t.dueDate<today()&&!t.done;
   const isFrog=t.id===S.frogId;
@@ -5301,9 +5338,14 @@ function saveJob(){
   }
   else S.jobs.unshift({id:uid(),...data,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('案件を保存しました');
-  // 請求書提出日が設定されていればGoogleカレンダーに毎月繰り返しで追加
-  const savedJob=S.jobs.find(j=>j.invoiceDate===data.invoiceDate&&j.title===data.title);
-  if(data.invoiceDate&&_gcalToken&&savedJob){gcalAddRecurringInvoice(savedJob);}
+  // 請求日・提出日が設定されていればGoogleカレンダーに毎月繰り返しで追加
+  if(_gcalToken){
+    const savedJob=EID?S.jobs.find(j=>j.id===EID):S.jobs[0];
+    if(savedJob){
+      if(data.invoiceDate)gcalAddRecurringInvoice(savedJob);
+      if(data.deliveryDate)gcalAddRecurringDelivery(savedJob);
+    }
+  }
 }
 
 function openHabitModal(id){
@@ -6516,7 +6558,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260520-4';
+const APP_VERSION='20260520-5';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
