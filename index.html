@@ -2023,7 +2023,7 @@ async function sheetsImportModal(){
               <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--t2);margin-top:3px">
                 ${j.unitPrice?`<span>¥${j.unitPrice.toLocaleString()}</span>`:''}
                 ${j.clientId?(S.clients.find(c=>c.id===j.clientId)?`<span>👤 ${esc(S.clients.find(c=>c.id===j.clientId).name)}</span>`:''): ''}
-                ${j.workerId?(S.workers.find(w=>w.id===j.workerId)?`<span>🛠 ${esc(S.workers.find(w=>w.id===j.workerId).name)}</span>`:''):''}
+                ${getJobWorkerNames(j)?`<span>🛠 ${esc(getJobWorkerNames(j))}</span>`:''}
                 ${j.deliveryDate?`<span>📅 ${j.deliveryDate}</span>`:''}
                 ${j.subtasks.length?`<span>📋 子${j.subtasks.length}件</span>`:''}
                 ${already?`<span style="color:var(--amber)">⚠️ 同名あり</span>`:''}
@@ -2165,6 +2165,15 @@ function migrate(d){
     });
     d.settings._editorStatusMigrated=true;
     if(n>0)console.log(`[migrate] 編集者進行中に変換: ${n}件`);
+  }
+  // migrate: workerId(単一) → workerIds(配列)
+  if(!d.settings._workerIdsMigrated){
+    (d.jobs||[]).forEach(j=>{
+      if(!j.workerIds){
+        j.workerIds=j.workerId?[j.workerId]:[];
+      }
+    });
+    d.settings._workerIdsMigrated=true;
   }
   return d;
 }
@@ -3079,7 +3088,7 @@ function sortJobs(jobs){
     case 'deadline': return [...jobs].sort((a,b)=>(a.deliveryDate||'9999')>(b.deliveryDate||'9999')?1:-1);
     case 'f1date': return [...jobs].sort((a,b)=>(a.editorDraftDate||'9999')>(b.editorDraftDate||'9999')?1:-1);
     case 'clientdraft': return [...jobs].sort((a,b)=>(a.clientDraftDate||'9999')>(b.clientDraftDate||'9999')?1:-1);
-    case 'f1worker': return [...jobs].sort((a,b)=>{const wa=S.workers.find(w=>w.id===a.workerId)?.name||'';const wb=S.workers.find(w=>w.id===b.workerId)?.name||'';return wa>wb?1:-1;});
+    case 'f1worker': return [...jobs].sort((a,b)=>{const wa=getJobWorkerNames(a);const wb=getJobWorkerNames(b);return wa>wb?1:-1;});
     case 'status': return [...jobs].sort((a,b)=>a.status>b.status?1:-1);
     case 'title': return [...jobs].sort((a,b)=>a.title>b.title?1:-1);
     default: return jobs;
@@ -3110,7 +3119,7 @@ ${(()=>{
   const activeJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
   for(const j of activeJobs){
     // クライアント初稿1日前（自分担当のみ）
-    if(j.clientDraftDate&&j.workerId===SELF_WID&&daysUntil(j.clientDraftDate)===1){
+    if(j.clientDraftDate&&getJobWorkerIds(j).includes(SELF_WID)&&daysUntil(j.clientDraftDate)===1){
       warnings.push(`<div style="background:#3b82f620;border:1px solid var(--blue);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openJobModal('${j.id}')">
         <span style="font-size:18px">📋</span>
         <div style="flex:1">
@@ -3135,7 +3144,7 @@ ${(()=>{
     const du_out=daysUntil(j.payoutDate);
     if(j.payoutDate&&du_out<=3&&du_out>=0){
       const dayLbl=du_out===0?'今日':du_out===1?'明日':`あと${du_out}日`;
-      const workerName=(S.workers||[]).find(w=>w.id===j.workerId)?.name||'担当者';
+      const workerName=getJobWorkerNames(j)||'担当者';
       warnings.push(`<div style="background:var(--adim);border:1px solid var(--amber);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openJobModal('${j.id}')">
         <span style="font-size:18px">💸</span>
         <div style="flex:1">
@@ -3293,23 +3302,30 @@ function jobTotalIn(j){
   return j.unitPrice||j.profit||0;
 }
 const SELF_WID='__self';
+function getJobWorkerIds(j){return j.workerIds||(j.workerId?[j.workerId]:[]);}
+function getJobWorkerNames(j){
+  const ids=getJobWorkerIds(j);
+  if(!ids.length)return'';
+  return ids.map(id=>id===SELF_WID?'自分':(S.workers.find(w=>w.id===id)?.name||'')).filter(Boolean).join(', ');
+}
 function jobTotalOut(j){
   const subs=j.subtasks||[];
   if(subs.some(s=>s.unitPrice>0||s.workerPay>0))
     return subs.filter(s=>s.workerId!==SELF_WID).reduce((sum,s)=>sum+(s.workerPay||0),0);
-  if(j.workerId===SELF_WID)return 0;
+  const wids=getJobWorkerIds(j);
+  if(!wids.length||wids.every(id=>id===SELF_WID))return 0;
   return j.workerPay||0;
 }
 function jobProfit(j){return jobTotalIn(j)-jobTotalOut(j);}
 function rProjCard(j){
   const cl=S.clients.find(c=>c.id===j.clientId);
-  const w=S.workers.find(w=>w.id===j.workerId);
+  const wNames=getJobWorkerNames(j);
   const uc=urgCls(j.deliveryDate);
   const pr=jobProfit(j),ti=jobTotalIn(j),to=jobTotalOut(j);
   return`<div class="proj-card" onclick="openJobModal('${j.id}')">
   <div class="proj-card-title">${esc(j.title)}</div>
   ${cl?`<div class="proj-card-client">👤 ${esc(cl.name)}</div>`:''}
-  ${w?`<div style="font-size:11px;color:var(--t2);margin-top:2px">🛠 ${esc(w.name)}</div>`:''}
+  ${wNames?`<div style="font-size:11px;color:var(--t2);margin-top:2px">🛠 ${esc(wNames)}</div>`:''}
   ${j.scope?`<div style="font-size:11px;color:var(--t2);margin-top:2px">📌 ${esc(j.scope)}</div>`:''}
   ${ti?`<div class="proj-profit" style="font-size:13px">
     単価 <span style="color:var(--blue)">¥${ti.toLocaleString()}</span>${to?` 支払 <span style="color:var(--amber)">¥${to.toLocaleString()}</span>`:''}
@@ -3366,13 +3382,13 @@ ${ungrouped.length?`<div class="section-ttl">クライアント未設定</div>${
 }
 
 function rJobItem(j){
-  const w=S.workers.find(wk=>wk.id===j.workerId);
+  const wNames=getJobWorkerNames(j);
   const pr=jobProfit(j),ti=jobTotalIn(j),to=jobTotalOut(j);
   const subDone=(j.subtasks||[]).filter(s=>s.done).length, subTot=(j.subtasks||[]).length;
   return`<div class="job-item" onclick="openJobModal('${j.id}')">
   <span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span>
   <span class="job-title">${esc(j.title)}</span>
-  ${w?`<span style="font-size:11px;color:var(--t2)">🛠 ${esc(w.name)}</span>`:''}
+  ${wNames?`<span style="font-size:11px;color:var(--t2)">🛠 ${esc(wNames)}</span>`:''}
   ${ti?`<span style="font-size:12px;color:var(--blue)">単価 ¥${ti.toLocaleString()}</span>`:''}
   ${to?`<span style="font-size:12px;color:var(--amber)">支払 ¥${to.toLocaleString()}</span>`:''}
   ${ti?`<span style="font-size:12px;font-weight:700;color:${pr>=0?'var(--green)':'var(--red)'}">利益 ¥${pr.toLocaleString()}</span>`:''}
@@ -3440,7 +3456,7 @@ function getPayEntries(month){
         entries.push({jobId:j.id,jobTitle:j.title,label:esc(s.title),workerId:s.workerId||'__none',workerPay:s.workerPay,payoutDate:pd});
       });
     }else{
-      if(!j.workerPay||j.workerId===SELF_WID)return;
+      const wids=getJobWorkerIds(j);if(!j.workerPay||(!wids.length||wids.every(id=>id===SELF_WID)))return;
       if(!j.payoutDate?.startsWith(month))return;
       entries.push({jobId:j.id,jobTitle:j.title,label:esc(j.title),workerId:j.workerId||'__none',workerPay:j.workerPay,payoutDate:j.payoutDate});
     }
@@ -3518,14 +3534,14 @@ function rProjWorker(){
 
   const groups=[];
   workers.forEach(w=>{
-    const jobs=sortJobs(allJobs.filter(j=>j.workerId===w.id));
+    const jobs=sortJobs(allJobs.filter(j=>getJobWorkerIds(j).includes(w.id)));
     const subs=subsForWorker(w.id);
     groups.push({label:w.name,id:w.id,jobs,subs});
   });
-  const selfJobs=sortJobs(allJobs.filter(j=>j.workerId===SELF_WID));
+  const selfJobs=sortJobs(allJobs.filter(j=>getJobWorkerIds(j).includes(SELF_WID)));
   const selfSubs=subsForWorker(SELF_WID);
   if(selfJobs.length||selfSubs.length)groups.unshift({label:'自分',id:SELF_WID,jobs:selfJobs,subs:selfSubs});
-  const noWorker=sortJobs(allJobs.filter(j=>!j.workerId||(!workers.find(w=>w.id===j.workerId)&&j.workerId!==SELF_WID)));
+  const noWorker=sortJobs(allJobs.filter(j=>getJobWorkerIds(j).length===0));
   const noWorkerSubs=subsForWorker(null);
   groups.push({label:'担当なし',id:null,jobs:noWorker,subs:[]});
   if(!allJobs.length)return`<div class="empty"><div class="empty-icon">👤</div><div class="empty-title">進行中の案件なし</div></div>`;
@@ -3579,8 +3595,7 @@ function rProjPriority(){
 ${allRows.map(row=>{
   if(row.type==='job'){
     const j=row.job;
-    const w=S.workers.find(wk=>wk.id===j.workerId);
-    const wName=j.workerId===SELF_WID?'自分':w?esc(w.name):'-';
+    const wName=getJobWorkerNames(j)||'-';
     const uc=urgCls(j.deliveryDate);
     return`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="openJobModal('${j.id}')">
       <td style="padding:8px 12px;font-weight:600">${esc(j.title)}</td>
@@ -5120,11 +5135,12 @@ function openJobModal(id,preStatus,preClientId){
     </select>
   </div>
   <div class="fg"><div class="fl">担当者名</div>
-    <select id="j-worker">
-      <option value="">未設定</option>
-      <option value="__self" ${j?.workerId===SELF_WID?'selected':''}>自分</option>
-      ${workers.map(w=>`<option value="${w.id}" ${j?.workerId===w.id?'selected':''}>${esc(w.name)}</option>`).join('')}
-    </select>
+    <div id="j-worker-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 0">
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;background:var(--card2);padding:4px 10px;border-radius:20px;border:1px solid var(--border)">
+        <input type="checkbox" class="j-worker-cb" value="__self" ${(j?getJobWorkerIds(j):['__self']).includes(SELF_WID)?'checked':''}>自分
+      </label>
+      ${workers.map(w=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;background:var(--card2);padding:4px 10px;border-radius:20px;border:1px solid var(--border)"><input type="checkbox" class="j-worker-cb" value="${esc(w.id)}" ${j&&getJobWorkerIds(j).includes(w.id)?'checked':''}>${esc(w.name)}</label>`).join('')}
+    </div>
     <div style="display:flex;gap:5px;margin-top:5px">
       <input id="j-new-worker-inp" placeholder="新規担当者名を入力" style="flex:1;font-size:12px;padding:5px 8px">
       <button class="btn btn-g btn-xs" onclick="addWorkerInline()">＋ 追加</button>
@@ -5294,7 +5310,20 @@ function addWorkerInline(){
   if(!S.workers)S.workers=[];
   const w={id:uid(),name,createdAt:new Date().toISOString()};
   S.workers.push(w);save();
-  _appendWorkerOpt(w,true);
+  // メインモーダルのチェックボックスリストに追加（チェック済み）
+  const list=document.getElementById('j-worker-list');
+  if(list){
+    const lbl=document.createElement('label');
+    lbl.style.cssText='display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;background:var(--card2);padding:4px 10px;border-radius:20px;border:1px solid var(--border)';
+    lbl.innerHTML=`<input type="checkbox" class="j-worker-cb" value="${w.id}" checked>${esc(name)}`;
+    list.appendChild(lbl);
+  }
+  // サブタスクのselectにも追加
+  document.querySelectorAll('.j-sub-worker').forEach(sel=>{
+    const opt=document.createElement('option');
+    opt.value=w.id;opt.textContent=name;
+    sel.appendChild(opt);
+  });
   document.getElementById('j-new-worker-inp').value='';
   toast(`担当者「${name}」を追加しました`);
 }
@@ -5306,17 +5335,16 @@ function addSubWorker(btn){
   if(!S.workers)S.workers=[];
   const w={id:uid(),name,createdAt:new Date().toISOString()};
   S.workers.push(w);save();
-  _appendWorkerOpt(w,false);
+  _appendWorkerOpt(w);
   const thisSel=row.querySelector('.j-sub-worker');
   if(thisSel)thisSel.value=w.id;
   inp.value='';
   toast(`担当者「${name}」を追加しました`);
 }
-function _appendWorkerOpt(w,selectMain){
-  document.querySelectorAll('.j-sub-worker,#j-worker').forEach(sel=>{
+function _appendWorkerOpt(w){
+  document.querySelectorAll('.j-sub-worker').forEach(sel=>{
     const opt=document.createElement('option');
     opt.value=w.id;opt.textContent=w.name;
-    if(selectMain&&sel.id==='j-worker')opt.selected=true;
     sel.appendChild(opt);
   });
 }
@@ -5343,9 +5371,11 @@ function saveJob(){
   }).filter(s=>s.title);
   const hasPricedSubs=subtasks.some(s=>s.unitPrice>0||s.workerPay>0);
   const unitPrice=hasPricedSubs?subtasks.reduce((s,sub)=>s+(sub.unitPrice||0),0):(parseInt(document.getElementById('j-unit')?.value)||0);
-  const workerPay=hasPricedSubs?subtasks.filter(s=>s.workerId!==SELF_WID).reduce((s,sub)=>s+(sub.workerPay||0),0):(document.getElementById('j-worker')?.value===SELF_WID?0:parseInt(document.getElementById('j-wpay')?.value)||0);
+  const selWorkerIds=[...document.querySelectorAll('.j-worker-cb:checked')].map(cb=>cb.value);
+  const onlySelf=selWorkerIds.length===0||selWorkerIds.every(id=>id===SELF_WID);
+  const workerPay=hasPricedSubs?subtasks.filter(s=>s.workerId!==SELF_WID).reduce((s,sub)=>s+(sub.workerPay||0),0):(onlySelf?0:parseInt(document.getElementById('j-wpay')?.value)||0);
   const isTrial=document.getElementById('j-trial-val')?.value==='1';
-  const data={title,clientId:document.getElementById('j-cl').value||null,workerId:document.getElementById('j-worker').value||null,scope:document.getElementById('j-scope').value||null,status:document.getElementById('j-stat').value,isTrial,unitPrice,profit:unitPrice,workerPay,sharedDate:document.getElementById('j-shared').value||null,editorDraftDate:document.getElementById('j-editor-draft').value||null,clientDraftDate:document.getElementById('j-client-draft').value||null,thumbnailDate:document.getElementById('j-thumbnail')?.value||null,deliveryDate:document.getElementById('j-deliver').value||null,invoiceDate:document.getElementById('j-invoice').value||null,paymentDate:document.getElementById('j-payin').value||null,payoutDate:document.getElementById('j-payout').value||null,notes:document.getElementById('j-notes').value.trim(),subtasks};
+  const data={title,clientId:document.getElementById('j-cl').value||null,workerIds:selWorkerIds,workerId:selWorkerIds[0]||null,scope:document.getElementById('j-scope').value||null,status:document.getElementById('j-stat').value,isTrial,unitPrice,profit:unitPrice,workerPay,sharedDate:document.getElementById('j-shared').value||null,editorDraftDate:document.getElementById('j-editor-draft').value||null,clientDraftDate:document.getElementById('j-client-draft').value||null,thumbnailDate:document.getElementById('j-thumbnail')?.value||null,deliveryDate:document.getElementById('j-deliver').value||null,invoiceDate:document.getElementById('j-invoice').value||null,paymentDate:document.getElementById('j-payin').value||null,payoutDate:document.getElementById('j-payout').value||null,notes:document.getElementById('j-notes').value.trim(),subtasks};
   if(EID){
     const j=S.jobs.find(j=>j.id===EID);
     const prevStatus=j?.status;
@@ -6526,7 +6556,7 @@ function checkClientDraftTasks(){
   const changed=[];
   if(!S.tasks)S.tasks=[];
   (S.jobs||[]).filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'
-    &&j.workerId===SELF_WID&&j.clientDraftDate)
+    &&getJobWorkerIds(j).includes(SELF_WID)&&j.clientDraftDate)
   .forEach(j=>{
     if(daysUntil(j.clientDraftDate)!==1)return;
     const exists=S.tasks.find(t=>t.sourceJobId===j.id&&t.taskType==='clientDraft'&&!t.deleted);
@@ -6538,7 +6568,7 @@ function checkClientDraftTasks(){
   });
   // サムネイル納品が2日前のものを自動タスク化
   (S.jobs||[]).filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'
-    &&j.workerId===SELF_WID&&j.thumbnailDate)
+    &&getJobWorkerIds(j).includes(SELF_WID)&&j.thumbnailDate)
   .forEach(j=>{
     if(daysUntil(j.thumbnailDate)!==2)return;
     const exists=S.tasks.find(t=>t.sourceJobId===j.id&&t.taskType==='thumbnail'&&!t.deleted);
@@ -6584,7 +6614,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260520-6';
+const APP_VERSION='20260520-7';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
