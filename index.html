@@ -1849,7 +1849,7 @@ function rTasksToday(){
 ${fixedSched?`${secTitle('🕐 固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${fixedSched}`:''}
 <div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
 ${over.length?`${secTitle(`⚠️ 期限超過 (${over.length}件)`)}${over.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
-${secTitle(`📋 今日のタスク (${todays.length}件)`)}
+${secTitle(`📋 今日のタスク (${todays.length}件)`)}<button class="btn btn-p btn-xs" style="margin-bottom:8px" onclick="openTaskModal(null,'${td}')">＋ タスク追加</button>
 ${todays.length?todays.map(t=>rTaskItem(t,isDraggable)).join(''):`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">今日のタスクはありません 🎉</div>`}
 ${gcalToday.length?`${secTitle(`📅 Googleカレンダー (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${todayHabits.length?`${secTitle(`🔥 今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
@@ -5835,7 +5835,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-4';
+const APP_VERSION='20260522-5';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
