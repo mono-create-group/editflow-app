@@ -1834,19 +1834,21 @@ function rTasksToday(){
   const gcalToday=_gcalUpcomingEvents.filter(e=>(e.start?.date||e.start?.dateTime?.slice(0,10))===td)
     .sort((a,b)=>(a.start?.dateTime||'00:00')>(b.start?.dateTime||'00:00')?1:-1);
   const isDraggable=getTaskSort()==='manual';
+  const todayHabits=habitsForDate(td).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+  const habitDoneCount=todayHabits.filter(h=>(h.completedDates||[]).includes(td)).length;
   return`
 <div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
 ${over.length?`${secTitle(`⚠️ 期限超過 (${over.length}件)`)}${over.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
 ${secTitle(`📋 今日のタスク (${todays.length}件)`)}
 ${todays.length?todays.map(t=>rTaskItem(t,isDraggable)).join(''):`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">今日のタスクはありません 🎉</div>`}
 ${gcalToday.length?`${secTitle(`📅 Googleカレンダー (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
+${todayHabits.length?`${secTitle(`🔥 今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
 ${no.length?`${secTitle('📦 期限なし')}${no.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
 </div>
 ${done.length?`${secTitle(`✅ 今日完了 (${done.length}件)`)}${done.map(t=>rTaskItem(t)).join('')}`:''}`;
 }
 
 function rTasksTomorrow(){
-  const td=today();
   const tmDate=new Date();tmDate.setDate(tmDate.getDate()+1);
   const tm=`${tmDate.getFullYear()}-${String(tmDate.getMonth()+1).padStart(2,'0')}-${String(tmDate.getDate()).padStart(2,'0')}`;
   const tasks=sortTaskList(S.tasks.filter(t=>!t.deleted&&!t.done&&t.dueDate===tm));
@@ -1854,6 +1856,7 @@ function rTasksTomorrow(){
     .sort((a,b)=>(a.start?.dateTime||'00:00')>(b.start?.dateTime||'00:00')?1:-1);
   const isDraggable=getTaskSort()==='manual';
   const dateLbl=`${tmDate.getMonth()+1}月${tmDate.getDate()}日（${'日月火水木金土'[tmDate.getDay()]}）`;
+  const tmHabits=habitsForDate(tm).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
   return`
 <div style="font-size:12px;color:var(--t2);margin-bottom:8px;font-weight:600">${dateLbl}</div>
 <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -1861,7 +1864,34 @@ function rTasksTomorrow(){
 </div>
 ${secTitle(`📋 明日のタスク (${tasks.length}件)`)}
 ${tasks.length?tasks.map(t=>rTaskItem(t,isDraggable)).join(''):`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">明日のタスクはまだありません</div>`}
-${gcalTm.length?`${secTitle(`📅 Googleカレンダー (${gcalTm.length}件)`)}${gcalTm.map(e=>rGcalEventItem(e)).join('')}`:''}`;
+${gcalTm.length?`${secTitle(`📅 Googleカレンダー (${gcalTm.length}件)`)}${gcalTm.map(e=>rGcalEventItem(e)).join('')}`:''}
+${tmHabits.length?`${secTitle(`🔥 明日の習慣 (${tmHabits.length}件)`)}${tmHabits.map(h=>rHabitInTaskView(h,tm,false)).join('')}`:''}`;
+}
+
+// 指定日に予定されている習慣を返す
+function habitsForDate(date){
+  const dow=new Date(date+'T00:00:00').getDay(); // 0=日, 1=月...
+  return S.habits.filter(h=>!h.deleted&&(!h.daysOfWeek?.length||h.daysOfWeek.includes(dow)));
+}
+// 習慣をタスクビュー内で表示するアイテム（interactive=trueで今日チェック可）
+function rHabitInTaskView(h,date,interactive){
+  const done=(h.completedDates||[]).includes(date);
+  const fail=(h.failedDates||[]).includes(date);
+  const streak=calcStreak(h.completedDates||[]);
+  const stateClass=done||fail?'done-item':'';
+  return`<div class="task-item ${stateClass}" style="border-left:3px solid var(--amber)">
+  ${interactive
+    ?`<div class="chk ${done?'done':fail?'fail':''}" onclick="toggleHabit('${h.id}','${date}')"></div>`
+    :`<span style="font-size:18px;flex-shrink:0">🔥</span>`}
+  <div class="task-body">
+    <div class="task-ttl ${done?'done':''}">${done?'✓ ':fail?'✕ ':''}${esc(h.title)}</div>
+    <div class="task-meta">
+      ${h.time?`<span class="badge bb">🕐 ${h.time}</span>`:''}
+      ${streak>0?`<span class="badge ba">🔥 ${streak}日</span>`:''}
+      ${h.description?`<span class="badge bk">${esc(h.description)}</span>`:''}
+    </div>
+  </div>
+</div>`;
 }
 
 function rGcalEventItem(e){
@@ -5753,7 +5783,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260521-2';
+const APP_VERSION='20260522-1';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
