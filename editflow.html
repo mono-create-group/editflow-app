@@ -1702,6 +1702,9 @@ ${secTitle('🧠 先延ばし分析')}
 </div>
 
 <div>
+${secTitle('🕐 今日のスケジュール')}
+${rFixedScheduleList(true)}
+
 ${secTitle('今日のタスク')}
 ${[...overdueT.slice(0,3).map(t=>miniTask(t,true)),...todayT.slice(0,5).map(t=>miniTask(t,false))].join('')||
   `<div class="card card-sm" style="color:var(--t2);text-align:center">今日のタスクはありません 🎉</div>`}
@@ -1836,6 +1839,7 @@ function rTasksToday(){
   const isDraggable=getTaskSort()==='manual';
   const todayHabits=habitsForDate(td).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
   const habitDoneCount=todayHabits.filter(h=>(h.completedDates||[]).includes(td)).length;
+  const fixedSched=rFixedScheduleList(false);
   return`
 <div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
 ${over.length?`${secTitle(`⚠️ 期限超過 (${over.length}件)`)}${over.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
@@ -1844,6 +1848,7 @@ ${todays.length?todays.map(t=>rTaskItem(t,isDraggable)).join(''):`<div class="ca
 ${gcalToday.length?`${secTitle(`📅 Googleカレンダー (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${todayHabits.length?`${secTitle(`🔥 今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
 ${no.length?`${secTitle('📦 期限なし')}${no.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
+${fixedSched?`${secTitle('🕐 固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${fixedSched}`:''}
 </div>
 ${done.length?`${secTitle(`✅ 今日完了 (${done.length}件)`)}${done.map(t=>rTaskItem(t)).join('')}`:''}`;
 }
@@ -1866,6 +1871,27 @@ ${secTitle(`📋 明日のタスク (${tasks.length}件)`)}
 ${tasks.length?tasks.map(t=>rTaskItem(t,isDraggable)).join(''):`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">明日のタスクはまだありません</div>`}
 ${gcalTm.length?`${secTitle(`📅 Googleカレンダー (${gcalTm.length}件)`)}${gcalTm.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${tmHabits.length?`${secTitle(`🔥 明日の習慣 (${tmHabits.length}件)`)}${tmHabits.map(h=>rHabitInTaskView(h,tm,false)).join('')}`:''}`;
+}
+
+// 固定タイムスケジュールをリスト表示（compact=trueで説明文省略）
+function rFixedScheduleList(compact=false){
+  const fs=S.fs||DEFAULT_FS;
+  if(!fs.length)return'';
+  const now=new Date();
+  const nowM=now.getHours()*60+now.getMinutes();
+  return fs.map(f=>{
+    const sm=tMin(f.s);
+    const em=tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e);
+    const isNow=nowM>=sm&&nowM<em;
+    return`<div class="task-item" style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'18;':''};margin-bottom:5px">
+  <div style="font-size:11px;color:var(--t3);flex-shrink:0;min-width:88px;padding-top:1px">${f.s}〜${f.e}</div>
+  <div class="task-body" style="min-width:0">
+    <div class="task-ttl" style="${isNow?'color:'+f.c+';font-weight:700':'font-weight:500'}">${isNow?'▶ ':''}${esc(f.t)}</div>
+    ${!compact&&f.d?`<div style="font-size:11px;color:var(--t2);margin-top:2px;word-break:break-all">${esc(f.d)}</div>`:''}
+  </div>
+  ${isNow?`<span style="font-size:10px;background:${f.c}30;color:${f.c};border-radius:99px;padding:2px 8px;flex-shrink:0;font-weight:700">進行中</span>`:''}
+</div>`;
+  }).join('');
 }
 
 // 指定日に予定されている習慣を返す
@@ -5783,7 +5809,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-1';
+const APP_VERSION='20260522-2';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
