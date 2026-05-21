@@ -1841,6 +1841,7 @@ function rTasksToday(){
   const habitDoneCount=todayHabits.filter(h=>(h.completedDates||[]).includes(td)).length;
   const fixedSched=rFixedScheduleList(false);
   return`
+${fixedSched?`${secTitle('🕐 固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${fixedSched}`:''}
 <div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
 ${over.length?`${secTitle(`⚠️ 期限超過 (${over.length}件)`)}${over.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
 ${secTitle(`📋 今日のタスク (${todays.length}件)`)}
@@ -1848,7 +1849,6 @@ ${todays.length?todays.map(t=>rTaskItem(t,isDraggable)).join(''):`<div class="ca
 ${gcalToday.length?`${secTitle(`📅 Googleカレンダー (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${todayHabits.length?`${secTitle(`🔥 今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
 ${no.length?`${secTitle('📦 期限なし')}${no.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
-${fixedSched?`${secTitle('🕐 固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${fixedSched}`:''}
 </div>
 ${done.length?`${secTitle(`✅ 今日完了 (${done.length}件)`)}${done.map(t=>rTaskItem(t)).join('')}`:''}`;
 }
@@ -5809,7 +5809,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-2';
+const APP_VERSION='20260522-3';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
