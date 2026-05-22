@@ -2643,6 +2643,10 @@ function jobTotalOut(j){
   return j.workerPay||0;
 }
 function jobProfit(j){return jobTotalIn(j)-jobTotalOut(j);}
+// 利益ページ用：サブタスクを含まずメインタスクの金額のみ
+function jobMainIn(j){return j.unitPrice||j.profit||0;}
+function jobMainOut(j){const wids=getJobWorkerIds(j);if(!wids.length||wids.every(id=>id===SELF_WID))return 0;return j.workerPay||0;}
+function jobMainProfit(j){return jobMainIn(j)-jobMainOut(j);}
 function rProjCard(j){
   const cl=S.clients.find(c=>c.id===j.clientId);
   const wNames=getJobWorkerNames(j);
@@ -2736,9 +2740,9 @@ function rProjProfit(){
   if(!months.includes(selM))months.unshift(selM);
   const curM=window._profitMonth||selM;
   const jobs=S.jobs.filter(j=>!j.deleted&&j.paymentDate?.startsWith(curM));
-  const totalIn=jobs.reduce((s,j)=>s+jobTotalIn(j),0);
-  const totalPay=jobs.reduce((s,j)=>s+jobTotalOut(j),0);
-  const totalProfit=jobs.reduce((s,j)=>s+jobProfit(j),0);
+  const totalIn=jobs.reduce((s,j)=>s+jobMainIn(j),0);
+  const totalPay=jobs.reduce((s,j)=>s+jobMainOut(j),0);
+  const totalProfit=jobs.reduce((s,j)=>s+jobMainProfit(j),0);
   return`${secTitle('💰 月別利益')}
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
   <select style="width:160px" onchange="window._profitMonth=this.value;render()">
@@ -2757,11 +2761,11 @@ ${jobs.length?`<div class="card" style="padding:0;overflow:hidden">
   <div class="profit-row" style="font-weight:700;font-size:12px;color:var(--t2);background:var(--card2)">
     <span>案件名</span><span>単価</span><span>支払</span><span>利益</span><span>入金日</span>
   </div>
-  ${jobs.map(j=>{const pr=jobProfit(j);const cl=S.clients.find(c=>c.id===j.clientId);
+  ${jobs.map(j=>{const pr=jobMainProfit(j);const cl=S.clients.find(c=>c.id===j.clientId);
   return`<div class="profit-row" style="cursor:pointer" onclick="openJobModal('${j.id}')">
     <span style="font-weight:600">${esc(j.title)}<br><span style="font-size:11px;color:var(--t2)">${cl?esc(cl.name):''}</span></span>
-    <span>¥${jobTotalIn(j).toLocaleString()}</span>
-    <span style="color:var(--amber)">¥${jobTotalOut(j).toLocaleString()}</span>
+    <span>¥${jobMainIn(j).toLocaleString()}</span>
+    <span style="color:var(--amber)">¥${jobMainOut(j).toLocaleString()}</span>
     <span style="${pr>=0?'color:var(--green)':'color:var(--red)'}">¥${pr.toLocaleString()}</span>
     <span style="font-size:11px;color:var(--t2)">${j.paymentDate||'-'}</span>
   </div>`;}).join('')}
@@ -5949,7 +5953,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-9';
+const APP_VERSION='20260522-10';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
