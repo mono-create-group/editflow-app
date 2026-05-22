@@ -1963,8 +1963,10 @@ function rTasksTomorrow(){
 <div style="display:flex;gap:8px;margin-bottom:10px">
   <button class="btn btn-g btn-sm" onclick="openTaskModal(null,'${tm}')">＋ 明日のタスクを追加</button>
 </div>
-${secTitle(`📋 明日のタスク (${tasks.length}件)`)}
+${secTitle(`📋 明日のタスク (${tasks.length}件)`)}${isDraggable?`<div style="font-size:11px;color:var(--t3);margin-bottom:6px">☰ ドラッグで並び替え可。この順番のまま今日に移動されます。</div>`:''}
+<div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
 ${tasks.length?tasks.map(t=>rTaskItem(t,isDraggable)).join(''):`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">明日のタスクはまだありません</div>`}
+</div>
 ${gcalTm.length?`${secTitle(`📅 Googleカレンダー (${gcalTm.length}件)`)}${gcalTm.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${tmHabits.length?`${secTitle(`🔥 明日の習慣 (${tmHabits.length}件)`)}${tmHabits.map(h=>rHabitInTaskView(h,tm,false)).join('')}`:''}`;
 }
@@ -5953,7 +5955,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-10';
+const APP_VERSION='20260522-11';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
