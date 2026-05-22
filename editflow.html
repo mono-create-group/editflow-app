@@ -32,7 +32,7 @@ select option{background:var(--card)}
 a{color:inherit;text-decoration:none}
 
 /* ─── LAYOUT ─── */
-#sidebar{width:210px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;position:sticky;top:0;flex-shrink:0}
+#sidebar{width:210px;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;position:sticky;top:0;flex-shrink:0;overflow-y:auto;scrollbar-width:none}
 #main{flex:1;overflow-y:auto;padding:28px 32px;max-width:960px}
 .logo{padding:0 18px 20px;font-size:17px;font-weight:700;color:var(--pl)}
 .logo small{display:block;font-size:11px;color:var(--t2);font-weight:400;margin-top:1px}
@@ -5949,7 +5949,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-7';
+const APP_VERSION='20260522-8';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){

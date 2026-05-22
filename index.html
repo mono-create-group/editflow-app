@@ -32,7 +32,7 @@ select option{background:var(--card)}
 a{color:inherit;text-decoration:none}
 
 /* ─── LAYOUT ─── */
-#sidebar{width:210px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;position:sticky;top:0;flex-shrink:0}
+#sidebar{width:210px;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;position:sticky;top:0;flex-shrink:0;overflow-y:auto;scrollbar-width:none}
 #main{flex:1;overflow-y:auto;padding:28px 32px;max-width:960px}
 .logo{padding:0 18px 20px;font-size:17px;font-weight:700;color:var(--pl)}
 .logo small{display:block;font-size:11px;color:var(--t2);font-weight:400;margin-top:1px}
@@ -783,7 +783,7 @@ let _gcalToken=null;
 let _gcalTokenClient=null;
 let _gcalUpcomingEvents=[];
 let _gcalCalendarList=[];
-const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/spreadsheets.readonly';
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/spreadsheets';
 const GCAL_CLIENT_ID='422987578809-sr1p6f6l2tvlsgc6fqqramfsphrg8q5j.apps.googleusercontent.com';
 
 function getGcalClientId(){
@@ -900,6 +900,7 @@ function _gcalInitAndAuth(clientId){
       gcalFetchCalendarList();
       gcalFetchUpcoming();
       gcalSync();
+      startSheetsAutoSync();
     }
   });
   _gcalTokenClient.requestAccessToken({prompt:'select_account'});
@@ -1024,6 +1025,95 @@ async function sheetsRead(range){
     const data=await res.json();
     return data.values||[];
   }catch(e){console.error('sheetsRead error',e);toast('スプレッドシート読み込みエラー','err');return null;}
+}
+
+// スプレッドシートへの書き込み（1案件）
+async function sheetsWriteJob(job){
+  if(!_gcalToken)return;
+  const sid=(S.settings.sheetsId||'').trim();
+  if(!sid)return;
+  const tab=(S.settings.sheetsTab||'').trim();
+  const pfx=tab?`'${tab}'!`:'';
+
+  // ワーカー名・クライアント名を解決
+  const workerNames=getJobWorkerNames(job)||'';
+  const client=job.clientId?(S.clients||[]).find(c=>c.id===job.clientId):null;
+  const clientName=client?client.name:'';
+
+  // 既存行を検索（タイトル一致）
+  let targetRow=-1;
+  try{
+    const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sid)}/values/${encodeURIComponent(pfx+'A:A')}`,{headers:{'Authorization':'Bearer '+_gcalToken}});
+    if(res.ok){
+      const d=await res.json();
+      const rows=d.values||[];
+      for(let i=1;i<rows.length;i++){
+        if((rows[i][0]||'').trim()===(job.title||'').trim()){targetRow=i+1;break;}
+      }
+    }
+  }catch(e){console.error('sheetsWriteJob find error',e);return;}
+
+  // 書き込む値（I,Jは既存値を保持）
+  let matLink='',refLink='';
+  if(targetRow>0){
+    try{
+      const r2=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sid)}/values/${encodeURIComponent(pfx+'I'+targetRow+':J'+targetRow)}`,{headers:{'Authorization':'Bearer '+_gcalToken}});
+      if(r2.ok){const d2=await r2.json();const v=d2.values?.[0]||[];matLink=v[0]||'';refLink=v[1]||'';}
+    }catch(e){}
+  }
+
+  const rowVals=[
+    job.title||'',
+    job.status||'',
+    workerNames,
+    job.sharedDate||'',
+    job.editorDraftDate||'',
+    job.clientDraftDate||'',
+    job.deliveryDate||'',
+    job.unitPrice!=null?String(job.unitPrice):'',
+    matLink,
+    refLink,
+    clientName,
+    job.notes||''
+  ];
+
+  try{
+    if(targetRow>0){
+      // 既存行を更新
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sid)}/values/${encodeURIComponent(pfx+'A'+targetRow+':L'+targetRow)}?valueInputOption=USER_ENTERED`,{
+        method:'PUT',
+        headers:{'Authorization':'Bearer '+_gcalToken,'Content-Type':'application/json'},
+        body:JSON.stringify({values:[rowVals]})
+      });
+    }else{
+      // 新規行を追加
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sid)}/values/${encodeURIComponent(pfx+'A:L')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+_gcalToken,'Content-Type':'application/json'},
+        body:JSON.stringify({values:[rowVals]})
+      });
+    }
+    console.log('[Sheets] synced:',job.title);
+  }catch(e){console.error('sheetsWriteJob write error',e);}
+}
+
+// 全案件を一括同期
+async function sheetsSyncAll(silent=false){
+  if(!_gcalToken||!(S.settings?.sheetsId))return;
+  const jobs=(S.jobs||[]).filter(j=>!j.deleted);
+  if(!jobs.length)return;
+  if(!silent)toast('📊 スプレッドシートを同期中…');
+  for(const job of jobs)await sheetsWriteJob(job);
+  if(!silent)toast(`📊 ${jobs.length}件をスプレッドシートに同期しました`);
+}
+
+// 30分ごとの自動同期
+let _sheetsAutoTimer=null;
+function startSheetsAutoSync(){
+  if(_sheetsAutoTimer)clearInterval(_sheetsAutoTimer);
+  _sheetsAutoTimer=setInterval(()=>{
+    if(_gcalToken&&S.settings?.sheetsId)sheetsSyncAll(true);
+  },30*60*1000);
 }
 
 function sheetRowToJob(row,childRows){
@@ -1206,7 +1296,7 @@ function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[],
   checkIns:[], workouts:[], workers:[], memos:[], meals:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
-  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs'},
+  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:''},
   frogId:null,
   customEx:[],
   navConfig:null,
@@ -3722,13 +3812,20 @@ ${secTitle('📅 固定タイムスケジュール')}
 
 ${secTitle('📊 Googleスプレッドシート連携')}
 <div class="card" style="margin-bottom:16px">
-  <div style="font-size:12px;color:var(--t2);margin-bottom:10px">案件掲載中ページの「📊 スプレから取り込む」ボタンで使用するスプレッドシートIDを設定します。GoogleカレンダーとのGoogle連携が必要です。</div>
+  <div style="font-size:12px;color:var(--t2);margin-bottom:10px">案件の追加・変更時に自動でスプレッドシートに書き込みます。30分ごとに自動同期。GoogleカレンダーのGoogle連携が必要です。</div>
   <div class="fg" style="margin-bottom:10px">
     <div class="fl">スプレッドシートID</div>
     <input id="set-sheets-id" value="${esc(S.settings.sheetsId||'')}" placeholder="スプレッドシートIDを入力">
     <div style="font-size:11px;color:var(--t3);margin-top:4px">URLの /spreadsheets/d/<strong>ここの部分</strong>/edit から取得できます</div>
   </div>
-  <button class="btn btn-p btn-sm" onclick="saveSheetsId()">保存</button>
+  <div class="fg" style="margin-bottom:10px">
+    <div class="fl">シートタブ名（省略可）</div>
+    <input id="set-sheets-tab" value="${esc(S.settings.sheetsTab||'')}" placeholder="例: 大塚周平様（空欄で1枚目のシート）">
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-p btn-sm" onclick="saveSheetsId()">保存</button>
+    <button class="btn btn-g btn-sm" onclick="sheetsSyncAll()">📊 今すぐ全件同期</button>
+  </div>
 </div>
 
 ${secTitle('👤 担当者管理')}
@@ -4023,7 +4120,7 @@ function savePomoSettings(){
   save();resetPomo();toast('ポモドーロ設定を保存しました');
 }
 function saveTarget(){S.settings.target=parseInt(document.getElementById('set-target').value)||0;save();toast('目標を保存しました');}
-function saveSheetsId(){const v=document.getElementById('set-sheets-id')?.value.trim();if(!v){toast('スプレッドシートIDを入力してください','err');return;}S.settings.sheetsId=v;save();toast('📊 スプレッドシートIDを保存しました');}
+function saveSheetsId(){const v=document.getElementById('set-sheets-id')?.value.trim();if(!v){toast('スプレッドシートIDを入力してください','err');return;}S.settings.sheetsId=v;S.settings.sheetsTab=(document.getElementById('set-sheets-tab')?.value||'').trim();save();toast('📊 スプレッドシート設定を保存しました');}
 function saveIdentity(){S.settings.identity=document.getElementById('set-identity').value.trim();save();toast('アイデンティティを保存しました');}
 function saveFS(){save();toast('スケジュールを保存しました');}
 
@@ -4633,6 +4730,7 @@ function saveJob(){
   }
   else S.jobs.unshift({id:uid(),...data,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('案件を保存しました');
+  if(_gcalToken&&S.settings?.sheetsId){const _sj=EID?S.jobs.find(j=>j.id===EID):S.jobs[0];if(_sj)sheetsWriteJob(_sj).then(()=>toast('📊 スプレッドシートを更新しました'));}
   // 請求日・提出日が設定されていればGoogleカレンダーに毎月繰り返しで追加
   if(_gcalToken){
     const savedJob=EID?S.jobs.find(j=>j.id===EID):S.jobs[0];
@@ -5851,7 +5949,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-6';
+const APP_VERSION='20260522-8';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
