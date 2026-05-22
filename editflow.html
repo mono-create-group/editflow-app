@@ -1290,7 +1290,7 @@ let RV='revenue'; // revenue sub-tab
 let GV='this_month'; // goals sub-tab (horizon)
 let PVMT='board'; // projects main tab (board/list/profit/payment/worker/priority)
 let JT='morning'; // journal tab (morning/evening)
-let JOB_SORT='default'; // job sort order
+let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[],
@@ -2430,8 +2430,8 @@ function rProjects(){
     <button class="btn btn-p btn-sm" onclick="openClientModal()">＋ クライアント追加</button>
     <button class="btn btn-g btn-sm" onclick="openJobModal()">＋ 案件追加</button>
     <select style="font-size:12px;padding:4px 8px;border-radius:6px" onchange="JOB_SORT=this.value;render()">
-      <option value="default" ${JOB_SORT==='default'?'selected':''}>並び順: デフォルト</option>
-      <option value="deadline" ${JOB_SORT==='deadline'?'selected':''}>納期順</option>
+      <option value="deadline" ${JOB_SORT==='deadline'?'selected':''}>納期順（優先度）</option>
+      <option value="default" ${JOB_SORT==='default'?'selected':''}>デフォルト</option>
       <option value="f1date" ${JOB_SORT==='f1date'?'selected':''}>編集者初稿順</option>
       <option value="clientdraft" ${JOB_SORT==='clientdraft'?'selected':''}>クライアント初稿順</option>
       <option value="f1worker" ${JOB_SORT==='f1worker'?'selected':''}>担当者順</option>
@@ -2607,11 +2607,11 @@ ${subListingJobs.length?`<div style="font-size:13px;font-weight:700;color:var(--
 }
 
 function rProjBoard(){
-  const statuses=['案件掲載中','未着手','進行中','編集者進行中','確認待ち','修正中','初稿完成'];
-  const scols={'案件掲載中':'#06b6d4','未着手':'#6b7280','進行中':'#3b82f6','編集者進行中':'#ec4899','確認待ち':'#f59e0b','修正中':'#ef4444','初稿完成':'#7c3aed'};
+  const statuses=['案件掲載中','未着手','進行中','編集者進行中','FB待ち','確認待ち','修正中','初稿完成'];
+  const scols={'案件掲載中':'#06b6d4','未着手':'#6b7280','進行中':'#3b82f6','編集者進行中':'#ec4899','FB待ち':'#ec4899','確認待ち':'#f59e0b','修正中':'#ef4444','初稿完成':'#7c3aed'};
   return`<div class="board-wrap">
 ${statuses.map(st=>{
-  const jobs=sortJobs(S.jobs.filter(j=>!j.deleted&&j.status===st));
+  const jobs=sortJobs(S.jobs.filter(j=>!j.deleted&&j.status===st&&j.status!=='完了'&&j.status!=='キャンセル'));
   return`<div class="board-col">
     <div class="board-col-hdr" style="background:${scols[st]||'#6b7280'}20;color:${scols[st]||'#6b7280'}">
       <span>${st}</span><span style="font-size:11px">${jobs.length}</span>
@@ -5949,7 +5949,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-8';
+const APP_VERSION='20260522-9';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
