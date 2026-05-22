@@ -187,6 +187,7 @@ a{color:inherit;text-decoration:none}
 .mday-task.done-t{opacity:.45;text-decoration:line-through}
 .mday-more{font-size:10px;color:var(--t3);margin-top:2px;padding-left:2px}
 .wtask.drag-over{border:1.5px dashed var(--purple);background:var(--pdim)}
+.fs-drop-zone.fs-drag-over{outline:2px dashed var(--purple);outline-offset:-2px;background:var(--pdim)!important}
 
 /* ─── TIME SCHEDULE ─── */
 .sched-wrap{display:flex;gap:0;margin-top:8px;overflow-y:auto;max-height:75vh}
@@ -1844,7 +1845,7 @@ function rTasksToday(){
   const isDraggable=getTaskSort()==='manual';
   const todayHabits=habitsForDate(td).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
   const habitDoneCount=todayHabits.filter(h=>(h.completedDates||[]).includes(td)).length;
-  const fixedSched=rFixedScheduleList(false);
+  const fixedSched=rFixedScheduleList(false,true);
   return`
 ${fixedSched?`${secTitle('🕐 固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${fixedSched}`:''}
 <div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
@@ -1879,16 +1880,17 @@ ${tmHabits.length?`${secTitle(`🔥 明日の習慣 (${tmHabits.length}件)`)}${
 }
 
 // 固定タイムスケジュールをリスト表示（compact=trueで説明文省略）
-function rFixedScheduleList(compact=false){
+function rFixedScheduleList(compact=false,droppable=false){
   const fs=S.fs||DEFAULT_FS;
   if(!fs.length)return'';
   const now=new Date();
   const nowM=now.getHours()*60+now.getMinutes();
-  return fs.map(f=>{
+  return fs.map((f,i)=>{
     const sm=tMin(f.s);
     const em=tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e);
     const isNow=nowM>=sm&&nowM<em;
-    return`<div class="task-item" style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'18;':''};margin-bottom:5px">
+    const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}',${i})" id="fs-block-${i}"`:'';
+    return`<div class="task-item fs-drop-zone" ${dropAttrs} style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'18;':''};margin-bottom:5px;transition:background .15s">
   <div style="font-size:11px;color:var(--t3);flex-shrink:0;min-width:88px;padding-top:1px">${f.s}〜${f.e}</div>
   <div class="task-body" style="min-width:0">
     <div class="task-ttl" style="${isNow?'color:'+f.c+';font-weight:700':'font-weight:500'}">${isNow?'▶ ':''}${esc(f.t)}</div>
@@ -2261,7 +2263,21 @@ function schedSideDrop(e,date){
 // ===TASK LIST D&D===
 let _taskDragId=null;
 function taskDragStart(e,id){_taskDragId=id;e.dataTransfer.effectAllowed='move';e.currentTarget.classList.add('dragging');}
-function taskDragEnd(e){e.currentTarget.classList.remove('dragging');document.querySelectorAll('.task-item.drag-over').forEach(el=>el.classList.remove('drag-over'));}
+function taskDragEnd(e){e.currentTarget.classList.remove('dragging');document.querySelectorAll('.task-item.drag-over,.fs-drop-zone.fs-drag-over').forEach(el=>el.classList.remove('drag-over','fs-drag-over'));}
+function fsBlockDragOver(e,i){e.preventDefault();e.stopPropagation();document.getElementById('fs-block-'+i)?.classList.add('fs-drag-over');}
+function fsBlockDragLeave(e,i){document.getElementById('fs-block-'+i)?.classList.remove('fs-drag-over');}
+function fsBlockDrop(e,startTime,i){
+  e.preventDefault();e.stopPropagation();
+  document.getElementById('fs-block-'+i)?.classList.remove('fs-drag-over');
+  const id=_taskDragId||_wdayDragId;
+  if(!id)return;
+  const t=S.tasks.find(t=>t.id===id);
+  if(!t){_taskDragId=null;_wdayDragId=null;return;}
+  t.startTime=startTime;
+  t.dueDate=today();
+  save();render();toast(`⏰ ${esc(t.title)} を ${startTime} に割り当てました`);
+  _taskDragId=null;_wdayDragId=null;
+}
 function taskListDrop(e){
   e.preventDefault();
   if(!_taskDragId)return;
@@ -5835,7 +5851,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-5';
+const APP_VERSION='20260522-6';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
