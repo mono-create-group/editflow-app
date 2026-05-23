@@ -791,28 +791,50 @@ function getGcalClientId(){
 }
 
 function renderGcalUI(){
-  let evHtml='';
-  if(_gcalToken&&_gcalUpcomingEvents.length){
-    const td=today();
-    const tmr=new Date(new Date(td+'T00:00:00').getTime()+86400000).toISOString().slice(0,10);
-    const now=new Date();
-    const fmtTime=dt=>{const d=new Date(dt);return`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
-    const todayEvs=_gcalUpcomingEvents.filter(e=>{
-      const d=e.start?.date||e.start?.dateTime?.slice(0,10);return d===td;
-    });
-    const tmrEvs=_gcalUpcomingEvents.filter(e=>{
-      const d=e.start?.date||e.start?.dateTime?.slice(0,10);return d===tmr;
-    });
-    const evRow=e=>{
-      const isTimed=!!e.start?.dateTime;
-      const time=isTimed?`<span style="color:var(--blue);font-weight:600;flex-shrink:0">${fmtTime(e.start.dateTime)}</span>`:`<span style="color:var(--t3);flex-shrink:0;font-size:10px">終日</span>`;
-      return`<div style="display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid var(--border);font-size:11px">${time}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${esc(e.summary||'(無題)')}</span></div>`;
+  const td=today();
+  const tmr=new Date(new Date(td+'T00:00:00').getTime()+86400000).toISOString().slice(0,10);
+  const fmtTime=dt=>{const d=new Date(dt);return`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+
+  // アプリのタスクをイベント形式に変換
+  const taskToEv=t=>({
+    _type:'task',_done:t.done,
+    date:t.dueDate,
+    time:t.startTime||null,
+    _sortKey:t.startTime||'99:99',
+    title:t.title
+  });
+  const todayTasks=(S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.dueDate===td).map(taskToEv);
+  const tmrTasks=(S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.dueDate===tmr).map(taskToEv);
+
+  // Googleカレンダーイベントをイベント形式に変換
+  const gcalToEv=e=>{
+    const isTimed=!!e.start?.dateTime;
+    return{
+      _type:'gcal',
+      date:e.start?.date||e.start?.dateTime?.slice(0,10),
+      time:isTimed?fmtTime(e.start.dateTime):null,
+      _sortKey:isTimed?fmtTime(e.start.dateTime):'99:99',
+      title:e.summary||'(無題)'
     };
-    evHtml=`<div style="margin-top:6px;padding:6px 8px;background:var(--card2);border-radius:6px;font-size:11px">
-      ${todayEvs.length?`<div style="color:var(--t3);font-size:10px;font-weight:700;margin-bottom:2px">📅 今日</div>${todayEvs.map(evRow).join('')}`:'<div style="color:var(--t3);font-size:11px;text-align:center;padding:4px 0">今日の予定はありません</div>'}
-      ${tmrEvs.length?`<div style="color:var(--t3);font-size:10px;font-weight:700;margin:5px 0 2px">明日</div>${tmrEvs.map(evRow).join('')}`:''}
-    </div>`;
-  }
+  };
+  const todayGcal=_gcalUpcomingEvents.filter(e=>(e.start?.date||e.start?.dateTime?.slice(0,10))===td).map(gcalToEv);
+  const tmrGcal=_gcalUpcomingEvents.filter(e=>(e.start?.date||e.start?.dateTime?.slice(0,10))===tmr).map(gcalToEv);
+
+  // マージ＆時間順ソート
+  const merge=(tasks,gcals)=>[...tasks,...gcals].sort((a,b)=>a._sortKey<b._sortKey?-1:a._sortKey>b._sortKey?1:0);
+  const todayAll=merge(todayTasks,todayGcal);
+  const tmrAll=merge(tmrTasks,tmrGcal);
+
+  const evRow=ev=>{
+    const icon=ev._type==='task'?`<span style="color:var(--green);flex-shrink:0;font-size:10px">✅</span>`:`<span style="color:var(--blue);flex-shrink:0;font-size:10px">📅</span>`;
+    const timeEl=ev.time?`<span style="color:var(--purple);font-weight:600;flex-shrink:0;font-size:10px">${ev.time}</span>`:`<span style="color:var(--t3);flex-shrink:0;font-size:10px">終日</span>`;
+    return`<div style="display:flex;align-items:center;gap:4px;padding:3px 0;border-bottom:1px solid var(--border);font-size:11px">${timeEl}${icon}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${esc(ev.title)}</span></div>`;
+  };
+
+  const evHtml=`<div style="margin-top:6px;padding:6px 8px;background:var(--card2);border-radius:6px;font-size:11px">
+    ${todayAll.length?`<div style="color:var(--t3);font-size:10px;font-weight:700;margin-bottom:2px">今日</div>${todayAll.map(evRow).join('')}`:'<div style="color:var(--t3);font-size:11px;text-align:center;padding:4px 0">今日の予定・タスクはありません</div>'}
+    ${tmrAll.length?`<div style="color:var(--t3);font-size:10px;font-weight:700;margin:5px 0 2px">明日</div>${tmrAll.map(evRow).join('')}`:''}
+  </div>`;
   const selCalIds=S.settings?.gcalCalendarIds||(S.settings?.gcalCalendarId?[S.settings.gcalCalendarId]:['primary']);
   const calPicker=_gcalCalendarList.length>0?`<div style="margin-top:6px;padding:5px 7px;background:var(--card2);border-radius:6px">
     <div style="font-size:10px;color:var(--t3);margin-bottom:4px;font-weight:600">カレンダーを選択（複数可）</div>
@@ -835,10 +857,13 @@ function renderGcalUI(){
       ${calPicker}
       ${evHtml}
     </div>`
-    :`<button onclick="gcalConnect()" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);display:flex;align-items:center;gap:7px;cursor:pointer">
-      <svg width="14" height="14" viewBox="0 0 24 24" style="flex-shrink:0"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px">📅 Gカレンダー連携</span>
-    </button>`;
+    :`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px">
+      <button onclick="gcalConnect()" style="width:100%;background:none;border:none;padding:0 0 6px;color:var(--text);display:flex;align-items:center;gap:7px;cursor:pointer;text-align:left">
+        <svg width="14" height="14" viewBox="0 0 24 24" style="flex-shrink:0"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--t2)">Gカレンダー連携する</span>
+      </button>
+      ${evHtml}
+    </div>`;
   const el=document.getElementById('gcal-ui');if(el)el.innerHTML=html;
   const mob=document.getElementById('mob-gcal-ui');if(mob)mob.innerHTML=html;
 }
@@ -1722,6 +1747,7 @@ function render(){
     document.getElementById('view').innerHTML=html;
     renderNav();
     document.querySelectorAll('.nav-item,.mnav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===V));
+    renderGcalUI();
   }catch(e){
     console.error('render error:',e);
     const v=document.getElementById('view');
@@ -6033,7 +6059,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-13';
+const APP_VERSION='20260522-14';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
