@@ -862,7 +862,7 @@ function renderGcalUI(){
       <div style="display:flex;align-items:center;gap:7px">
         <span style="font-size:15px">📅</span>
         <div style="flex:1;min-width:0"><div style="color:var(--text);font-weight:600">Googleカレンダー</div><div style="color:var(--amber);font-size:11px">⚠️ 再接続が必要</div></div>
-        <button onclick="gcalSilentReconnect()" style="color:var(--purple);font-size:11px;padding:2px 6px;background:var(--pdim);border-radius:5px;border:none;cursor:pointer;font-weight:600">再接続</button>
+        <button onclick="gcalManualReconnect()" style="color:var(--purple);font-size:11px;padding:2px 6px;background:var(--pdim);border-radius:5px;border:none;cursor:pointer;font-weight:600">再接続</button>
       </div>
     </div>`
     :`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px">
@@ -993,7 +993,7 @@ function _gcalInitAndAuth(clientId,silent=false){
       setTimeout(()=>_gcalRefreshToken(clientId), 55*60*1000);
     }
   });
-  _gcalTokenClient.requestAccessToken({prompt:silent?'none':'select_account'});
+  _gcalTokenClient.requestAccessToken({prompt:silent?'':'select_account'});
 }
 function _gcalRefreshToken(clientId){
   // バックグラウンドでトークンを自動更新（ポップアップなし）
@@ -1193,13 +1193,15 @@ function startSheetsAutoSync(){
   },30*60*1000);
 }
 function gcalSilentReconnect(){
+  // ページロード時のauto-popup はブラウザにブロックされるため
+  // サイドバーに「再接続」ボタンを表示するだけにする
   if(!S.settings?.gcalConnected)return;
-  if(typeof google==='undefined'){
-    // Google APIがまだロードされていない場合、少し待つ
-    setTimeout(gcalSilentReconnect,2000);
-    return;
-  }
-  _gcalInitAndAuth(GCAL_CLIENT_ID,true);
+  renderGcalUI(); // 「再接続が必要」ボタンを表示
+}
+function gcalManualReconnect(){
+  // ユーザーのクリックで呼ばれる（popup許可されている）
+  if(typeof google==='undefined'){toast('Google APIの読み込み中です','warn');return;}
+  _gcalInitAndAuth(GCAL_CLIENT_ID,false);
 }
 
 function sheetRowToJob(row,childRows){
@@ -6655,7 +6657,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260523-21';
+const APP_VERSION='20260523-22';
 
 render();
 function forceAppUpdate(){
