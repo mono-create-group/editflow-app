@@ -1296,7 +1296,7 @@ function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[],
   checkIns:[], workouts:[], workers:[], memos:[], meals:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
-  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:''},
+  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true},
   frogId:null,
   customEx:[],
   navConfig:null,
@@ -1596,10 +1596,13 @@ function checkDailyLock(){
   const now=new Date();
   const hour=now.getHours();
   const td=today();
+  const morningLockOn=S.settings?.morningLockEnabled!==false;
+  const eveningLockOn=S.settings?.eveningLockEnabled!==false;
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
-  // 朝8時以降で朝のジャーナルが未完了 → 朝ロック
-  if(hour>=8&&hour<19&&!hasMorning)return true;
-  if(hour<19)return false; // 8時前または朝ジャーナル済みなら夜ロックチェックのみ
+  // 朝8時以降で朝のジャーナルが未完了 → 朝ロック（設定ON時のみ）
+  if(morningLockOn&&hour>=8&&hour<19&&!hasMorning&&!sessionStorage.getItem('ef_skip_morning_'+td))return true;
+  if(hour<19)return false;
+  if(!eveningLockOn)return false;
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
@@ -1633,7 +1636,9 @@ function rLockScreen(){
     <div style="font-size:15px;padding:6px 0;color:var(--red)">❌ 🌅 朝のジャーナル</div>
   </div>
   <button class="btn btn-p" onclick="V='journal';JT='morning';render()">🌅 朝のジャーナルを記入する</button>
-  <div style="font-size:12px;color:var(--t3);margin-top:24px">記録完了後、自動的にアプリが開きます</div>
+  <button class="btn btn-g btn-sm" style="margin-top:12px" onclick="sessionStorage.setItem('ef_skip_morning_'+today(),'1');render()">スキップ（今日だけ）</button>
+  <div style="font-size:12px;color:var(--t3);margin-top:16px">記録完了後、自動的にアプリが開きます</div>
+  <div style="font-size:11px;color:var(--t3);margin-top:6px">ロック機能は設定ページでオフにできます</div>
 </div>`;
   }
   // 夜ロック（19時以降）
@@ -3779,6 +3784,28 @@ ${secTitle('🧠 アイデンティティ')}
   </div>
   <div class="fhint">ダッシュボードに表示され、行動のブレを防ぎます</div>
   <button class="btn btn-p btn-sm" onclick="saveIdentity()">保存</button>
+</div>
+
+${secTitle('🔒 ジャーナルロック設定')}
+<div class="card" style="margin-bottom:16px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div>
+      <div style="font-size:13px;font-weight:600">朝のジャーナルロック</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:2px">ONにすると、朝のジャーナル未記入の場合8〜18時はアプリがロックされます</div>
+    </div>
+    <div onclick="S.settings.morningLockEnabled=!(S.settings.morningLockEnabled!==false);save();render()" style="cursor:pointer;width:44px;height:24px;border-radius:12px;background:${S.settings.morningLockEnabled!==false?'var(--purple)':'var(--border)'};position:relative;transition:background .2s;flex-shrink:0">
+      <div style="position:absolute;top:3px;left:${S.settings.morningLockEnabled!==false?'23':'3'}px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:13px;font-weight:600">夜の記録ロック</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:2px">ONにすると、19時以降に夜ジャーナル・習慣未完了でアプリがロックされます</div>
+    </div>
+    <div onclick="S.settings.eveningLockEnabled=!(S.settings.eveningLockEnabled!==false);save();render()" style="cursor:pointer;width:44px;height:24px;border-radius:12px;background:${S.settings.eveningLockEnabled!==false?'var(--purple)':'var(--border)'};position:relative;transition:background .2s;flex-shrink:0">
+      <div style="position:absolute;top:3px;left:${S.settings.eveningLockEnabled!==false?'23':'3'}px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
+    </div>
+  </div>
 </div>
 
 ${secTitle('💪 筋トレコミットメント')}
@@ -5955,7 +5982,7 @@ checkClientDraftTasks();
 render();
 
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-11';
+const APP_VERSION='20260522-12';
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
