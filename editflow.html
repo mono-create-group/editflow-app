@@ -677,6 +677,7 @@ const BUILTIN_VIEWS=[
   {id:'memo',label:'ブレインダンプ',icon:'🧠'},
   {id:'aichat',label:'AIアシスタント',icon:'🤖'},
   {id:'fitness',label:'フィットネス',icon:'💪'},
+  {id:'kpi',label:'KPI管理',icon:'📊'},
 ];
 
 const DB_OLD='ef_v4';
@@ -1344,6 +1345,8 @@ const DEFAULT_FS=[
 
 // ===STATE===
 let S=load(), V=sessionStorage.getItem('ef_view')||'dashboard', TV='today', HV='weekly', WO=0, MO=0, EID=null, PVM='board', JD=today();
+let KV=null; // 現在の事業部ID
+let KT='kgi'; // KPIページ内タブ
 let SD=0; // schedule day offset (0=today,1=tomorrow,...)
 let RV='revenue'; // revenue sub-tab
 let GV='this_month'; // goals sub-tab (horizon)
@@ -1360,6 +1363,7 @@ function defState(){return{
   customEx:[],
   navConfig:null,
   customPages:[],
+  divisions:[],
 };}
 function migrate(d){
   // migrate ef_v4 → ef_v5
@@ -1744,7 +1748,7 @@ function render(){
       }
     }
     sessionStorage.setItem('ef_view',V);
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -3826,6 +3830,375 @@ function saveFitnessGoals(){
   S.settings.dailyCalorieTarget=parseInt(document.getElementById('fit-cal')?.value)||0;
   save();render();toast('フィットネス目標を保存しました');
 }
+// ===KPI/KGI MANAGEMENT===
+function rKpi(){
+  if(!S.divisions)S.divisions=[];
+  const divs=S.divisions.filter(d=>!d.deleted);
+  let div=divs.find(d=>d.id===KV)||(divs[0]||null);
+  if(div)KV=div.id; else KV=null;
+
+  const divTabs=divs.map(d=>`<button class="btn btn-sm ${KV===d.id?'btn-p':'btn-g'}" onclick="KV='${d.id}';render()" style="flex-shrink:0">${esc(d.name)}</button>`).join('');
+
+  const innerTabs=[['kgi','🎯 KGI'],['kpi','📈 KPI'],['issues','⚠️ イシュー'],['tasks','✅ タスク']];
+  const tabBar=innerTabs.map(([k,l])=>`<div class="stab${KT===k?' act':''}" onclick="KT='${k}';render()">${l}</div>`).join('');
+
+  let content='';
+  if(!div){
+    content=`<div class="card" style="text-align:center;padding:40px 20px;color:var(--t2)">事業部を追加してKPI/KGI管理を始めましょう</div>`;
+  } else if(KT==='kgi'){
+    content=rKgiTab(div);
+  } else if(KT==='kpi'){
+    content=rKpiTab(div);
+  } else if(KT==='issues'){
+    content=rIssueTab(div);
+  } else {
+    content=rDivTaskTab(div);
+  }
+
+  return`<div class="ph">
+  <div class="ph-title">📊 KPI管理</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-p btn-sm" onclick="openDivModal(null)">＋ 事業部追加</button>
+    ${div?`<button class="btn btn-g btn-sm" onclick="openDivModal('${div.id}')">✏️ 編集</button>
+    <button class="btn btn-g btn-sm btn-red" onclick="delDiv('${div.id}')">🗑 削除</button>`:''}
+  </div>
+</div>
+<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:16px;scrollbar-width:none">
+  ${divTabs}
+</div>
+${div?`<div class="sub-tabs" style="margin-bottom:16px">${tabBar}</div>`:''}
+${content}`;
+}
+
+function rKgiTab(div){
+  const kgis=(div.kgis||[]).filter(k=>!k.deleted);
+  const cards=kgis.length===0
+    ?`<div class="card" style="text-align:center;padding:24px;color:var(--t2)">KGIがまだありません</div>`
+    :kgis.map(k=>{
+      const pct=k.targetValue>0?Math.min(100,Math.round((k.currentValue||0)/k.targetValue*100)):0;
+      const colClass=pct>=100?'bg':pct>=60?'bb':pct>=30?'ba':'br';
+      return `<div class="card" style="margin-bottom:10px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+    <div style="font-weight:600;font-size:15px">${esc(k.title)}</div>
+    <div style="display:flex;gap:4px">
+      <button class="btn btn-g btn-xs" onclick="openKgiModal('${div.id}','${k.id}')">✏️</button>
+      <button class="btn btn-g btn-xs btn-red" onclick="delKgi('${div.id}','${k.id}')">🗑</button>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+      <div style="height:100%;background:var(--${pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red'});width:${pct}%;border-radius:4px;transition:width .4s"></div>
+    </div>
+    <span class="badge ${colClass}" style="flex-shrink:0">${pct}%</span>
+  </div>
+  <div style="display:flex;gap:16px;font-size:12px;color:var(--t2)">
+    <span>現状: <b style="color:var(--text)">${k.currentValue||0}${esc(k.unit||'')}</b></span>
+    <span>目標: <b style="color:var(--text)">${k.targetValue||0}${esc(k.unit||'')}</b></span>
+    ${k.deadline?`<span>期限: <b style="color:var(--text)">${k.deadline}</b></span>`:''}
+  </div>
+</div>`;
+    }).join('');
+  return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  ${secTitle('🎯 KGI一覧')}
+  <button class="btn btn-p btn-sm" onclick="openKgiModal('${div.id}',null)">＋ KGI追加</button>
+</div>
+${cards}`;
+}
+
+function rKpiTab(div){
+  const kpis=(div.kpis||[]).filter(k=>!k.deleted);
+  const kgis=(div.kgis||[]).filter(k=>!k.deleted);
+  const cards=kpis.length===0
+    ?`<div class="card" style="text-align:center;padding:24px;color:var(--t2)">KPIがまだありません</div>`
+    :kpis.map(k=>{
+      const pct=k.targetValue>0?Math.min(100,Math.round((k.currentValue||0)/k.targetValue*100)):0;
+      const colClass=pct>=100?'bg':pct>=60?'bb':pct>=30?'ba':'br';
+      const relKgi=kgis.find(g=>g.id===k.kgiId);
+      return `<div class="card" style="margin-bottom:10px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+    <div>
+      <div style="font-weight:600;font-size:14px">${esc(k.title)}</div>
+      ${relKgi?`<div style="font-size:11px;color:var(--pl);margin-top:2px">🎯 ${esc(relKgi.title)}</div>`:''}
+    </div>
+    <div style="display:flex;gap:4px">
+      <button class="btn btn-g btn-xs" onclick="openKpiModal('${div.id}','${k.id}')">✏️</button>
+      <button class="btn btn-g btn-xs btn-red" onclick="delKpi('${div.id}','${k.id}')">🗑</button>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden">
+      <div style="height:100%;background:var(--${pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red'});width:${pct}%;border-radius:4px;transition:width .4s"></div>
+    </div>
+    <span class="badge ${colClass}" style="flex-shrink:0">${pct}%</span>
+  </div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--t2)">
+    <span>現状: <b style="color:var(--text)">${k.currentValue||0}${esc(k.unit||'')}</b></span>
+    <span>目標: <b style="color:var(--text)">${k.targetValue||0}${esc(k.unit||'')}</b></span>
+    ${k.period?`<span>周期: <b style="color:var(--text)">${esc(k.period)}</b></span>`:''}
+  </div>
+</div>`;
+    }).join('');
+  return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  ${secTitle('📈 KPI一覧')}
+  <button class="btn btn-p btn-sm" onclick="openKpiModal('${div.id}',null)">＋ KPI追加</button>
+</div>
+${cards}`;
+}
+
+function rIssueTab(div){
+  const issues=(div.issues||[]).filter(i=>!i.deleted);
+  const kpis=(div.kpis||[]).filter(k=>!k.deleted);
+  const priMap={'high':'🔴 高','medium':'🟡 中','low':'🔵 低'};
+  const stMap={'open':'未対応','in_progress':'対応中','resolved':'解決済み'};
+  const stColMap={'open':'br','in_progress':'ba','resolved':'bg'};
+  const cards=issues.length===0
+    ?`<div class="card" style="text-align:center;padding:24px;color:var(--t2)">イシューがまだありません</div>`
+    :issues.map(i=>{
+      const relKpi=kpis.find(k=>k.id===i.kpiId);
+      const stClass=stColMap[i.status||'open']||'bk';
+      const nextSt=i.status==='open'?'in_progress':i.status==='in_progress'?'resolved':'open';
+      const nextStLbl=i.status==='open'?'対応中へ':i.status==='in_progress'?'解決済みへ':'未対応に戻す';
+      return `<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:flex-start;gap:8px">
+    <div style="flex:1">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+        <span style="font-size:12px">${priMap[i.priority||'medium']||''}</span>
+        <span style="font-weight:600">${esc(i.title)}</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span class="badge ${stClass}">${stMap[i.status||'open']||'未対応'}</span>
+        ${relKpi?`<span class="badge bk">📈 ${esc(relKpi.title)}</span>`:''}
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+      <button class="btn btn-g btn-xs" onclick="changeIssueStatus('${div.id}','${i.id}','${nextSt}')">${nextStLbl}</button>
+      <button class="btn btn-g btn-xs" onclick="openIssueModal('${div.id}','${i.id}')">✏️</button>
+      <button class="btn btn-g btn-xs btn-red" onclick="delIssue('${div.id}','${i.id}')">🗑</button>
+    </div>
+  </div>
+</div>`;
+    }).join('');
+  return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  ${secTitle('⚠️ イシュー一覧')}
+  <button class="btn btn-p btn-sm" onclick="openIssueModal('${div.id}',null)">＋ イシュー追加</button>
+</div>
+${cards}`;
+}
+
+function rDivTaskTab(div){
+  const divTasks=(S.tasks||[]).filter(t=>!t.deleted&&t.divisionId===div.id);
+  const done=divTasks.filter(t=>t.done);
+  const undone=divTasks.filter(t=>!t.done);
+  const tasksHtml=undone.length+done.length===0
+    ?`<div class="card" style="text-align:center;padding:24px;color:var(--t2)">この事業部のタスクはまだありません</div>`
+    :[...undone.map(t=>rTaskItem(t)),...done.map(t=>rTaskItem(t))].join('');
+  return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  ${secTitle('✅ この事業部のタスク')}
+  <button class="btn btn-p btn-sm" onclick="openKpiTaskModal('${div.id}')">＋ タスク追加</button>
+</div>
+${tasksHtml}`;
+}
+
+function openKpiTaskModal(divId){
+  openTaskModal(null,null,false);
+  setTimeout(()=>{
+    const t=S.tasks[0];
+    if(t)t.divisionId=divId;
+  },300);
+}
+
+// ─── KPI Division CRUD ───
+function openDivModal(id){
+  const d=id?S.divisions.find(d=>d.id===id):null;
+  const colors=['#7c3aed','#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#8b5cf6'];
+  const colorOpts=colors.map(c=>`<button type="button" style="width:26px;height:26px;border-radius:50%;background:${c};border:3px solid ${(d?.color||colors[0])===c?'#fff':'transparent'};cursor:pointer;flex-shrink:0" onclick="document.getElementById('div-color').value='${c}';document.querySelectorAll('.div-col-btn').forEach(b=>b.style.borderColor='transparent');this.style.borderColor='#fff'" class="div-col-btn"></button>`).join('');
+  openModal(`<div class="mhdr"><div class="mtitle">${d?'事業部編集':'事業部追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div class="fg"><div class="fl">事業部名 *</div><input id="div-name" value="${esc(d?.name||'')}" placeholder="例: 動画編集事業部"></div>
+<div class="fg"><div class="fl">カラー</div>
+  <input type="hidden" id="div-color" value="${d?.color||colors[0]}">
+  <div style="display:flex;gap:8px;flex-wrap:wrap">${colorOpts}</div>
+</div>
+<div class="mfooter">
+  <button class="btn btn-g" onclick="closeModal()">キャンセル</button>
+  <button class="btn btn-p" onclick="saveDiv('${id||''}')">保存</button>
+</div>`);
+  document.getElementById('div-name')?.focus();
+}
+function saveDiv(id){
+  const name=document.getElementById('div-name')?.value.trim();
+  if(!name){toast('事業部名を入力してください','err');return;}
+  const color=document.getElementById('div-color')?.value||'#7c3aed';
+  if(!S.divisions)S.divisions=[];
+  if(id){
+    const d=S.divisions.find(d=>d.id===id);
+    if(d){d.name=name;d.color=color;}
+  } else {
+    const nd={id:uid(),name,color,kgis:[],kpis:[],issues:[]};
+    S.divisions.push(nd);
+    KV=nd.id;
+  }
+  save();closeModal();render();toast('事業部を保存しました');
+}
+function delDiv(id){
+  if(!confirm('この事業部を削除しますか？関連するKGI・KPI・イシューも削除されます'))return;
+  const d=S.divisions.find(d=>d.id===id);
+  if(d){d.deleted=true;}
+  const remaining=S.divisions.filter(d=>!d.deleted);
+  KV=remaining[0]?.id||null;
+  save();render();toast('事業部を削除しました');
+}
+
+// ─── KGI CRUD ───
+function openKgiModal(divId,id){
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.kgis)div.kgis=[];
+  const k=id?div.kgis.find(k=>k.id===id):null;
+  openModal(`<div class="mhdr"><div class="mtitle">${k?'KGI編集':'KGI追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div class="fg"><div class="fl">KGIタイトル *</div><input id="kgi-title" value="${esc(k?.title||'')}" placeholder="例: 月間売上500万円達成"></div>
+<div class="frow">
+  <div class="fg"><div class="fl">目標値 *</div><input type="number" id="kgi-target" value="${k?.targetValue||''}" placeholder="例: 5000000"></div>
+  <div class="fg"><div class="fl">現状値</div><input type="number" id="kgi-current" value="${k?.currentValue||''}" placeholder="例: 2000000"></div>
+</div>
+<div class="frow">
+  <div class="fg"><div class="fl">単位</div><input id="kgi-unit" value="${esc(k?.unit||'')}" placeholder="例: 円・件・%"></div>
+  <div class="fg"><div class="fl">期限</div><input type="date" id="kgi-deadline" value="${k?.deadline||''}"></div>
+</div>
+<div class="mfooter">
+  <button class="btn btn-g" onclick="closeModal()">キャンセル</button>
+  <button class="btn btn-p" onclick="saveKgi('${divId}','${id||''}')">保存</button>
+</div>`);
+  document.getElementById('kgi-title')?.focus();
+}
+function saveKgi(divId,id){
+  const title=document.getElementById('kgi-title')?.value.trim();
+  if(!title){toast('KGIタイトルを入力してください','err');return;}
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.kgis)div.kgis=[];
+  if(id){
+    const k=div.kgis.find(k=>k.id===id);
+    if(k){k.title=title;k.targetValue=parseFloat(document.getElementById('kgi-target')?.value)||0;k.currentValue=parseFloat(document.getElementById('kgi-current')?.value)||0;k.unit=document.getElementById('kgi-unit')?.value.trim()||'';k.deadline=document.getElementById('kgi-deadline')?.value||null;}
+  } else {
+    div.kgis.push({id:uid(),title,targetValue:parseFloat(document.getElementById('kgi-target')?.value)||0,currentValue:parseFloat(document.getElementById('kgi-current')?.value)||0,unit:document.getElementById('kgi-unit')?.value.trim()||'',deadline:document.getElementById('kgi-deadline')?.value||null});
+  }
+  save();closeModal();render();toast('KGIを保存しました');
+}
+function delKgi(divId,id){
+  if(!confirm('このKGIを削除しますか？'))return;
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  const k=div.kgis?.find(k=>k.id===id);
+  if(k)k.deleted=true;
+  save();render();toast('KGIを削除しました');
+}
+
+// ─── KPI CRUD ───
+function openKpiModal(divId,id){
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.kpis)div.kpis=[];
+  const k=id?div.kpis.find(k=>k.id===id):null;
+  const kgis=(div.kgis||[]).filter(g=>!g.deleted);
+  const kgiOpts=kgis.map(g=>`<option value="${g.id}" ${k?.kgiId===g.id?'selected':''}>${esc(g.title)}</option>`).join('');
+  const periods=['日次','週次','月次','四半期','年次'];
+  const periodOpts=periods.map(p=>`<option${k?.period===p?' selected':''}>${p}</option>`).join('');
+  openModal(`<div class="mhdr"><div class="mtitle">${k?'KPI編集':'KPI追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div class="fg"><div class="fl">KPI指標名 *</div><input id="kpi-title" value="${esc(k?.title||'')}" placeholder="例: 月間新規クライアント獲得数"></div>
+<div class="frow">
+  <div class="fg"><div class="fl">目標値 *</div><input type="number" id="kpi-target" value="${k?.targetValue||''}" placeholder="例: 10"></div>
+  <div class="fg"><div class="fl">現状値</div><input type="number" id="kpi-current" value="${k?.currentValue||''}" placeholder="例: 3"></div>
+</div>
+<div class="frow">
+  <div class="fg"><div class="fl">単位</div><input id="kpi-unit" value="${esc(k?.unit||'')}" placeholder="例: 件・%・円"></div>
+  <div class="fg"><div class="fl">周期</div><select id="kpi-period"><option value="">選択なし</option>${periodOpts}</select></div>
+</div>
+${kgis.length>0?`<div class="fg"><div class="fl">紐付けKGI</div><select id="kpi-kgi"><option value="">なし</option>${kgiOpts}</select></div>`:''}
+<div class="mfooter">
+  <button class="btn btn-g" onclick="closeModal()">キャンセル</button>
+  <button class="btn btn-p" onclick="saveKpi('${divId}','${id||''}')">保存</button>
+</div>`);
+  document.getElementById('kpi-title')?.focus();
+}
+function saveKpi(divId,id){
+  const title=document.getElementById('kpi-title')?.value.trim();
+  if(!title){toast('KPI指標名を入力してください','err');return;}
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.kpis)div.kpis=[];
+  const kgiId=document.getElementById('kpi-kgi')?.value||null;
+  if(id){
+    const k=div.kpis.find(k=>k.id===id);
+    if(k){k.title=title;k.targetValue=parseFloat(document.getElementById('kpi-target')?.value)||0;k.currentValue=parseFloat(document.getElementById('kpi-current')?.value)||0;k.unit=document.getElementById('kpi-unit')?.value.trim()||'';k.period=document.getElementById('kpi-period')?.value||'';k.kgiId=kgiId||null;}
+  } else {
+    div.kpis.push({id:uid(),title,targetValue:parseFloat(document.getElementById('kpi-target')?.value)||0,currentValue:parseFloat(document.getElementById('kpi-current')?.value)||0,unit:document.getElementById('kpi-unit')?.value.trim()||'',period:document.getElementById('kpi-period')?.value||'',kgiId:kgiId||null});
+  }
+  save();closeModal();render();toast('KPIを保存しました');
+}
+function delKpi(divId,id){
+  if(!confirm('このKPIを削除しますか？'))return;
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  const k=div.kpis?.find(k=>k.id===id);
+  if(k)k.deleted=true;
+  save();render();toast('KPIを削除しました');
+}
+
+// ─── Issue CRUD ───
+function openIssueModal(divId,id){
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.issues)div.issues=[];
+  const issue=id?div.issues.find(i=>i.id===id):null;
+  const kpis=(div.kpis||[]).filter(k=>!k.deleted);
+  const kpiOpts=kpis.map(k=>`<option value="${k.id}" ${issue?.kpiId===k.id?'selected':''}>${esc(k.title)}</option>`).join('');
+  const statuses=[['open','未対応'],['in_progress','対応中'],['resolved','解決済み']];
+  const stOpts=statuses.map(([v,l])=>`<option value="${v}" ${(issue?.status||'open')===v?'selected':''}>${l}</option>`).join('');
+  const priorities=[['high','🔴 高'],['medium','🟡 中'],['low','🔵 低']];
+  const priOpts=priorities.map(([v,l])=>`<option value="${v}" ${(issue?.priority||'medium')===v?'selected':''}>${l}</option>`).join('');
+  openModal(`<div class="mhdr"><div class="mtitle">${issue?'イシュー編集':'イシュー追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div class="fg"><div class="fl">タイトル *</div><input id="iss-title" value="${esc(issue?.title||'')}" placeholder="例: 新規獲得が目標の50%に未達"></div>
+<div class="frow">
+  <div class="fg"><div class="fl">優先度</div><select id="iss-priority">${priOpts}</select></div>
+  <div class="fg"><div class="fl">ステータス</div><select id="iss-status">${stOpts}</select></div>
+</div>
+${kpis.length>0?`<div class="fg"><div class="fl">紐付けKPI</div><select id="iss-kpi"><option value="">なし</option>${kpiOpts}</select></div>`:''}
+<div class="mfooter">
+  <button class="btn btn-g" onclick="closeModal()">キャンセル</button>
+  <button class="btn btn-p" onclick="saveIssue('${divId}','${id||''}')">保存</button>
+</div>`);
+  document.getElementById('iss-title')?.focus();
+}
+function saveIssue(divId,id){
+  const title=document.getElementById('iss-title')?.value.trim();
+  if(!title){toast('タイトルを入力してください','err');return;}
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.issues)div.issues=[];
+  const kpiId=document.getElementById('iss-kpi')?.value||null;
+  if(id){
+    const i=div.issues.find(i=>i.id===id);
+    if(i){i.title=title;i.priority=document.getElementById('iss-priority')?.value||'medium';i.status=document.getElementById('iss-status')?.value||'open';i.kpiId=kpiId||null;}
+  } else {
+    div.issues.push({id:uid(),title,priority:document.getElementById('iss-priority')?.value||'medium',status:'open',kpiId:kpiId||null,createdAt:new Date().toISOString()});
+  }
+  save();closeModal();render();toast('イシューを保存しました');
+}
+function delIssue(divId,id){
+  if(!confirm('このイシューを削除しますか？'))return;
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  const i=div.issues?.find(i=>i.id===id);
+  if(i)i.deleted=true;
+  save();render();toast('イシューを削除しました');
+}
+function changeIssueStatus(divId,id,newStatus){
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  const i=div.issues?.find(i=>i.id===id);
+  if(i){i.status=newStatus;save();render();}
+}
+
 function rSettings(){
   return`<div class="ph"><div class="ph-title">設定</div></div>
 
@@ -6084,7 +6457,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260523-18';
+const APP_VERSION='20260523-19';
 
 render();
 function forceAppUpdate(){
