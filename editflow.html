@@ -868,15 +868,20 @@ function renderGcalUI(){
   const mob=document.getElementById('mob-gcal-ui');if(mob)mob.innerHTML=html;
 }
 function gcalEventsForDate(date){
-  // アプリがGcalへ書き込んだイベント・除外ワードを除く
+  // アプリタスクとして取り込み済みのGcalイベントIDセット
+  const importedGcalIds=new Set((S.tasks||[]).filter(t=>t.gcalEventId).map(t=>t.gcalEventId));
   return _gcalUpcomingEvents.filter(e=>{
     const d=e.start?.date||e.start?.dateTime?.slice(0,10);
     if(d!==date)return false;
     const title=(e.summary||'').trim();
+    // 除外: 確保時間
     if(title.includes('確保時間'))return false;
-    // アプリが書き込んだイベント（案件・請求書）を除外して重複を防ぐ
-    if(/^📋\s*(提出:|.+$)/.test(title)&&(e.description||'').includes('案件:'))return false;
+    // 除外: アプリがGcalに書き込んだイベント（案件納品・請求書）
     if(title.startsWith('🧾 請求書提出:'))return false;
+    if(title.startsWith('📋 提出:')&&(e.description||'').includes('案件:'))return false;
+    if(title.startsWith('📋 ')&&(e.description||'').includes('ステータス:'))return false;
+    // 除外: 既にアプリタスクとして取り込み済みのイベント（最重要: 重複防止）
+    if(importedGcalIds.has(e.id))return false;
     return true;
   });
 }
@@ -6457,7 +6462,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260523-19';
+const APP_VERSION='20260523-20';
 
 render();
 function forceAppUpdate(){
