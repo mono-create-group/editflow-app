@@ -2017,7 +2017,7 @@ ${fixedSched?`${secTitle('🕐 固定タイムスケジュール')}<button class
 ${over.length?`${secTitle(`⚠️ 期限超過 (${over.length}件)`)}${over.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
 ${secTitle(`📋 今日のタスク (${totalCount}件)`)}<button class="btn btn-p btn-xs" style="margin-bottom:8px" onclick="openTaskModal(null,'${td}')">＋ タスク追加</button>
 ${gcalToday.map(e=>rGcalEventItem(e)).join('')}
-${todays.length?todays.map(t=>rTaskItem(t,isDraggable)).join(''):(gcalToday.length?''):`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">今日のタスクはありません 🎉</div>`}
+${todays.length?todays.map(t=>rTaskItem(t,isDraggable)).join(''):(gcalToday.length?'':`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">今日のタスクはありません 🎉</div>`)}
 ${todayHabits.length?`${secTitle(`🔥 今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
 ${no.length?`${secTitle('📦 期限なし')}${no.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
 </div>
@@ -2041,7 +2041,7 @@ function rTasksTomorrow(){
 ${secTitle(`📋 明日のタスク (${tmTotal}件)`)}${isDraggable?`<div style="font-size:11px;color:var(--t3);margin-bottom:6px">☰ ドラッグで並び替え可。この順番のまま今日に移動されます。</div>`:''}
 <div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
 ${gcalTm.map(e=>rGcalEventItem(e)).join('')}
-${tasks.length?tasks.map(t=>rTaskItem(t,isDraggable)).join(''):(gcalTm.length?''):`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">明日のタスクはまだありません</div>`}
+${tasks.length?tasks.map(t=>rTaskItem(t,isDraggable)).join(''):(gcalTm.length?'':`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">明日のタスクはまだありません</div>`)}
 </div>
 ${tmHabits.length?`${secTitle(`🔥 明日の習慣 (${tmHabits.length}件)`)}${tmHabits.map(h=>rHabitInTaskView(h,tm,false)).join('')}`:''}`;
 }
@@ -6081,10 +6081,10 @@ updSessionCount();
 initPomo();
 initReminders();
 checkClientDraftTasks();
-render();
-
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260522-16';
+const APP_VERSION='20260523-17';
+
+render();
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
