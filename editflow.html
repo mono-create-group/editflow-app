@@ -867,12 +867,15 @@ function renderGcalUI(){
   const mob=document.getElementById('mob-gcal-ui');if(mob)mob.innerHTML=html;
 }
 function gcalEventsForDate(date){
-  // 「確保時間」を含むイベントは除外
+  // アプリがGcalへ書き込んだイベント・除外ワードを除く
   return _gcalUpcomingEvents.filter(e=>{
     const d=e.start?.date||e.start?.dateTime?.slice(0,10);
     if(d!==date)return false;
     const title=(e.summary||'').trim();
     if(title.includes('確保時間'))return false;
+    // アプリが書き込んだイベント（案件・請求書）を除外して重複を防ぐ
+    if(/^📋\s*(提出:|.+$)/.test(title)&&(e.description||'').includes('案件:'))return false;
+    if(title.startsWith('🧾 請求書提出:'))return false;
     return true;
   });
 }
@@ -985,23 +988,10 @@ function gcalDisconnect(){
 }
 
 async function gcalSync(){
+  // アプリ→Gcal書き込みは無効（読み取り専用連携、重複防止）
   if(!_gcalToken){toast('先にGoogleカレンダーと連携してください','warn');return;}
-  // 案件の納品日のみ同期（タスクは同期しない＝重複防止）
-  const td=today();
-  const jobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'&&j.deliveryDate&&j.deliveryDate>=td);
-  const calIds=S.settings?.gcalCalendarIds||(S.settings?.gcalCalendarId?[S.settings.gcalCalendarId]:['primary']);
-  const writeCalId=encodeURIComponent(calIds[0]||'primary');
-  let count=0;
-  for(const j of jobs.slice(0,20)){
-    const event={summary:'📋 '+j.title,description:`ステータス: ${j.status}`,start:{date:j.deliveryDate},end:{date:j.deliveryDate}};
-    try{
-      await fetch(`https://www.googleapis.com/calendar/v3/calendars/${writeCalId}/events`,{
-        method:'POST',headers:{'Authorization':'Bearer '+_gcalToken,'Content-Type':'application/json'},
-        body:JSON.stringify(event)
-      });count++;
-    }catch(e){console.error('gcal job sync error',e);}
-  }
-  if(count>0)toast(`📅 ${count}件の案件をGoogleカレンダーに同期しました`);
+  await gcalFetchUpcoming();
+  toast('📅 Googleカレンダーの予定を更新しました');
 }
 
 async function gcalAddRecurringInvoice(j){
@@ -1876,11 +1866,13 @@ ${secTitle('🧠 先延ばし分析')}
 ${secTitle('🕐 今日のスケジュール')}
 ${rFixedScheduleList(true)}
 
-${secTitle('今日のタスク')}
-${[...overdueT.slice(0,3).map(t=>miniTask(t,true)),...todayT.slice(0,5).map(t=>miniTask(t,false))].join('')||
-  `<div class="card card-sm" style="color:var(--t2);text-align:center">今日のタスクはありません 🎉</div>`}
-
-${(()=>{const gcEvs=gcalEventsForDate(td).sort((a,b)=>(a.start?.dateTime||'')>(b.start?.dateTime||'')?1:-1);return gcEvs.length?`${secTitle('📅 今日のカレンダー')}${gcEvs.map(e=>rGcalEventItem(e)).join('')}`:'';})()}
+${(()=>{
+  const gcEvs=gcalEventsForDate(td).sort((a,b)=>(a.start?.dateTime||'')>(b.start?.dateTime||'')?1:-1);
+  const taskHtml=[...overdueT.slice(0,3).map(t=>miniTask(t,true)),...todayT.slice(0,5).map(t=>miniTask(t,false))].join('');
+  const gcHtml=gcEvs.map(e=>rGcalEventItem(e)).join('');
+  const totalCount=overdueT.slice(0,3).length+todayT.slice(0,5).length+gcEvs.length;
+  return`${secTitle('今日のタスク'+(totalCount?` (${totalCount}件)`:' '))}${gcHtml}${taskHtml||(!gcHtml?'<div class="card card-sm" style="color:var(--t2);text-align:center">今日のタスクはありません 🎉</div>':'')}`;
+})()}
 
 ${secTitle('進行中案件')}
 ${activeJ.slice(0,4).map(j=>{
@@ -2264,6 +2256,19 @@ function rTasksSchedule(){
       ${h>=36&&!isOverlap?`<div style="display:flex;gap:3px;margin-top:2px"><button onclick="event.stopPropagation();splitSchedTask('${t.id}')" style="font-size:9px;padding:1px 4px;background:rgba(255,255,255,.15);border:none;border-radius:3px;color:#fff;cursor:pointer" title="タスクを分割">✂</button></div>`:''}
     </div>`;}).join('');
   const nowLine=(isToday&&nowM>=SS&&nowM<=SE)?`<div class="now-line" style="top:${nowTop}px"></div>`:'';
+  // Gcalイベントをタイムラインとサイドパネルへ
+  const gcalEvs=gcalEventsForDate(d);
+  const gcalTimedBlocks=gcalEvs.filter(e=>e.start?.dateTime).map(e=>{
+    const sm=tMin(new Date(e.start.dateTime).toTimeString().slice(0,5));
+    const em=e.end?.dateTime?tMin(new Date(e.end.dateTime).toTimeString().slice(0,5)):sm+60;
+    const top=mPos(sm),h=Math.max(18,(em-sm)*PPM);
+    const timeLbl=new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+(e.end?.dateTime?'〜'+new Date(e.end.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'');
+    return`<div style="position:absolute;top:${top}px;height:${h}px;left:52%;right:0.5%;background:var(--blue)22;border-left:3px solid var(--blue);border-radius:5px;padding:2px 5px;overflow:hidden;pointer-events:none;z-index:1">
+      <div style="font-size:10px;color:var(--blue);font-weight:600">📅 ${timeLbl}</div>
+      <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.summary||'(無題)')}</div>
+    </div>`;
+  }).join('');
+  const gcalAllDay=gcalEvs.filter(e=>!e.start?.dateTime);
   // サイドパネル用：未スケジュールのタスク（startTimeなし）
   const allDay=S.tasks.filter(t=>!t.deleted&&(t.dueDate===d||(!t.dueDate&&isToday)));
   const unscheduled=allDay.filter(t=>!t.startTime);
@@ -2314,7 +2319,11 @@ function rTasksSchedule(){
       <span>📋 未配置タスク</span>
       <span style="font-size:11px;background:var(--border);padding:1px 6px;border-radius:10px">${totalUndone}</span>
     </div>
-    ${sideItems||`<div style="font-size:12px;color:var(--t3);text-align:center;padding:16px 8px">未スケジュールの<br>タスクはありません 🎉</div>`}
+    ${gcalAllDay.map(e=>`<div style="padding:4px 8px;border-left:3px solid var(--blue);margin-bottom:4px;background:var(--blue)11;border-radius:3px">
+      <div style="font-size:10px;color:var(--blue)">📅 終日</div>
+      <div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.summary||'(無題)')}</div>
+    </div>`).join('')}
+    ${sideItems||(!gcalAllDay.length?`<div style="font-size:12px;color:var(--t3);text-align:center;padding:16px 8px">未スケジュールの<br>タスクはありません 🎉</div>`:'')}
     <div style="font-size:10px;color:var(--t3);text-align:center;padding:6px 8px 8px;border-top:1px solid var(--border);margin-top:4px">⠿ をドラッグしてスケジュールへ配置</div>
   </div>`;
   const dateLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'long'});
@@ -2341,7 +2350,7 @@ function rTasksSchedule(){
       </div>
       <div class="sched-main" style="height:${totalH}px">
         ${hours.map(h=>`<div class="hline" style="top:${mPos(h*60)}px"></div><div class="hline-half" style="top:${mPos(h*60+30)}px"></div>`).join('')}
-        ${fixedBlocks}${taskBlocks}${nowLine}
+        ${fixedBlocks}${taskBlocks}${gcalTimedBlocks}${nowLine}
       </div>
     </div>
     <div class="sched-add-hint">↑ スケジュールは設定から編集できます</div>
@@ -4871,14 +4880,7 @@ function saveJob(){
   else S.jobs.unshift({id:uid(),...data,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('案件を保存しました');
   if(_gcalToken&&S.settings?.sheetsId){const _sj=EID?S.jobs.find(j=>j.id===EID):S.jobs[0];if(_sj)sheetsWriteJob(_sj).then(()=>toast('📊 スプレッドシートを更新しました'));}
-  // 請求日・提出日が設定されていればGoogleカレンダーに毎月繰り返しで追加
-  if(_gcalToken){
-    const savedJob=EID?S.jobs.find(j=>j.id===EID):S.jobs[0];
-    if(savedJob){
-      if(data.invoiceDate)gcalAddRecurringInvoice(savedJob);
-      if(data.deliveryDate)gcalAddRecurringDelivery(savedJob);
-    }
-  }
+  // ※ GcalへのアプリデータWriteは行わない（読み戻し重複防止）
 }
 
 function openHabitModal(id){
@@ -6082,7 +6084,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260523-17';
+const APP_VERSION='20260523-18';
 
 render();
 function forceAppUpdate(){
