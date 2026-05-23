@@ -857,6 +857,14 @@ function renderGcalUI(){
       ${calPicker}
       ${evHtml}
     </div>`
+    :S.settings?.gcalConnected
+    ?`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px">
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="font-size:15px">📅</span>
+        <div style="flex:1;min-width:0"><div style="color:var(--text);font-weight:600">Googleカレンダー</div><div style="color:var(--amber);font-size:11px">⚠️ 再接続が必要</div></div>
+        <button onclick="gcalSilentReconnect()" style="color:var(--purple);font-size:11px;padding:2px 6px;background:var(--pdim);border-radius:5px;border:none;cursor:pointer;font-weight:600">再接続</button>
+      </div>
+    </div>`
     :`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px">
       <button onclick="gcalConnect()" style="width:100%;background:none;border:none;padding:0 0 6px;color:var(--text);display:flex;align-items:center;gap:7px;cursor:pointer;text-align:left">
         <svg width="14" height="14" viewBox="0 0 24 24" style="flex-shrink:0"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -963,8 +971,14 @@ function _gcalInitAndAuth(clientId,silent=false){
     scope:GCAL_SCOPE,
     callback:(resp)=>{
       if(resp.error){
-        if(!silent)toast('Googleカレンダーの連携に失敗しました: '+resp.error,'err');
-        if(S.settings)S.settings.gcalConnected=false;
+        if(!silent){
+          toast('Googleカレンダーの連携に失敗しました: '+resp.error,'err');
+          if(S.settings)S.settings.gcalConnected=false;
+          save();
+        }
+        // silent失敗時はgcalConnectedをtrueのまま維持（次回リロードで再試行できるよう）
+        // ただしサイドバーに再接続ボタンを表示
+        renderGcalUI();
         return;
       }
       _gcalToken=resp.access_token;
@@ -975,9 +989,16 @@ function _gcalInitAndAuth(clientId,silent=false){
       gcalFetchUpcoming();
       startSheetsAutoSync();
       render();
+      // トークンは1時間で失効→自動リフレッシュ
+      setTimeout(()=>_gcalRefreshToken(clientId), 55*60*1000);
     }
   });
-  _gcalTokenClient.requestAccessToken({prompt:silent?'':'select_account'});
+  _gcalTokenClient.requestAccessToken({prompt:silent?'none':'select_account'});
+}
+function _gcalRefreshToken(clientId){
+  // バックグラウンドでトークンを自動更新（ポップアップなし）
+  if(!S.settings?.gcalConnected)return;
+  _gcalInitAndAuth(clientId,true);
 }
 
 function gcalDisconnect(){
@@ -1351,7 +1372,7 @@ const DEFAULT_FS=[
 // ===STATE===
 let S=load(), V=sessionStorage.getItem('ef_view')||'dashboard', TV='today', HV='weekly', WO=0, MO=0, EID=null, PVM='board', JD=today();
 let KV=null; // 現在の事業部ID
-let KT='kgi'; // KPIページ内タブ
+let KT='1w'; // KPIページ内タブ
 let SD=0; // schedule day offset (0=today,1=tomorrow,...)
 let RV='revenue'; // revenue sub-tab
 let GV='this_month'; // goals sub-tab (horizon)
@@ -1363,7 +1384,7 @@ function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[],
   checkIns:[], workouts:[], workers:[], memos:[], meals:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
-  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true},
+  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false},
   frogId:null,
   customEx:[],
   navConfig:null,
@@ -1660,6 +1681,23 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 document.addEventListener('input',e=>{
   if(document.getElementById('modal-overlay')?.contains(e.target))_modalDirty=true;
 });
+function checkKpiLock(){
+  if(!S.settings?.kpiLockEnabled)return false;
+  if(!S.divisions||S.divisions.length===0)return false;
+  const td=today();
+  const now=new Date(td+'T00:00:00');
+  const dayOfWeek=now.getDay();
+  const monday=new Date(now);
+  monday.setDate(now.getDate()-(dayOfWeek===0?6:dayOfWeek-1));
+  const mondayStr=monday.toISOString().slice(0,10);
+  const activeDivs=S.divisions.filter(d=>!d.deleted);
+  if(activeDivs.length===0)return false;
+  return activeDivs.some(d=>{
+    const h=d.horizons?.['1w'];
+    if(!h?.updatedAt)return true;
+    return h.updatedAt<mondayStr;
+  });
+}
 function checkDailyLock(){
   const now=new Date();
   const hour=now.getHours();
@@ -1669,13 +1707,17 @@ function checkDailyLock(){
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
   // 朝8時以降で朝のジャーナルが未完了 → 朝ロック（設定ON時のみ）
   if(morningLockOn&&hour>=8&&hour<19&&!hasMorning&&!sessionStorage.getItem('ef_skip_morning_'+td))return true;
-  if(hour<19)return false;
-  if(!eveningLockOn)return false;
+  if(hour<19){
+    // 時間帯に関わらずKPIロックをチェック
+    return checkKpiLock();
+  }
+  if(!eveningLockOn)return checkKpiLock();
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
   const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
   const gymOk=!S.settings?.gymCommit||gymDoneToday();
-  return !hasMorning||!hasEvening||!habitDone||!gymOk;
+  if(!hasMorning||!hasEvening||!habitDone||!gymOk)return true;
+  return checkKpiLock();
 }
 function gymDoneToday(){
   const td=today();
@@ -1707,6 +1749,16 @@ function rLockScreen(){
   <button class="btn btn-g btn-sm" style="margin-top:12px" onclick="sessionStorage.setItem('ef_skip_morning_'+today(),'1');render()">スキップ（今日だけ）</button>
   <div style="font-size:12px;color:var(--t3);margin-top:16px">記録完了後、自動的にアプリが開きます</div>
   <div style="font-size:11px;color:var(--t3);margin-top:6px">ロック機能は設定ページでオフにできます</div>
+</div>`;
+  }
+  // KPIロックチェック（朝ロックでない場合）
+  if(checkKpiLock()){
+    return`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:40px 20px">
+  <div style="font-size:64px;margin-bottom:20px">📊</div>
+  <div style="font-size:22px;font-weight:700;margin-bottom:12px">今週のKPI振り返りをしてからアプリを使えます</div>
+  <div style="font-size:14px;color:var(--t2);margin-bottom:24px;line-height:1.7">各事業部の今週（1w）のKPIを更新・振り返りしてください。<br>完了後、自動的にアプリが開きます。</div>
+  <button class="btn btn-p" onclick="V='kpi';KT='1w';render()">📊 KPI管理へ</button>
+  <div style="font-size:11px;color:var(--t3);margin-top:16px">ロック機能は設定ページでオフにできます</div>
 </div>`;
   }
   // 夜ロック（19時以降）
@@ -1743,7 +1795,8 @@ function render(){
       const _morningLock=_lh>=8&&_lh<19; // 朝ロック中かどうか
       // 朝ロック：ジャーナルのみ通過許可
       // 夜ロック：ジャーナル・習慣トラッカー・フィットネスのみ通過許可
-      const _pass=_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness');
+      const _kpiOnly=!_morningLock&&checkKpiLock()&&!(_lh>=19&&(S.settings?.eveningLockEnabled!==false));
+      const _pass=_kpiOnly?(V==='kpi'):_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness'||V==='kpi');
       if(!_pass){
         V='dashboard';
         sessionStorage.setItem('ef_view','dashboard');
@@ -3393,6 +3446,17 @@ function rJournal(){
     <div class="fl">💬 今日の自分へのコミットメント（一言）</div>
     <div class="fhint" style="margin-bottom:6px">今日という一日に対して自分に誓う姿勢・在り方</div>
     <input id="j-commit" placeholder="例：完璧より完了。まず動く。 / 判断を先延ばしにしない。" value="${esc(morningEntry.commitment||'')}">
+  </div>
+  <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--pl)">📊 今週のKPIチェック</div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:10px">各事業部の今週の目標と現状を確認・更新しましょう</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="j-kpi-reviewed" ${morningEntry.kpiReviewedToday?'checked':''} onchange="(()=>{const e=S.journals.find(j=>j.date===JD&&(j.type==='morning'||!j.type));if(e)e.kpiReviewedToday=this.checked;save();})()">
+        <span>KPI確認済み</span>
+      </label>
+      <button class="btn btn-g btn-sm" onclick="V='kpi';KT='1w';render()">今週のKPI確認 →</button>
+    </div>
   </div>`;
 
   const eveningForm=`
@@ -3844,12 +3908,16 @@ function rKpi(){
 
   const divTabs=divs.map(d=>`<button class="btn btn-sm ${KV===d.id?'btn-p':'btn-g'}" onclick="KV='${d.id}';render()" style="flex-shrink:0">${esc(d.name)}</button>`).join('');
 
+  const horizonTabs=[['5y','🗓 5年後'],['1y','📆 1年後'],['6m','📅 半年後'],['3m','🗒 3ヶ月後'],['1m','📌 今月'],['1w','⚡ 今週']];
   const innerTabs=[['kgi','🎯 KGI'],['kpi','📈 KPI'],['issues','⚠️ イシュー'],['tasks','✅ タスク']];
-  const tabBar=innerTabs.map(([k,l])=>`<div class="stab${KT===k?' act':''}" onclick="KT='${k}';render()">${l}</div>`).join('');
+  const allTabs=[...horizonTabs,...innerTabs];
+  const tabBar=allTabs.map(([k,l])=>`<div class="stab${KT===k?' act':''}" onclick="KT='${k}';render()">${l}</div>`).join('');
 
   let content='';
   if(!div){
     content=`<div class="card" style="text-align:center;padding:40px 20px;color:var(--t2)">事業部を追加してKPI/KGI管理を始めましょう</div>`;
+  } else if(['5y','1y','6m','3m','1m','1w'].includes(KT)){
+    content=rHorizonTab(div,KT);
   } else if(KT==='kgi'){
     content=rKgiTab(div);
   } else if(KT==='kpi'){
@@ -3866,6 +3934,7 @@ function rKpi(){
     <button class="btn btn-p btn-sm" onclick="openDivModal(null)">＋ 事業部追加</button>
     ${div?`<button class="btn btn-g btn-sm" onclick="openDivModal('${div.id}')">✏️ 編集</button>
     <button class="btn btn-g btn-sm btn-red" onclick="delDiv('${div.id}')">🗑 削除</button>`:''}
+    <button class="btn btn-g btn-sm" onclick="V='journal';render()">📔 今日のジャーナル</button>
   </div>
 </div>
 <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:16px;scrollbar-width:none">
@@ -3873,6 +3942,121 @@ function rKpi(){
 </div>
 ${div?`<div class="sub-tabs" style="margin-bottom:16px">${tabBar}</div>`:''}
 ${content}`;
+}
+
+const HORIZON_LABELS={'5y':'5年後','1y':'1年後','6m':'半年後','3m':'3ヶ月後','1m':'今月','1w':'今週'};
+const HORIZON_DESC={'5y':'5年後のビジョン・長期目標','1y':'1年後の目標・年間KPI','6m':'半年後の目標・中期KPI','3m':'3ヶ月後の目標・四半期KPI','1m':'今月の目標・月次KPI','1w':'今週の目標・振り返り'};
+
+function rHorizonTab(div,period){
+  if(!div.horizons)div.horizons={};
+  if(!div.horizons[period])div.horizons[period]={goal:'',kpis:[],updatedAt:null};
+  const h=div.horizons[period];
+  const label=HORIZON_LABELS[period]||period;
+  const desc=HORIZON_DESC[period]||'';
+  const kpis=h.kpis||[];
+  const kpiRows=kpis.length===0
+    ?`<div style="text-align:center;padding:16px;color:var(--t2);font-size:13px">KPIがまだありません</div>`
+    :kpis.map(k=>{
+      const pct=k.target>0?Math.min(100,Math.round((k.current||0)/k.target*100)):0;
+      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+      const colClass=pct>=100?'bg':pct>=60?'bb':pct>=30?'ba':'br';
+      return `<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="flex:1;font-weight:600;font-size:14px">${esc(k.title)}</div>
+    <button class="btn btn-g btn-xs btn-red" onclick="delHorizonKpi('${div.id}','${period}','${k.id}')">🗑</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden">
+      <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:4px;transition:width .4s"></div>
+    </div>
+    <span class="badge ${colClass}" style="flex-shrink:0">${pct}%</span>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--t2);align-items:center">
+    <span>現状: <input id="hz-kpi-cur-${k.id}" type="number" value="${k.current||0}" style="width:70px;padding:2px 6px;border:1px solid var(--border);border-radius:6px;background:var(--card2);color:var(--text);font-size:12px"></span>
+    <span>目標: <b style="color:var(--text)">${k.target||0}${esc(k.unit||'')}</b></span>
+    ${k.unit?`<span>単位: <b style="color:var(--text)">${esc(k.unit)}</b></span>`:''}
+  </div>
+</div>`;
+    }).join('');
+
+  return`<div style="margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="font-size:18px;font-weight:700;color:var(--pl)">${label}</div>
+    <div style="font-size:12px;color:var(--t2)">${desc}</div>
+    ${h.updatedAt?`<span class="badge bk" style="font-size:11px">最終更新: ${h.updatedAt}</span>`:''}
+  </div>
+</div>
+<div class="card" style="margin-bottom:12px">
+  <div class="fl" style="margin-bottom:6px">🎯 ${label}の大きな目標・ビジョン</div>
+  <textarea id="hz-goal-${div.id}-${period}" rows="4" placeholder="例：〇〇を実現し、月収〇〇万円を達成する" style="width:100%;box-sizing:border-box">${esc(h.goal||'')}</textarea>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  ${secTitle('📈 KPI指標')}
+  <button class="btn btn-p btn-sm" onclick="addHorizonKpi('${div.id}','${period}')">＋ KPI追加</button>
+</div>
+${kpiRows}
+<div style="display:flex;justify-content:flex-end;margin-top:14px">
+  <button class="btn btn-p" onclick="saveHorizon('${div.id}','${period}')">✅ 振り返りを保存</button>
+</div>`;
+}
+
+function saveHorizon(divId,period){
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.horizons)div.horizons={};
+  if(!div.horizons[period])div.horizons[period]={goal:'',kpis:[]};
+  const goalEl=document.getElementById('hz-goal-'+divId+'-'+period);
+  if(goalEl)div.horizons[period].goal=goalEl.value;
+  (div.horizons[period].kpis||[]).forEach(k=>{
+    const curEl=document.getElementById('hz-kpi-cur-'+k.id);
+    if(curEl)k.current=parseFloat(curEl.value)||0;
+  });
+  div.horizons[period].updatedAt=today();
+  save();
+  toast('✅ 振り返りを保存しました');
+  render();
+}
+
+function addHorizonKpi(divId,period){
+  const label=(HORIZON_LABELS[period]||period);
+  openModal(`<div class="mhdr"><div class="mtitle">KPI追加 (${label})</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div class="fg">
+  <div class="fl">指標名 *</div>
+  <input class="finput" id="hz-kpi-title" placeholder="例: 月間売上">
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+  <div class="fg"><div class="fl">目標値</div><input class="finput" id="hz-kpi-target" type="number" placeholder="100"></div>
+  <div class="fg"><div class="fl">現状値</div><input class="finput" id="hz-kpi-current" type="number" placeholder="0"></div>
+  <div class="fg"><div class="fl">単位</div><input class="finput" id="hz-kpi-unit" placeholder="万円"></div>
+</div>
+<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+  <button class="btn btn-g btn-sm" onclick="closeModal()">キャンセル</button>
+  <button class="btn btn-p btn-sm" onclick="confirmAddHorizonKpi('${divId}','${period}')">追加</button>
+</div>`);
+}
+
+function confirmAddHorizonKpi(divId,period){
+  const t=document.getElementById('hz-kpi-title').value.trim();
+  if(!t){alert('指標名は必須です');return;}
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.horizons)div.horizons={};
+  if(!div.horizons[period])div.horizons[period]={goal:'',kpis:[]};
+  div.horizons[period].kpis.push({
+    id:uid(),title:t,
+    target:parseFloat(document.getElementById('hz-kpi-target').value)||0,
+    current:parseFloat(document.getElementById('hz-kpi-current').value)||0,
+    unit:document.getElementById('hz-kpi-unit').value
+  });
+  save();closeModal();render();
+}
+
+function delHorizonKpi(divId,period,kpiId){
+  if(!confirm('このKPIを削除しますか？'))return;
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div||!div.horizons||!div.horizons[period])return;
+  div.horizons[period].kpis=(div.horizons[period].kpis||[]).filter(k=>k.id!==kpiId);
+  save();render();toast('KPIを削除しました');
 }
 
 function rKgiTab(div){
@@ -4270,6 +4454,15 @@ ${secTitle('🔒 ジャーナルロック設定')}
     </div>
     <div onclick="S.settings.eveningLockEnabled=!(S.settings.eveningLockEnabled!==false);save();render()" style="cursor:pointer;width:44px;height:24px;border-radius:12px;background:${S.settings.eveningLockEnabled!==false?'var(--purple)':'var(--border)'};position:relative;transition:background .2s;flex-shrink:0">
       <div style="position:absolute;top:3px;left:${S.settings.eveningLockEnabled!==false?'23':'3'}px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
+    <div>
+      <div style="font-size:13px;font-weight:600">KPI振り返りロック</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:2px">ONにすると、今週の1w KPIが未更新の場合アプリがロックされます</div>
+    </div>
+    <div onclick="S.settings.kpiLockEnabled=!S.settings.kpiLockEnabled;save();render()" style="cursor:pointer;width:44px;height:24px;border-radius:12px;background:${S.settings.kpiLockEnabled?'var(--purple)':'var(--border)'};position:relative;transition:background .2s;flex-shrink:0">
+      <div style="position:absolute;top:3px;left:${S.settings.kpiLockEnabled?'23':'3'}px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
     </div>
   </div>
 </div>
@@ -6462,7 +6655,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260523-20';
+const APP_VERSION='20260523-21';
 
 render();
 function forceAppUpdate(){
