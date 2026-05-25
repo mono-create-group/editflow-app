@@ -876,20 +876,27 @@ function renderGcalUI(){
   const mob=document.getElementById('mob-gcal-ui');if(mob)mob.innerHTML=html;
 }
 function gcalEventsForDate(date){
-  // アプリタスクとして取り込み済みのGcalイベントIDセット
+  // アプリ内の全タスクタイトルセット（削除済み除く）— タイトル照合用
+  const appTaskTitles=new Set(
+    (S.tasks||[]).filter(t=>!t.deleted).map(t=>(t.title||'').trim().toLowerCase())
+  );
+  // GcalEventIDで取り込み済みのイベントIDセット
   const importedGcalIds=new Set((S.tasks||[]).filter(t=>t.gcalEventId).map(t=>t.gcalEventId));
+
   return _gcalUpcomingEvents.filter(e=>{
     const d=e.start?.date||e.start?.dateTime?.slice(0,10);
     if(d!==date)return false;
     const title=(e.summary||'').trim();
     // 除外: 確保時間
     if(title.includes('確保時間'))return false;
-    // 除外: アプリがGcalに書き込んだイベント（案件納品・請求書）
+    // 除外: アプリがGcalに書き込んだイベント（案件納品・請求書・旧gcalSync）
     if(title.startsWith('🧾 請求書提出:'))return false;
-    if(title.startsWith('📋 提出:')&&(e.description||'').includes('案件:'))return false;
-    if(title.startsWith('📋 ')&&(e.description||'').includes('ステータス:'))return false;
-    // 除外: 既にアプリタスクとして取り込み済みのイベント（最重要: 重複防止）
+    if(title.startsWith('📋 提出:'))return false;
+    if(title.startsWith('📋 '))return false;
+    // 除外: 既にアプリタスクとして取り込み済み（ID照合）
     if(importedGcalIds.has(e.id))return false;
+    // 除外: アプリ内に同名タスクが既にある（タイトル照合 — 最重要）
+    if(appTaskTitles.has(title.toLowerCase()))return false;
     return true;
   });
 }
@@ -1794,9 +1801,13 @@ function render(){
     // ロックチェック（朝8時以降・朝ジャーナル未完了、または19時以降・夜の記録未完了）
     if(checkDailyLock()){
       const _lh=new Date().getHours();
-      const _morningLock=_lh>=8&&_lh<19; // 朝ロック中かどうか
+      const _td=today();
+      const _hasMorning=S.journals.some(j=>j.date===_td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
+      // 朝ロック中かどうか：時間帯だけでなく実際に朝ジャーナルが未完了かで判定
+      const _morningLock=(S.settings?.morningLockEnabled!==false)&&_lh>=8&&_lh<19&&!_hasMorning&&!sessionStorage.getItem('ef_skip_morning_'+_td);
       // 朝ロック：ジャーナルのみ通過許可
-      // 夜ロック：ジャーナル・習慣トラッカー・フィットネスのみ通過許可
+      // KPIロック：KPIページのみ通過許可
+      // 夜ロック：ジャーナル・習慣トラッカー・フィットネス・KPIのみ通過許可
       const _kpiOnly=!_morningLock&&checkKpiLock()&&!(_lh>=19&&(S.settings?.eveningLockEnabled!==false));
       const _pass=_kpiOnly?(V==='kpi'):_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness'||V==='kpi');
       if(!_pass){
@@ -3989,8 +4000,11 @@ function rHorizonTab(div,period){
   </div>
 </div>
 <div class="card" style="margin-bottom:12px">
-  <div class="fl" style="margin-bottom:6px">🎯 ${label}の大きな目標・ビジョン</div>
-  <textarea id="hz-goal-${div.id}-${period}" rows="4" placeholder="例：〇〇を実現し、月収〇〇万円を達成する" style="width:100%;box-sizing:border-box">${esc(h.goal||'')}</textarea>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <div class="fl">🎯 ${label}の大きな目標・ビジョン</div>
+    <span id="hz-goal-saved-${div.id}-${period}" style="font-size:11px;color:var(--green);opacity:0;transition:opacity .5s">✅ 保存済み</span>
+  </div>
+  <textarea id="hz-goal-${div.id}-${period}" rows="4" placeholder="例：〇〇を実現し、月収〇〇万円を達成する" style="width:100%;box-sizing:border-box" oninput="autoSaveHorizonGoal('${div.id}','${period}')">${esc(h.goal||'')}</textarea>
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
   ${secTitle('📈 KPI指標')}
@@ -4002,6 +4016,22 @@ ${kpiRows}
 </div>`;
 }
 
+let _horizonGoalTimer=null;
+function autoSaveHorizonGoal(divId,period){
+  clearTimeout(_horizonGoalTimer);
+  _horizonGoalTimer=setTimeout(()=>{
+    const div=S.divisions.find(d=>d.id===divId);
+    if(!div)return;
+    if(!div.horizons)div.horizons={};
+    if(!div.horizons[period])div.horizons[period]={goal:'',kpis:[]};
+    const goalEl=document.getElementById('hz-goal-'+divId+'-'+period);
+    if(!goalEl)return;
+    div.horizons[period].goal=goalEl.value;
+    save();
+    const indicator=document.getElementById('hz-goal-saved-'+divId+'-'+period);
+    if(indicator){indicator.style.opacity='1';setTimeout(()=>indicator.style.opacity='0',2000);}
+  },800);
+}
 function saveHorizon(divId,period){
   const div=S.divisions.find(d=>d.id===divId);
   if(!div)return;
@@ -6657,7 +6687,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260523-22';
+const APP_VERSION='20260523-23';
 
 render();
 function forceAppUpdate(){
