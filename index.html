@@ -2817,6 +2817,22 @@ function jobProfit(j){return jobTotalIn(j)-jobTotalOut(j);}
 function jobMainIn(j){return j.unitPrice||j.profit||0;}
 function jobMainOut(j){const wids=getJobWorkerIds(j);if(!wids.length||wids.every(id=>id===SELF_WID))return 0;return j.workerPay||0;}
 function jobMainProfit(j){return jobMainIn(j)-jobMainOut(j);}
+function markJobPaid(id){
+  const j=S.jobs.find(j=>j.id===id);if(!j)return;
+  j.paymentDate=today();
+  save();render();toast('💰 入金済みにしました');
+}
+function unmarkJobPaid(id){
+  const j=S.jobs.find(j=>j.id===id);if(!j)return;
+  if(!confirm('入金済みを取り消しますか？'))return;
+  j.paymentDate=null;
+  save();render();toast('入金済みを取り消しました');
+}
+function markJobPayout(id){
+  const j=S.jobs.find(j=>j.id===id);if(!j)return;
+  j.payoutDate=today();
+  save();render();toast('💳 支払い済みにしました');
+}
 function rProjCard(j){
   const cl=S.clients.find(c=>c.id===j.clientId);
   const wNames=getJobWorkerNames(j);
@@ -2831,9 +2847,12 @@ function rProjCard(j){
     単価 <span style="color:var(--blue)">¥${ti.toLocaleString()}</span>${to?` 支払 <span style="color:var(--amber)">¥${to.toLocaleString()}</span>`:''}
     → 利益 <span style="color:${pr>=0?'var(--green)':'var(--red)'}">¥${pr.toLocaleString()}</span>
   </div>`:''}
-  <div class="proj-card-meta">
+  <div class="proj-card-meta" style="flex-wrap:wrap;gap:4px">
     <span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span>
-    ${j.paymentDate?'<span class="badge bg">入金済</span>':''}
+    ${j.paymentDate
+      ?`<span class="badge bg" onclick="event.stopPropagation();unmarkJobPaid('${j.id}')" style="cursor:pointer" title="クリックで取り消し">💰 入金済 ${j.paymentDate}</span>`
+      :`<button class="btn btn-xs" onclick="event.stopPropagation();markJobPaid('${j.id}')" style="border:1px solid var(--green);color:var(--green);background:transparent;padding:2px 7px;border-radius:100px;font-size:10px;cursor:pointer">💰 入金済みにする</button>`
+    }
   </div>
   ${j.editorDraftDate?`<div class="proj-due-label ${urgCls(j.editorDraftDate)}">✏️ 編集者初稿: ${j.editorDraftDate} (${fmt(j.editorDraftDate)})</div>`:''}
   ${j.clientDraftDate?`<div class="proj-due-label ${urgCls(j.clientDraftDate)}">📋 クライアント提出: ${j.clientDraftDate} (${fmt(j.clientDraftDate)})</div>`:''}
@@ -2893,10 +2912,13 @@ function rJobItem(j){
   ${to?`<span style="font-size:12px;color:var(--amber)">支払 ¥${to.toLocaleString()}</span>`:''}
   ${ti?`<span style="font-size:12px;font-weight:700;color:${pr>=0?'var(--green)':'var(--red)'}">利益 ¥${pr.toLocaleString()}</span>`:''}
   ${subTot?`<span class="badge bb">☑ ${subDone}/${subTot}</span>`:''}
+  ${j.paymentDate
+    ?`<span class="badge bg" onclick="event.stopPropagation();unmarkJobPaid('${j.id}')" style="cursor:pointer" title="クリックで取り消し">💰 入金済 ${j.paymentDate}</span>`
+    :`<button class="btn btn-xs" onclick="event.stopPropagation();markJobPaid('${j.id}')" style="border:1px solid var(--green);color:var(--green);background:transparent;padding:2px 7px;border-radius:100px;font-size:10px;cursor:pointer">💰 入金済みにする</button>`
+  }
   <div class="job-dates">
     ${j.editorDraftDate?`編集者初稿 ${j.editorDraftDate}`:''}
     ${j.deliveryDate?` 納品 ${j.deliveryDate}`:''}
-    ${j.paymentDate?` 入金 ${j.paymentDate}`:''}
   </div>
 </div>`;
 }
@@ -2905,7 +2927,6 @@ function rProjProfit(){
   const now=new Date();
   const [py,pm]=[(now.getFullYear()),(now.getMonth()+1)];
   const selM=`${py}-${String(pm).padStart(2,'0')}`;
-  // Build month selector from available paymentDates
   const months=[...new Set(S.jobs.filter(j=>!j.deleted&&j.paymentDate).map(j=>j.paymentDate.slice(0,7)))].sort().reverse();
   if(!months.includes(selM))months.unshift(selM);
   const curM=window._profitMonth||selM;
@@ -2913,7 +2934,30 @@ function rProjProfit(){
   const totalIn=jobs.reduce((s,j)=>s+jobMainIn(j),0);
   const totalPay=jobs.reduce((s,j)=>s+jobMainOut(j),0);
   const totalProfit=jobs.reduce((s,j)=>s+jobMainProfit(j),0);
+  // 入金待ち: 完了済みだが入金日未設定の案件
+  const pendingJobs=S.jobs.filter(j=>!j.deleted&&j.status==='完了'&&!j.paymentDate&&jobMainIn(j)>0);
+  const pendingTotal=pendingJobs.reduce((s,j)=>s+jobMainIn(j),0);
   return`${secTitle('💰 月別利益')}
+${pendingJobs.length?`<div class="card" style="margin-bottom:14px;border:1px solid var(--adim)">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div>
+      <div style="font-size:12px;color:var(--amber);font-weight:600;margin-bottom:4px">⏳ 入金待ち ${pendingJobs.length}件</div>
+      <div style="font-size:18px;font-weight:700;color:var(--amber)">¥${pendingTotal.toLocaleString()}</div>
+    </div>
+  </div>
+  <div style="margin-top:10px">
+    ${pendingJobs.map(j=>{const cl=S.clients.find(c=>c.id===j.clientId);return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);gap:8px;flex-wrap:wrap">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</div>
+        <div style="font-size:11px;color:var(--t2)">${cl?esc(cl.name):''} ${j.deliveryDate?`| 納品 ${j.deliveryDate}`:''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-weight:700;color:var(--blue)">¥${jobMainIn(j).toLocaleString()}</span>
+        <button class="btn btn-p btn-sm" onclick="markJobPaid('${j.id}')">💰 入金済みにする</button>
+      </div>
+    </div>`;}).join('')}
+  </div>
+</div>`:''}
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
   <select style="width:160px" onchange="window._profitMonth=this.value;render()">
     ${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m}</option>`).join('')}
@@ -2932,12 +2976,15 @@ ${jobs.length?`<div class="card" style="padding:0;overflow:hidden">
     <span>案件名</span><span>単価</span><span>支払</span><span>利益</span><span>入金日</span>
   </div>
   ${jobs.map(j=>{const pr=jobMainProfit(j);const cl=S.clients.find(c=>c.id===j.clientId);
-  return`<div class="profit-row" style="cursor:pointer" onclick="openJobModal('${j.id}')">
-    <span style="font-weight:600">${esc(j.title)}<br><span style="font-size:11px;color:var(--t2)">${cl?esc(cl.name):''}</span></span>
+  return`<div class="profit-row">
+    <span style="font-weight:600;cursor:pointer" onclick="openJobModal('${j.id}')">${esc(j.title)}<br><span style="font-size:11px;color:var(--t2)">${cl?esc(cl.name):''}</span></span>
     <span>¥${jobMainIn(j).toLocaleString()}</span>
     <span style="color:var(--amber)">¥${jobMainOut(j).toLocaleString()}</span>
     <span style="${pr>=0?'color:var(--green)':'color:var(--red)'}">¥${pr.toLocaleString()}</span>
-    <span style="font-size:11px;color:var(--t2)">${j.paymentDate||'-'}</span>
+    <span style="font-size:11px;color:var(--t2);display:flex;align-items:center;gap:4px">
+      ${j.paymentDate}
+      <button class="btn btn-xs btn-red" onclick="unmarkJobPaid('${j.id}')" style="font-size:10px;padding:1px 5px" title="取り消し">✕</button>
+    </span>
   </div>`;}).join('')}
 </div>`
 :`<div class="empty" style="padding:30px 0"><div class="empty-icon">💰</div><div>${curM} の入金記録なし</div></div>`}`;
@@ -2975,21 +3022,44 @@ function rProjPayment(){
   const curM=window._payMonth||selM;
   const entries=getPayEntries(curM);
   const total=entries.reduce((s,e)=>s+e.workerPay,0);
+  // 入金済み件数・未入金件数の集計
+  const paidEntries=entries.filter(e=>{const j=S.jobs.find(j=>j.id===e.jobId);return j?.paymentDate;});
+  const unpaidEntries=entries.filter(e=>{const j=S.jobs.find(j=>j.id===e.jobId);return !j?.paymentDate;});
   const byWorker={};
   entries.forEach(e=>{if(!byWorker[e.workerId])byWorker[e.workerId]=[];byWorker[e.workerId].push(e);});
   return`${secTitle('💳 月別ワーカー支払い')}
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
   <select style="width:160px" onchange="window._payMonth=this.value;render()">
     ${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m}</option>`).join('')}
   </select>
-  <span style="font-size:18px;font-weight:700;color:var(--amber)">合計 ¥${total.toLocaleString()}</span>
+  <span style="font-size:18px;font-weight:700;color:var(--amber)">支払合計 ¥${total.toLocaleString()}</span>
 </div>
+${entries.length?`<div class="card" style="margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap">
+  <div><div style="font-size:11px;color:var(--t2)">入金済み案件</div><div style="font-size:16px;font-weight:700;color:var(--green)">${paidEntries.length}件</div></div>
+  <div><div style="font-size:11px;color:var(--t2)">入金待ち案件</div><div style="font-size:16px;font-weight:700;color:${unpaidEntries.length?'var(--amber)':'var(--t2)'}">${unpaidEntries.length}件</div></div>
+</div>`:''}
 ${Object.entries(byWorker).length?Object.entries(byWorker).map(([wid,es])=>{
   const w=S.workers.find(w=>w.id===wid);
   const wTotal=es.reduce((s,e)=>s+e.workerPay,0);
   return`<div class="card" style="margin-bottom:10px">
     <div style="font-weight:700;margin-bottom:8px">${w?esc(w.name):'担当者未設定'} — <span style="color:var(--amber)">¥${wTotal.toLocaleString()}</span></div>
-    ${es.map(e=>`<div class="payment-row"><span class="pmt-worker">${e.label}</span><span class="pmt-amount">¥${e.workerPay.toLocaleString()}</span><span style="font-size:11px;color:var(--t2)">${e.payoutDate}</span><button class="btn btn-g btn-xs" onclick="openJobModal('${e.jobId}')">詳細</button></div>`).join('')}
+    ${es.map(e=>{
+      const job=S.jobs.find(j=>j.id===e.jobId);
+      const isClientPaid=!!job?.paymentDate;
+      return`<div class="payment-row" style="flex-wrap:wrap;gap:4px">
+        <span class="pmt-worker">${e.label}</span>
+        <span class="pmt-amount">¥${e.workerPay.toLocaleString()}</span>
+        <span style="font-size:11px;color:var(--t2)">${e.payoutDate}</span>
+        ${isClientPaid
+          ?`<span class="badge bg" style="font-size:10px">💰 入金済</span>`
+          :`<span class="badge ba" style="font-size:10px">⏳ 入金待ち</span>`
+        }
+        <div style="display:flex;gap:4px">
+          ${!isClientPaid?`<button class="btn btn-g btn-xs" style="color:var(--green)" onclick="markJobPaid('${e.jobId}')">💰 入金済みにする</button>`:''}
+          <button class="btn btn-g btn-xs" onclick="openJobModal('${e.jobId}')">詳細</button>
+        </div>
+      </div>`;
+    }).join('')}
   </div>`;}).join('')
 :`<div class="empty" style="padding:30px 0"><div class="empty-icon">💳</div><div>${curM} の支払い記録なし</div></div>`}`;
 }
@@ -6687,7 +6757,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260523-23';
+const APP_VERSION='20260526-24';
 
 render();
 function forceAppUpdate(){
