@@ -2592,7 +2592,7 @@ function sortJobs(jobs){
 }
 function rProjects(){
   const clients=S.clients.filter(c=>!c.deleted);
-  const tabs=[['board','📋 ボード'],['listing','📢 掲載中'],['list','📄 リスト'],['profit','💰 利益'],['payment','💳 支払い'],['completed','✅ 完了済み'],['worker','👤 編集者別'],['priority','📊 優先度表']];
+  const tabs=[['board','📋 ボード'],['listing','📢 掲載中'],['list','📄 リスト'],['clients','👥 クライアント一覧'],['profit','💰 利益'],['payment','💳 支払い'],['completed','✅ 完了済み'],['worker','👤 編集者別'],['priority','📊 優先度表']];
   return`<div class="ph">
   <div class="ph-title">案件管理</div>
   <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
@@ -2654,7 +2654,7 @@ ${(()=>{
   if(!warnings.length)return'';
   return`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px">${warnings.join('')}</div>`;
 })()}
-${{board:rProjBoard,listing:rProjListing,list:()=>rProjList(clients),profit:rProjProfit,payment:rProjPayment,completed:rProjCompleted,worker:rProjWorker,priority:rProjPriority}[PVMT]?.()??rProjBoard()}`;
+${{board:rProjBoard,listing:rProjListing,list:()=>rProjList(clients),clients:rProjClients,profit:rProjProfit,payment:rProjPayment,completed:rProjCompleted,worker:rProjWorker,priority:rProjPriority}[PVMT]?.()??rProjBoard()}`;
 }
 
 function rProjListing(){
@@ -2774,6 +2774,104 @@ ${subListingJobs.length?`<div style="font-size:13px;font-weight:700;color:var(--
 <div style="display:flex;flex-direction:column;gap:10px">
   ${subListingJobs.map(j=>rJobCard(j,s=>s.status===ST)).join('')}
 </div>`:''}`;
+}
+
+function rProjClients(){
+  const clients=S.clients.filter(c=>!c.deleted);
+  if(!clients.length)return`<div class="empty"><div class="empty-icon">👤</div><div class="empty-title">クライアントなし</div><div style="color:var(--t2)">「＋ クライアント追加」から登録してください</div></div>`;
+
+  // 全クライアントの集計
+  const allActiveJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
+  const allDoneJobs=S.jobs.filter(j=>!j.deleted&&j.status==='完了');
+  const totalRevenue=allDoneJobs.reduce((s,j)=>s+jobMainIn(j),0);
+  const totalProfit=allDoneJobs.reduce((s,j)=>s+jobMainProfit(j),0);
+  const totalPending=allDoneJobs.filter(j=>!j.paymentDate).reduce((s,j)=>s+jobMainIn(j),0);
+  const trialClients=clients.filter(c=>c.isTrial);
+  const contractClients=clients.filter(c=>!c.isTrial);
+
+  // ソート: トライアル → 成約、その中でアクティブ案件数順
+  const sorted=[...clients].sort((a,b)=>{
+    const aJobs=allActiveJobs.filter(j=>j.clientId===a.id).length;
+    const bJobs=allActiveJobs.filter(j=>j.clientId===b.id).length;
+    if(a.isTrial!==b.isTrial)return a.isTrial?-1:1;
+    return bJobs-aJobs;
+  });
+
+  return`
+<div class="card" style="margin-bottom:16px;display:flex;gap:20px;flex-wrap:wrap">
+  <div><div style="font-size:11px;color:var(--t2)">総クライアント数</div><div style="font-size:20px;font-weight:700">${clients.length}社</div></div>
+  <div><div style="font-size:11px;color:var(--amber)">トライアル</div><div style="font-size:20px;font-weight:700;color:var(--amber)">${trialClients.length}社</div></div>
+  <div><div style="font-size:11px;color:var(--green)">成約</div><div style="font-size:20px;font-weight:700;color:var(--green)">${contractClients.length}社</div></div>
+  <div><div style="font-size:11px;color:var(--t2)">進行中案件</div><div style="font-size:20px;font-weight:700;color:var(--blue)">${allActiveJobs.length}件</div></div>
+  ${totalRevenue?`<div><div style="font-size:11px;color:var(--t2)">累計売上</div><div style="font-size:20px;font-weight:700;color:var(--blue)">¥${totalRevenue.toLocaleString()}</div></div>`:''}
+  ${totalProfit?`<div><div style="font-size:11px;color:var(--t2)">累計利益</div><div style="font-size:20px;font-weight:700;color:var(--green)">¥${totalProfit.toLocaleString()}</div></div>`:''}
+  ${totalPending?`<div><div style="font-size:11px;color:var(--amber)">入金待ち</div><div style="font-size:20px;font-weight:700;color:var(--amber)">¥${totalPending.toLocaleString()}</div></div>`:''}
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+${sorted.map(cl=>{
+  const activeJobs=S.jobs.filter(j=>!j.deleted&&j.clientId===cl.id&&j.status!=='完了'&&j.status!=='キャンセル');
+  const doneJobs=S.jobs.filter(j=>!j.deleted&&j.clientId===cl.id&&j.status==='完了');
+  const allJobs=S.jobs.filter(j=>!j.deleted&&j.clientId===cl.id);
+  const revenue=doneJobs.reduce((s,j)=>s+jobMainIn(j),0);
+  const profit=doneJobs.reduce((s,j)=>s+jobMainProfit(j),0);
+  const pending=doneJobs.filter(j=>!j.paymentDate).reduce((s,j)=>s+jobMainIn(j),0);
+  const activeTotal=activeJobs.reduce((s,j)=>s+jobMainIn(j),0);
+
+  // ステータス別件数
+  const statusCounts={};
+  activeJobs.forEach(j=>{statusCounts[j.status]=(statusCounts[j.status]||0)+1;});
+
+  return`<div class="card" style="display:flex;flex-direction:column;gap:10px;border:1px solid ${cl.isTrial?'var(--adim)':'var(--border)'}">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cl.name)}</div>
+        ${cl.notes?`<div style="font-size:11px;color:var(--t2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cl.notes)}</div>`:''}
+      </div>
+      <span class="badge ${cl.isTrial?'ba':'bg'}" style="flex-shrink:0;margin-top:2px">${cl.isTrial?'🔶 トライアル':'✅ 成約'}</span>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${activeJobs.length?`<div style="text-align:center;background:var(--bdim);border-radius:8px;padding:6px 10px;flex:1;min-width:60px">
+        <div style="font-size:18px;font-weight:700;color:var(--blue)">${activeJobs.length}</div>
+        <div style="font-size:10px;color:var(--t2)">進行中</div>
+      </div>`:''}
+      ${doneJobs.length?`<div style="text-align:center;background:var(--gdim);border-radius:8px;padding:6px 10px;flex:1;min-width:60px">
+        <div style="font-size:18px;font-weight:700;color:var(--green)">${doneJobs.length}</div>
+        <div style="font-size:10px;color:var(--t2)">完了</div>
+      </div>`:''}
+      ${revenue?`<div style="text-align:center;background:var(--card2);border-radius:8px;padding:6px 10px;flex:1;min-width:60px">
+        <div style="font-size:13px;font-weight:700;color:var(--blue)">¥${revenue.toLocaleString()}</div>
+        <div style="font-size:10px;color:var(--t2)">累計売上</div>
+      </div>`:''}
+      ${profit?`<div style="text-align:center;background:var(--card2);border-radius:8px;padding:6px 10px;flex:1;min-width:60px">
+        <div style="font-size:13px;font-weight:700;color:${profit>=0?'var(--green)':'var(--red)'}">¥${profit.toLocaleString()}</div>
+        <div style="font-size:10px;color:var(--t2)">累計利益</div>
+      </div>`:''}
+    </div>
+
+    ${activeJobs.length?`<div style="display:flex;flex-wrap:wrap;gap:4px">
+      ${Object.entries(statusCounts).map(([st,cnt])=>`<span class="badge ${SCOLBG[st]||'bk'}" style="font-size:10px">${st} ${cnt}</span>`).join('')}
+    </div>`:''}
+
+    ${pending?`<div style="background:var(--adim);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--amber)">⏳ 入金待ち ¥${pending.toLocaleString()}</div>`:''}
+
+    ${activeJobs.length?`<div style="border-top:1px solid var(--border);padding-top:8px">
+      ${activeJobs.slice(0,3).map(j=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer;font-size:12px" onclick="openJobModal('${j.id}')">
+        <span class="badge ${SCOLBG[j.status]||'bk'}" style="font-size:10px">${j.status}</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</span>
+        ${j.deliveryDate?`<span style="font-size:10px;color:var(--t2);flex-shrink:0">${j.deliveryDate}</span>`:''}
+      </div>`).join('')}
+      ${activeJobs.length>3?`<div style="font-size:11px;color:var(--t2);margin-top:2px">他 ${activeJobs.length-3}件...</div>`:''}
+    </div>`:''}
+
+    <div style="display:flex;gap:6px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:8px">
+      <button class="btn btn-p btn-xs" onclick="openJobModal(null,'進行中','${cl.id}')">＋ 案件</button>
+      <button class="btn btn-g btn-xs" onclick="openClientModal('${cl.id}')">✏️ 編集</button>
+      <button class="btn btn-red btn-xs" onclick="delClient('${cl.id}')">🗑</button>
+    </div>
+  </div>`;
+}).join('')}
+</div>`;
 }
 
 function rProjBoard(){
@@ -6757,7 +6855,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260526-24';
+const APP_VERSION='20260526-25';
 
 render();
 function forceAppUpdate(){

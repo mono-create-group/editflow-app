@@ -1,5 +1,5 @@
-// EditFlow Service Worker v20260526-24
-const CACHE = 'editflow-20260526-24';
+// EditFlow Service Worker v20260526-25
+const CACHE = 'editflow-20260526-25';
 const URLS = ['./', './editflow.html'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(URLS)).then(() => self.skipWaiting()));
