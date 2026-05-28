@@ -4824,6 +4824,19 @@ ${secTitle('📅 Googleカレンダー連携')}
   </div>`}
 </div>`;
 }
+function promoteWorkerToTrial(id){
+  const w=S.workers.find(w=>w.id===id);if(!w)return;
+  w.employStatus='trial';
+  save();render();toast(`🎬 ${w.name} のトライアルを開始しました`);
+}
+function promoteWorkerToHired(id){
+  const w=S.workers.find(w=>w.id===id);if(!w)return;
+  if(!confirm(`${w.name} を本採用にしますか？`))return;
+  w.employStatus='hired';
+  if(!S.logs)S.logs=[];
+  S.logs.push({id:uid(),type:'hire',date:today(),title:w.name,result:'内定',note:'本採用に昇格',createdAt:new Date().toISOString()});
+  save();render();toast(`👤 ${w.name} を本採用にしました`);
+}
 function rWorkers(){
   const workers=S.workers||[];
   const activeJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'&&j.status!=='案件掲載中');
@@ -4855,38 +4868,71 @@ function rWorkers(){
       </div>
     </div>`;
   }
-  return`<div class="ph">
-  <div class="ph-title">ワーカー管理</div>
-  <button class="btn btn-p" onclick="openAddWorkerModal()">＋ ワーカー追加</button>
-</div>
-${!workers.length?`<div class="empty"><div class="empty-icon">👥</div><div class="empty-title">ワーカーがいません</div><div style="color:var(--t2)">案件モーダルや設定から担当者を追加してください</div></div>`
-:workers.map(w=>{
-  const myJobs=activeJobs.filter(j=>j.workerId===w.id);
-  const mySubs=subsForWorker(w.id);
-  const totalCount=myJobs.length+mySubs.length;
-  const pastPaid=S.jobs.filter(j=>!j.deleted&&j.workerId===w.id&&j.payoutDate).reduce((s,j)=>s+jobTotalOut(j),0);
-  return`<div class="card" style="margin-bottom:12px">
+
+  function rWorkerCard(w, showActions=true){
+    const myJobs=activeJobs.filter(j=>j.workerId===w.id);
+    const mySubs=subsForWorker(w.id);
+    const totalCount=myJobs.length+mySubs.length;
+    const pastPaid=S.jobs.filter(j=>!j.deleted&&j.workerId===w.id&&j.payoutDate).reduce((s,j)=>s+jobTotalOut(j),0);
+    const isProspect=w.employStatus==='prospect';
+    const isTrial=(w.employStatus||'trial')==='trial';
+    return`<div class="card" style="margin-bottom:12px;border-left:3px solid ${isProspect?'var(--cyan)':isTrial?'var(--amber)':'var(--green)'}">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-    <div>
-      <div style="font-size:16px;font-weight:700">${esc(w.name)}${w.affiliation?` <span style="font-size:12px;color:var(--t2);font-weight:400">・${esc(w.affiliation)}</span>`:''}</div>
-      ${w.skills?`<div style="font-size:12px;color:var(--t2);margin-top:2px">🎨 ${esc(w.skills)}</div>`:''}
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:16px;font-weight:700">${esc(w.name)}</span>
+        ${w.affiliation?`<span style="font-size:12px;color:var(--t2)">・${esc(w.affiliation)}</span>`:''}
+        <span class="badge ${isProspect?'bc':isTrial?'ba':'bg'}" style="font-size:10px">${isProspect?'📋 採用予定':isTrial?'🔶 トライアル':'✅ 本採用'}</span>
+      </div>
+      ${w.skills?`<div style="font-size:12px;color:var(--t2);margin-top:4px">🎨 ${esc(w.skills)}</div>`:''}
       ${w.contact?`<div style="font-size:12px;color:var(--blue);margin-top:2px">📧 ${esc(w.contact)}</div>`:''}
       ${w.workConditions?`<div style="font-size:12px;color:var(--t2);margin-top:2px">📋 ${esc(w.workConditions)}</div>`:''}
     </div>
-    <div style="display:flex;gap:6px">
+    <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+      ${isProspect?`<button class="btn btn-p btn-sm" onclick="promoteWorkerToTrial('${w.id}')">🎬 トライアル開始</button>`:''}
+      ${isTrial?`<button class="btn btn-g btn-sm" style="color:var(--green)" onclick="promoteWorkerToHired('${w.id}')">✅ 本採用にする</button>`:''}
       <button class="btn btn-g btn-sm" onclick="openWorkerEditModal('${w.id}')">✏️ 編集</button>
     </div>
   </div>
-  <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
+  ${!isProspect?`<div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
     <div><div style="font-size:11px;color:var(--t2)">担当中</div><div style="font-size:18px;font-weight:700;color:var(--blue)">${totalCount}件</div></div>
     ${w.minFee?`<div><div style="font-size:11px;color:var(--t2)">最低依頼料</div><div style="font-size:18px;font-weight:700;color:var(--green)">¥${Number(w.minFee).toLocaleString()}</div></div>`:''}
     ${pastPaid?`<div><div style="font-size:11px;color:var(--t2)">支払い累計</div><div style="font-size:18px;font-weight:700;color:var(--amber)">¥${pastPaid.toLocaleString()}</div></div>`:''}
-  </div>
-  ${totalCount?`<div style="margin-top:10px">
+  </div>`:''}
+  ${isProspect&&w.minFee?`<div style="margin-top:8px;font-size:12px;color:var(--t2)">最低依頼料 <span style="color:var(--green);font-weight:700">¥${Number(w.minFee).toLocaleString()}</span></div>`:''}
+  ${!isProspect&&totalCount?`<div style="margin-top:10px">
     ${myJobs.map(j=>`<div class="job-item" onclick="openJobModal('${j.id}')"><span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span><span class="job-title">${esc(j.title)}</span>${j.deliveryDate?`<span style="font-size:11px;color:var(--t2)">📅 ${j.deliveryDate}</span>`:''}</div>`).join('')}
     ${mySubs.length?`${myJobs.length?`<div style="font-size:11px;color:var(--t3);font-weight:700;margin:6px 0 4px;padding-top:6px;border-top:1px solid var(--border)">📋 サブタスク</div>`:''}${mySubs.map(s=>rWorkerSubItem(s)).join('')}`:''}
   </div>`:''}
-</div>`;}).join('')}`;
+</div>`;
+  }
+
+  const prospectWorkers=workers.filter(w=>w.employStatus==='prospect');
+  const trialWorkers=workers.filter(w=>(w.employStatus||'trial')==='trial');
+  const hiredWorkers=workers.filter(w=>w.employStatus==='hired');
+
+  return`<div class="ph">
+  <div class="ph-title">ワーカー管理</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-p" onclick="openAddWorkerModal()">＋ ワーカー追加</button>
+    <div style="display:flex;gap:10px;font-size:12px;color:var(--t2)">
+      ${prospectWorkers.length?`<span class="badge bc">📋 採用予定 ${prospectWorkers.length}</span>`:''}
+      ${trialWorkers.length?`<span class="badge ba">🔶 トライアル ${trialWorkers.length}</span>`:''}
+      ${hiredWorkers.length?`<span class="badge bg">✅ 本採用 ${hiredWorkers.length}</span>`:''}
+    </div>
+  </div>
+</div>
+${!workers.length?`<div class="empty"><div class="empty-icon">👥</div><div class="empty-title">ワーカーがいません</div><div style="color:var(--t2)">「＋ ワーカー追加」から登録してください</div></div>`:''}
+
+${prospectWorkers.length?`<div class="section-ttl" style="color:var(--cyan)">📋 採用予定ワーカー (${prospectWorkers.length})</div>
+${prospectWorkers.map(w=>rWorkerCard(w)).join('')}`:''}
+
+${trialWorkers.length?`<div class="section-ttl" style="color:var(--amber)">🔶 トライアル中 (${trialWorkers.length})</div>
+${trialWorkers.map(w=>rWorkerCard(w)).join('')}`:''}
+
+${hiredWorkers.length?`<div class="section-ttl" style="color:var(--green)">✅ 本採用ワーカー (${hiredWorkers.length})</div>
+${hiredWorkers.map(w=>rWorkerCard(w)).join('')}`:''}
+`;
 }
 function workerAffiliationDatalist(){
   const affs=[...new Set((S.workers||[]).map(w=>w.affiliation).filter(Boolean))];
@@ -4898,15 +4944,16 @@ ${workerAffiliationDatalist()}
 <div class="fg"><div class="fl">名前 *</div><input id="wm-name" placeholder="担当者名"></div>
 <div class="fg"><div class="fl">ステータス</div>
   <select id="wm-status">
-    <option value="trial">トライアル</option>
-    <option value="hired">本採用</option>
+    <option value="prospect">📋 採用予定</option>
+    <option value="trial">🔶 トライアル</option>
+    <option value="hired">✅ 本採用</option>
   </select>
 </div>
 <div class="fg"><div class="fl">所属</div><input id="wm-affiliation" list="wm-aff-list" placeholder="例：フリーランス・〇〇プロダクション"></div>
 <div class="fg"><div class="fl">スキル</div><input id="wm-skills" placeholder="例：動画編集・サムネイル制作"></div>
 <div class="fg"><div class="fl">連絡先</div><input id="wm-contact" placeholder="例：メール・LINE ID"></div>
 <div class="fg"><div class="fl">最低依頼料（円）</div><input id="wm-minfee" type="number" placeholder="0"></div>
-<div class="fg"><div class="fl">労働条件</div><textarea id="wm-workcond" rows="3" style="width:100%;box-sizing:border-box" placeholder="例：週3日まで・納期1週間以上必須"></textarea></div>
+<div class="fg"><div class="fl">労働条件・メモ</div><textarea id="wm-workcond" rows="3" style="width:100%;box-sizing:border-box" placeholder="例：週3日まで・納期1週間以上必須・ポートフォリオURL等"></textarea></div>
 <div class="mfooter">
   <button class="btn btn-g" onclick="closeModal()">キャンセル</button>
   <button class="btn btn-p" onclick="saveWorkerModal()">追加</button>
@@ -4920,8 +4967,9 @@ ${workerAffiliationDatalist()}
 <div class="fg"><div class="fl">名前 *</div><input id="wm-name" value="${esc(w.name)}"></div>
 <div class="fg"><div class="fl">ステータス</div>
   <select id="wm-status">
-    <option value="trial" ${(w.employStatus||'trial')==='trial'?'selected':''}>トライアル</option>
-    <option value="hired" ${w.employStatus==='hired'?'selected':''}>本採用</option>
+    <option value="prospect" ${w.employStatus==='prospect'?'selected':''}>📋 採用予定</option>
+    <option value="trial" ${(w.employStatus||'trial')==='trial'?'selected':''}>🔶 トライアル</option>
+    <option value="hired" ${w.employStatus==='hired'?'selected':''}>✅ 本採用</option>
   </select>
 </div>
 <div class="fg"><div class="fl">所属</div><input id="wm-affiliation" list="wm-aff-list" value="${esc(w.affiliation||'')}" placeholder="例：フリーランス・〇〇プロダクション"></div>
@@ -4950,6 +4998,8 @@ function saveWorkerModal(id){
     const w=S.workers.find(w=>w.id===id);
     const prevStatus=w?.employStatus||'trial';
     if(w)Object.assign(w,{name,skills,contact,affiliation,minFee,workConditions,employStatus});
+    // 採用予定→トライアル昇格トースト
+    if(prevStatus==='prospect'&&employStatus==='trial'){toast(`🎬 ${name} のトライアルを開始しました`);}
     // トライアル→本採用に変わった瞬間に採用自動記帳（result:'内定' で目標達成確認にカウント）
     if(prevStatus!=='hired'&&employStatus==='hired'){
       S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'内定',note:'本採用に変更時に自動記帳',createdAt:new Date().toISOString()});
@@ -6855,7 +6905,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260526-25';
+const APP_VERSION='20260526-26';
 
 render();
 function forceAppUpdate(){
