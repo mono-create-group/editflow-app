@@ -1393,7 +1393,8 @@ function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[],
   checkIns:[], workouts:[], workers:[], memos:[], meals:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
-  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false},
+  dailySchedules:{},
+  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false,timeScheduleLockEnabled:true},
   frogId:null,
   customEx:[],
   navConfig:null,
@@ -1690,6 +1691,56 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 document.addEventListener('input',e=>{
   if(document.getElementById('modal-overlay')?.contains(e.target))_modalDirty=true;
 });
+function checkTimeScheduleLock(){
+  if(S.settings?.timeScheduleLockEnabled===false)return false;
+  const td=today();
+  if(sessionStorage.getItem('ef_skip_ts_'+td))return false;
+  const hour=new Date().getHours();
+  if(hour<5)return false;
+  const ds=S.dailySchedules?.[td];
+  return!ds||!ds.slots||ds.slots.length<1;
+}
+let _tsRowCount=0;
+function addTsSlot(){
+  const container=document.getElementById('ts-slots');
+  if(!container)return;
+  _tsRowCount++;
+  const div=document.createElement('div');
+  div.className='ts-slot-row';
+  div.style.cssText='display:flex;gap:8px;margin-bottom:8px;align-items:center';
+  div.innerHTML=`<input type="time" class="ts-time" style="width:100px;padding:8px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:13px;flex-shrink:0"><input type="text" class="ts-title" placeholder="予定・活動内容" style="flex:1;padding:8px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:13px"><button onclick="this.closest('.ts-slot-row').remove()" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0">✕</button>`;
+  container.appendChild(div);
+  div.querySelector('.ts-title').focus();
+}
+function saveDailySchedule(){
+  const rows=document.querySelectorAll('.ts-slot-row');
+  const slots=[];
+  rows.forEach(row=>{
+    const time=row.querySelector('.ts-time')?.value.trim()||'';
+    const title=row.querySelector('.ts-title')?.value.trim()||'';
+    if(title)slots.push({id:uid(),time,title,done:false});
+  });
+  if(slots.length<1){toast('少なくとも1つ予定を入力してください','err');return;}
+  if(!S.dailySchedules)S.dailySchedules={};
+  S.dailySchedules[today()]={slots,savedAt:new Date().toISOString()};
+  save();render();toast('📅 今日のスケジュールを保存しました');
+}
+function skipTimeSchedule(){
+  sessionStorage.setItem('ef_skip_ts_'+today(),'1');
+  render();
+}
+function rGcalReminder(){
+  const td=today();
+  if(sessionStorage.getItem('ef_gcal_remind_off_'+td))return'';
+  return`<div id="gcal-remind-banner" style="background:linear-gradient(135deg,#f59e0b18,#ef444415);border:2px solid var(--amber);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:14px">
+  <span style="font-size:30px;flex-shrink:0">📅</span>
+  <div style="flex:1">
+    <div style="font-weight:800;color:var(--amber);font-size:15px;letter-spacing:.3px">Googleカレンダーを確認してください</div>
+    <div style="font-size:13px;color:var(--text);margin-top:3px;font-weight:500">面談の予定は入っていませんか？</div>
+  </div>
+  <button onclick="sessionStorage.setItem('ef_gcal_remind_off_'+today(),'1');document.getElementById('gcal-remind-banner')?.remove()" style="background:var(--border);border:none;border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;padding:6px 12px;flex-shrink:0;font-weight:600">✓ 確認した</button>
+</div>`;
+}
 function checkKpiLock(){
   if(!S.settings?.kpiLockEnabled)return false;
   if(!S.divisions||S.divisions.length===0)return false;
@@ -1708,6 +1759,8 @@ function checkKpiLock(){
   });
 }
 function checkDailyLock(){
+  // タイムスケジュールロック（最優先）
+  if(checkTimeScheduleLock())return true;
   const now=new Date();
   const hour=now.getHours();
   const td=today();
@@ -1744,6 +1797,36 @@ function rLockScreen(){
   const now=new Date();
   const hour=now.getHours();
   const td=today();
+  // ===タイムスケジュールロック（最優先）===
+  if(checkTimeScheduleLock()){
+    const existing=S.dailySchedules?.[td];
+    const fs=S.fs||DEFAULT_FS;
+    // 固定スケジュールから現在時刻以降のものを提案
+    const nowMin=hour*60+now.getMinutes();
+    let initSlots=[];
+    if(existing?.slots?.length>0){
+      initSlots=existing.slots;
+    }else{
+      initSlots=fs.filter(f=>f.t&&f.s).slice(0,6).map(f=>({time:f.s,title:f.t}));
+      if(!initSlots.length)initSlots=[{time:'09:00',title:''},{time:'12:00',title:''},{time:'15:00',title:''}];
+    }
+    return`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:40px 20px">
+  <div style="font-size:64px;margin-bottom:16px">📅</div>
+  <div style="font-size:24px;font-weight:700;margin-bottom:8px">今日のタイムスケジュールを記入してください</div>
+  <div style="font-size:14px;color:var(--t2);margin-bottom:28px;line-height:1.7">スケジュールを入力してから、アプリが使えるようになります。</div>
+  <div id="ts-slots" style="width:100%;max-width:460px;margin-bottom:12px;text-align:left">
+    ${initSlots.map(s=>`<div class="ts-slot-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <input type="time" class="ts-time" value="${s.time||''}" style="width:105px;padding:8px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:13px;flex-shrink:0">
+      <input type="text" class="ts-title" value="${esc(s.title||'')}" placeholder="予定・活動内容" style="flex:1;padding:8px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:13px">
+      <button onclick="this.closest('.ts-slot-row').remove()" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0">✕</button>
+    </div>`).join('')}
+  </div>
+  <button class="btn btn-g btn-sm" style="margin-bottom:20px" onclick="addTsSlot()">＋ 時間を追加</button>
+  <button class="btn btn-p" style="min-width:220px;font-size:16px;padding:14px 24px" onclick="saveDailySchedule()">✅ 保存してアプリを開く</button>
+  <button class="btn btn-g btn-sm" style="margin-top:14px" onclick="skipTimeSchedule()">スキップ（今日だけ）</button>
+  <div style="font-size:11px;color:var(--t3);margin-top:16px">ロック機能は設定ページでオフにできます</div>
+</div>`;
+  }
   const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
   // 朝ロック（8〜18時・朝ジャーナル未完了）
   if(hour>=8&&hour<19&&!hasMorning){
@@ -1803,13 +1886,15 @@ function render(){
       const _lh=new Date().getHours();
       const _td=today();
       const _hasMorning=S.journals.some(j=>j.date===_td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
+      // タイムスケジュールロック中は全ページブロック
+      const _tsLock=checkTimeScheduleLock();
       // 朝ロック中かどうか：時間帯だけでなく実際に朝ジャーナルが未完了かで判定
       const _morningLock=(S.settings?.morningLockEnabled!==false)&&_lh>=8&&_lh<19&&!_hasMorning&&!sessionStorage.getItem('ef_skip_morning_'+_td);
       // 朝ロック：ジャーナルのみ通過許可
       // KPIロック：KPIページのみ通過許可
       // 夜ロック：ジャーナル・習慣トラッカー・フィットネス・KPIのみ通過許可
-      const _kpiOnly=!_morningLock&&checkKpiLock()&&!(_lh>=19&&(S.settings?.eveningLockEnabled!==false));
-      const _pass=_kpiOnly?(V==='kpi'):_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness'||V==='kpi');
+      const _kpiOnly=!_tsLock&&!_morningLock&&checkKpiLock()&&!(_lh>=19&&(S.settings?.eveningLockEnabled!==false));
+      const _pass=_tsLock?false:_kpiOnly?(V==='kpi'):_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness'||V==='kpi');
       if(!_pass){
         V='dashboard';
         sessionStorage.setItem('ef_view','dashboard');
@@ -1825,7 +1910,7 @@ function render(){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
       html=page?rCustomPage(page):`<div class="empty"><div class="empty-icon">😕</div><div>ページが見つかりません</div></div>`;
     }else{html=(views[V]||rDash)();}
-    document.getElementById('view').innerHTML=html;
+    document.getElementById('view').innerHTML=rGcalReminder()+html;
     renderNav();
     document.querySelectorAll('.nav-item,.mnav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===V));
     renderGcalUI();
@@ -6905,7 +6990,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260526-26';
+const APP_VERSION='20260529-27';
 
 render();
 function forceAppUpdate(){
