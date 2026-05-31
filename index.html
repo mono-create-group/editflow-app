@@ -1787,7 +1787,6 @@ function rLockScreen(){
     <div style="font-size:13px;padding:5px 0">③ タスクを時間軸にドラッグ or「＋ 時間付きタスク追加」</div>
   </div>
   <button class="btn btn-p" style="min-width:220px;font-size:15px;padding:12px 24px" onclick="V='tasks';TV='schedule';render()">📅 スケジュールを入力する</button>
-  <button class="btn btn-g btn-sm" style="margin-top:14px" onclick="skipTimeSchedule()">スキップ（今日だけ）</button>
   <div style="font-size:11px;color:var(--t3);margin-top:16px">ロック機能は設定ページでオフにできます</div>
 </div>`;
   }
@@ -6969,7 +6968,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260529-29';
+const APP_VERSION='20260529-30';
 
 render();
 function forceAppUpdate(){
