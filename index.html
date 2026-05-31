@@ -1387,6 +1387,7 @@ let RV='revenue'; // revenue sub-tab
 let GV='this_month'; // goals sub-tab (horizon)
 let PVMT='board'; // projects main tab (board/list/profit/payment/worker/priority)
 let JT='morning'; // journal tab (morning/evening)
+let JCM=today().slice(0,7); // journal calendar month (YYYY-MM)
 let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
@@ -3659,8 +3660,18 @@ function rGoalCard(g){
 </div>`;
 }
 // ===JOURNAL===
+function jcmShift(delta){
+  const [cy,cmStr]=JCM.split('-').map(Number);
+  const d=new Date(cy,cmStr-1+delta,1);
+  JCM=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  render();
+}
 function rJournal(){
-  const td=today(),now=new Date(),y=now.getFullYear(),m=now.getMonth();
+  const td=today();
+  // カレンダー表示月を JCM から取得（JD と連動）
+  if(!JCM)JCM=JD.slice(0,7);
+  const [cy,cmStr]=JCM.split('-').map(Number);
+  const y=cy, m=cmStr-1; // m は 0-indexed
   const first=new Date(y,m,1),last=new Date(y,m+1,0);
   const sd=(first.getDay()+6)%7;
   const morningEntry=S.journals.find(j=>j.date===JD&&j.type==='morning')||S.journals.find(j=>j.date===JD&&!j.type)||{};
@@ -3737,12 +3748,17 @@ function rJournal(){
   </div>`;
 
   return`<div class="ph"><div class="ph-title">ジャーナル</div></div>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
+  <button class="btn btn-g btn-sm" onclick="jcmShift(-1)">◀ 前月</button>
+  <span style="font-weight:700;font-size:15px">${y}年${m+1}月</span>
+  <button class="btn btn-g btn-sm" onclick="jcmShift(1)">翌月 ▶</button>
+</div>
 <div class="journal-cal">
   ${['月','火','水','木','金','土','日'].map(d=>`<div class="month-dow">${d}</div>`).join('')}
   ${dayGrid.map(d=>{
     if(!d)return`<div></div>`;
     const has=S.journals.some(j=>j.date===d&&(j.topPriority||j.content||j.achievement));
-    return`<div class="jcal-day ${has?'has-entry':''} ${JD===d?'selected':''} ${d===td?'today-j':''}" onclick="JD='${d}';render()">${+d.slice(8)}</div>`;
+    return`<div class="jcal-day ${has?'has-entry':''} ${JD===d?'selected':''} ${d===td?'today-j':''}" onclick="JD='${d}';JCM='${d.slice(0,7)}';render()">${+d.slice(8)}</div>`;
   }).join('')}
 </div>
 
@@ -6990,7 +7006,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260529-27';
+const APP_VERSION='20260529-28';
 
 render();
 function forceAppUpdate(){
