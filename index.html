@@ -1395,7 +1395,8 @@ function defState(){return{
   checkIns:[], workouts:[], workers:[], memos:[], meals:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
-  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false,timeScheduleLockEnabled:true},
+  goalReviews:{},
+  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false,timeScheduleLockEnabled:true,goalLockEnabled:true},
   frogId:null,
   customEx:[],
   navConfig:null,
@@ -1706,6 +1707,21 @@ function skipTimeSchedule(){
   sessionStorage.setItem('ef_skip_ts_'+today(),'1');
   render();
 }
+function checkGoalLock(){
+  if(S.settings?.goalLockEnabled===false)return false;
+  const td=today();
+  const hour=new Date().getHours();
+  if(hour<5)return false;
+  const review=S.goalReviews?.[td];
+  return!review?.reflection?.trim();
+}
+function saveGoalReview(){
+  const ref=document.getElementById('goal-review-text')?.value.trim();
+  if(!ref){toast('振り返りを入力してください','err');return;}
+  if(!S.goalReviews)S.goalReviews={};
+  S.goalReviews[today()]={reflection:ref,reviewedAt:new Date().toISOString()};
+  save();render();toast('🎯 目標の振り返りを保存しました');
+}
 function rGcalReminder(){
   const td=today();
   if(sessionStorage.getItem('ef_gcal_remind_off_'+td))return'';
@@ -1738,6 +1754,8 @@ function checkKpiLock(){
 function checkDailyLock(){
   // タイムスケジュールロック（最優先）
   if(checkTimeScheduleLock())return true;
+  // 目標振り返りロック
+  if(checkGoalLock())return true;
   const now=new Date();
   const hour=now.getHours();
   const td=today();
@@ -1787,6 +1805,37 @@ function rLockScreen(){
     <div style="font-size:13px;padding:5px 0">③ タスクを時間軸にドラッグ or「＋ 時間付きタスク追加」</div>
   </div>
   <button class="btn btn-p" style="min-width:220px;font-size:15px;padding:12px 24px" onclick="V='tasks';TV='schedule';render()">📅 スケジュールを入力する</button>
+  <div style="font-size:11px;color:var(--t3);margin-top:16px">ロック機能は設定ページでオフにできます</div>
+</div>`;
+  }
+  // ===目標振り返りロック===
+  if(checkGoalLock()){
+    const activeGoals=S.goals.filter(g=>!g.deleted);
+    const todayGoals=activeGoals.filter(g=>['this_month','next_month'].includes(g.horizon||'this_month'));
+    const longGoals=activeGoals.filter(g=>['year1','year5','year10'].includes(g.horizon));
+    return`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:40px 20px">
+  <div style="font-size:64px;margin-bottom:16px">🎯</div>
+  <div style="font-size:24px;font-weight:700;margin-bottom:8px">目標の確認と振り返りを記入してください</div>
+  <div style="font-size:14px;color:var(--t2);margin-bottom:24px;line-height:1.7">目標を確認し、今日の振り返りを書いてからアプリが使えます。</div>
+  ${activeGoals.length?`<div style="width:100%;max-width:520px;margin-bottom:20px;text-align:left">
+    ${todayGoals.length?`<div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:6px">📅 今月・来月の目標</div>
+    ${todayGoals.slice(0,5).map(g=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;font-size:13px">
+      <span style="font-size:16px">${GOAL_CATS.find(c=>c.v===g.category)?.l.split(' ')[0]||'🎯'}</span>
+      <span style="flex:1">${esc(g.title)}</span>
+      ${g.progress?`<span style="font-size:11px;color:var(--t2)">${g.progress}%</span>`:''}
+    </div>`).join('')}`:''}
+    ${longGoals.length?`<div style="font-size:12px;font-weight:700;color:var(--blue);margin-top:10px;margin-bottom:6px">🚀 長期目標</div>
+    ${longGoals.slice(0,3).map(g=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--bdim);border-radius:8px;margin-bottom:5px;font-size:13px">
+      <span style="font-size:16px">${g.horizon==='year1'?'🌱':g.horizon==='year5'?'🌟':'✨'}</span>
+      <span style="flex:1">${esc(g.title)}</span>
+    </div>`).join('')}`:''}
+    <button class="btn btn-g btn-sm" style="margin-top:8px" onclick="V='goals';render()">目標管理ページを開く →</button>
+  </div>`:`<div style="font-size:13px;color:var(--t2);margin-bottom:20px">まだ目標が登録されていません</div>`}
+  <div style="width:100%;max-width:520px;text-align:left;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">📝 今日の振り返り（目標への進捗・気づき・課題）</div>
+    <textarea id="goal-review-text" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:14px;min-height:120px;resize:vertical" placeholder="例：今月の売上目標に対して〇〇%進んでいる。課題は△△。明日は□□を優先する。"></textarea>
+  </div>
+  <button class="btn btn-p" style="min-width:220px;font-size:15px;padding:12px 24px" onclick="saveGoalReview()">✅ 保存してアプリを開く</button>
   <div style="font-size:11px;color:var(--t3);margin-top:16px">ロック機能は設定ページでオフにできます</div>
 </div>`;
   }
@@ -1857,7 +1906,8 @@ function render(){
       // KPIロック：KPIページのみ通過許可
       // 夜ロック：ジャーナル・習慣トラッカー・フィットネス・KPIのみ通過許可
       const _kpiOnly=!_tsLock&&!_morningLock&&checkKpiLock()&&!(_lh>=19&&(S.settings?.eveningLockEnabled!==false));
-      const _pass=_tsLock?(V==='tasks'):_kpiOnly?(V==='kpi'):_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness'||V==='kpi');
+      const _goalLock=!_tsLock&&checkGoalLock();
+      const _pass=_tsLock?(V==='tasks'):_goalLock?(V==='goals'):_kpiOnly?(V==='kpi'):_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness'||V==='kpi');
       if(!_pass){
         V='dashboard';
         sessionStorage.setItem('ef_view','dashboard');
@@ -6968,7 +7018,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260529-30';
+const APP_VERSION='20260529-31';
 
 render();
 function forceAppUpdate(){
