@@ -671,13 +671,12 @@ const BUILTIN_VIEWS=[
   {id:'projects',label:'案件管理',icon:'🎬'},
   {id:'workers',label:'ワーカー管理',icon:'👥'},
   {id:'habits',label:'習慣トラッカー',icon:'🔥'},
-  {id:'goals',label:'目標管理',icon:'🎯'},
+  {id:'goals',label:'目標・KPI管理',icon:'🎯'},
   {id:'journal',label:'ジャーナル',icon:'📔'},
   {id:'revenue',label:'目標達成確認',icon:'💰'},
   {id:'memo',label:'ブレインダンプ',icon:'🧠'},
   {id:'aichat',label:'AIアシスタント',icon:'🤖'},
   {id:'fitness',label:'フィットネス',icon:'💪'},
-  {id:'kpi',label:'KPI管理',icon:'📊'},
 ];
 
 const DB_OLD='ef_v4';
@@ -1363,6 +1362,18 @@ function sheetsDoImport(allJobs){
 const LOG_TYPE_LBL={revenue:'💰 収益',sales:'📞 営業',hire:'👤 採用'};
 const GOAL_CATS=[{v:'revenue',l:'💰 収益'},{v:'skill',l:'📚 スキル'},{v:'habit',l:'🔥 習慣'},{v:'project',l:'🎬 案件'},{v:'sales',l:'📞 営業'},{v:'hire',l:'👤 採用'}];
 const GOAL_HORIZONS=[{v:'this_month',l:'今月の目標',icon:'📅'},{v:'next_month',l:'来月の目標',icon:'🗓'},{v:'monthly',l:'月毎の目標',icon:'📆'},{v:'year1',l:'1年間の目標',icon:'🌱'},{v:'year5',l:'5年後の目標',icon:'🚀'},{v:'year10',l:'10年後の目標',icon:'🌟'},{v:'tree',l:'ツリー表示',icon:'🌳'}];
+// 目標・KPI統合ページ用のホライズン定義
+const UNIFIED_HORIZONS=[
+  {v:'1w',         l:'今週',   icon:'⚡', kpi:'1w',  goals:null},
+  {v:'this_month', l:'今月',   icon:'📅', kpi:'1m',  goals:'this_month'},
+  {v:'next_month', l:'来月',   icon:'🗓', kpi:null,  goals:'next_month'},
+  {v:'3m',         l:'3ヶ月後', icon:'🗒', kpi:'3m',  goals:null},
+  {v:'6m',         l:'半年後',  icon:'📆', kpi:'6m',  goals:null},
+  {v:'year1',      l:'1年後',  icon:'🌱', kpi:'1y',  goals:'year1'},
+  {v:'year5',      l:'5年後',  icon:'🚀', kpi:'5y',  goals:'year5'},
+  {v:'year10',     l:'10年後', icon:'🌟', kpi:null,  goals:'year10'},
+  {v:'tree',       l:'ツリー',  icon:'🌳', kpi:null,  goals:'tree'},
+];
 // 時間軸の長さ順（短→長）
 const HORIZON_ORDER=['this_month','next_month','monthly','year1','year5','year10'];
 // 上位目標として選べるホライズン（自分より長い時間軸）
@@ -1921,7 +1932,7 @@ function rLockScreen(){
       <span style="font-size:16px">${g.horizon==='year1'?'🌱':g.horizon==='year5'?'🌟':'✨'}</span>
       <span style="flex:1">${esc(g.title)}</span>
     </div>`).join('')}`:''}
-    <button class="btn btn-g btn-sm" style="margin-top:8px" onclick="V='goals';render()">目標管理ページを開く →</button>
+    <button class="btn btn-g btn-sm" style="margin-top:8px" onclick="V='goals';render()">目標・KPI管理ページを開く →</button>
   </div>`:`<div style="font-size:13px;color:var(--t2);margin-bottom:20px">まだ目標が登録されていません</div>`}
   <div style="width:100%;max-width:520px;text-align:left;margin-bottom:16px">
     <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">📝 今日の振り返り（目標への進捗・気づき・課題）</div>
@@ -2038,6 +2049,7 @@ function render(){
       }
     }
     sessionStorage.setItem('ef_view',V);
+    if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
     const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi};
     let html;
     if(V.startsWith('cp_')){
@@ -3736,31 +3748,164 @@ function rGoalTree(){
 ${roots.map(g=>renderNode(g,0)).join('')}`;
 }
 function rGoals(){
-  const hz=GOAL_HORIZONS.find(h=>h.v===GV)||GOAL_HORIZONS[0];
+  // 統合ページ: 目標管理 + KPI管理を1ページに
+  if(!S.divisions)S.divisions=[];
+  const divs=S.divisions.filter(d=>!d.deleted);
+  let div=divs.find(d=>d.id===KV)||(divs[0]||null);
+  if(div)KV=div.id; else KV=null;
+
+  const validTabs=UNIFIED_HORIZONS.map(h=>h.v);
+  if(!validTabs.includes(GV))GV='this_month';
+  const tabDef=UNIFIED_HORIZONS.find(h=>h.v===GV)||UNIFIED_HORIZONS[1];
+
+  const divTabs=divs.length>1?`<div style="display:flex;gap:8px;flex-wrap:wrap;overflow-x:auto;margin-bottom:12px;padding-bottom:4px;scrollbar-width:none">
+    ${divs.map(d=>`<button class="btn btn-sm ${KV===d.id?'btn-p':'btn-g'}" onclick="KV='${d.id}';render()" style="flex-shrink:0">${esc(d.name)}</button>`).join('')}
+  </div>`:'';
+
+  let content;
   if(GV==='tree'){
-    return`<div class="ph"><div class="ph-title">目標管理</div></div>
-${subTabs(GOAL_HORIZONS.map(h=>[h.v,h.icon+' '+h.l]),GV,'setGV')}
-${rGoalTree()}`;
+    content=rGoalTree();
+  } else {
+    content=rUnifiedHorizonTab(div,tabDef);
   }
-  const goals=S.goals.filter(g=>!g.deleted&&(g.horizon||'this_month')===GV);
-  const monthlyGrouped=GV==='monthly'?(()=>{
-    const months=[...new Set(goals.map(g=>g.targetMonth||today().slice(0,7)))].sort();
-    return months.map(m=>{
-      const [yr,mo]=m.split('-').map(Number);
-      const label=`${yr}年${mo}月`;
-      const mg=goals.filter(g=>(g.targetMonth||today().slice(0,7))===m);
-      return{label,month:m,goals:mg};
-    });
-  })():null;
-  return`<div class="ph"><div class="ph-title">目標管理</div><button class="btn btn-p" onclick="openGoalModal(null,'${GV}')">＋ 目標追加</button></div>
-${subTabs(GOAL_HORIZONS.map(h=>[h.v,h.icon+' '+h.l]),GV,'setGV')}
-${!goals.length?`<div class="empty"><div class="empty-icon">${hz.icon}</div><div class="empty-title">${hz.l}を設定しよう</div><div style="color:var(--t2)">大きな目標をマイルストーンに分解して達成しましょう</div></div>`
-:GV==='monthly'?monthlyGrouped.map(({label,goals:mg})=>`
-<div style="margin-bottom:20px">
-  <div style="font-size:13px;font-weight:700;color:var(--purple);padding:6px 0;margin-bottom:8px;border-bottom:2px solid var(--purple)">📆 ${label}</div>
-  ${mg.map(g=>rGoalCard(g)).join('')}
-</div>`).join('')
-:goals.map(g=>rGoalCard(g)).join('')}`;
+
+  return`<div class="ph">
+  <div class="ph-title">🎯 目標・KPI管理</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${tabDef.goals?`<button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}')">＋ 目標追加</button>`:''}
+    <button class="btn btn-g btn-sm" onclick="openDivModal(null)">＋ 事業部</button>
+    ${div?`<button class="btn btn-g btn-sm" onclick="openDivModal('${div.id}')">✏️ 事業部編集</button>`:''}
+  </div>
+</div>
+${divTabs}
+${subTabs(UNIFIED_HORIZONS.map(h=>[h.v,h.icon+' '+h.l]),GV,'setGV')}
+${content}`;
+}
+
+function rUnifiedHorizonTab(div,tabDef){
+  const td=today();
+  const label=tabDef.icon+' '+tabDef.l;
+
+  // ===今週専用コンテキスト===
+  let weeklyCtx='';
+  if(tabDef.v==='1w'){
+    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month');
+    const monthKpis=div?(div.horizons?.['1m']?.kpis||[]):[];
+    const now=new Date(td);
+    const endOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0);
+    const daysLeft=Math.max(1,Math.ceil((endOfMonth-now)/(1000*60*60*24))+1);
+    const weeksLeft=Math.max(1,Math.ceil(daysLeft/7));
+    const monthGoalsHtml=thisMonthGoals.length
+      ?thisMonthGoals.map(g=>{
+          const pct=g.progress||0;
+          const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+          return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+  <span style="font-size:15px">${GOAL_CATS.find(c=>c.v===g.category)?.l.split(' ')[0]||'🎯'}</span>
+  <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.title)}</div>
+  <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div style="height:100%;background:var(--${col});width:${pct}%;border-radius:2px"></div></div></div>
+  <span style="font-size:12px;font-weight:700;color:var(--${col})">${pct}%</span>
+</div>`;}).join('')
+      :`<div style="font-size:13px;color:var(--t2);padding:8px 0">今月の目標がまだ登録されていません</div>`;
+    const weeklyKpiRows=monthKpis.length
+      ?monthKpis.map(k=>{
+          const remaining=Math.max(0,(k.target||0)-(k.current||0));
+          const weeklyNeed=Math.ceil(remaining/weeksLeft);
+          const pct=k.target>0?Math.min(100,Math.round((k.current||0)/k.target*100)):0;
+          const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+          return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="flex:1;font-weight:600;font-size:13px">${esc(k.title)}</div>
+    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}">${pct}%</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
+    <div style="background:var(--card2);padding:6px;border-radius:6px"><div style="color:var(--t2);margin-bottom:2px">月間目標</div><div style="font-weight:700">${(k.target||0).toLocaleString()}${esc(k.unit||'')}</div></div>
+    <div style="background:var(--card2);padding:6px;border-radius:6px"><div style="color:var(--t2);margin-bottom:2px">現状</div><div style="font-weight:700;color:var(--${col})">${(k.current||0).toLocaleString()}${esc(k.unit||'')}</div></div>
+    <div style="background:${weeklyNeed>0?'linear-gradient(135deg,#f59e0b18,#ef444412)':'var(--card2)'};padding:6px;border-radius:6px;border:${weeklyNeed>0?'1px solid var(--amber)':'none'}"><div style="color:var(--t2);margin-bottom:2px">今週必要</div><div style="font-weight:800;color:${weeklyNeed>0?'var(--amber)':'var(--t3)'}">${weeklyNeed.toLocaleString()}${esc(k.unit||'')}</div></div>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin-top:4px">月末まで${daysLeft}日 / 残り約${weeksLeft}週</div>
+</div>`;}).join('')
+      :`<div style="font-size:13px;color:var(--t2);padding:8px 0">今月タブにKPIを設定すると今週必要な数値を自動計算します</div>`;
+    weeklyCtx=`<div class="card" style="margin-bottom:14px">
+  <div style="font-size:13px;font-weight:800;color:var(--blue);margin-bottom:10px">📅 今月の目標</div>
+  ${monthGoalsHtml}
+  <button class="btn btn-g btn-xs" style="margin-top:8px" onclick="GV='this_month';render()">今月タブへ →</button>
+</div>
+<div style="margin-bottom:14px">
+  <div style="font-size:13px;font-weight:800;color:var(--amber);margin-bottom:8px">⚡ 今週必要な目標数値</div>
+  ${weeklyKpiRows}
+</div>`;
+  }
+
+  // ===目標カードセクション===
+  let goalsSection='';
+  if(tabDef.goals){
+    const goals=(S.goals||[]).filter(g=>!g.deleted&&(g.horizon||'this_month')===tabDef.goals);
+    goalsSection=`<div style="margin-bottom:16px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:14px;font-weight:800;color:var(--purple)">🎯 ${tabDef.l}の目標</div>
+    <button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}')">＋ 目標追加</button>
+  </div>
+  ${goals.length?goals.map(g=>rGoalCard(g)).join('')
+    :`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px">
+      <div style="font-size:28px;margin-bottom:6px">${tabDef.icon}</div>
+      ${tabDef.l}の目標を追加しましょう
+    </div>`}
+</div>`;
+  }
+
+  // ===ビジョン＋KPIセクション===
+  let kpiSection='';
+  if(tabDef.kpi && div){
+    if(!div.horizons)div.horizons={};
+    if(!div.horizons[tabDef.kpi])div.horizons[tabDef.kpi]={goal:'',kpis:[],updatedAt:null};
+    const h=div.horizons[tabDef.kpi];
+    const kpis=h.kpis||[];
+    const kpiRows=kpis.length===0
+      ?`<div style="text-align:center;padding:16px;color:var(--t2);font-size:13px">KPIがまだありません</div>`
+      :kpis.map(k=>{
+          const pct=k.target>0?Math.min(100,Math.round((k.current||0)/k.target*100)):0;
+          const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+          return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="flex:1;font-weight:600;font-size:14px">${esc(k.title)}</div>
+    <button class="btn btn-g btn-xs btn-red" onclick="delHorizonKpi('${div.id}','${tabDef.kpi}','${k.id}')">🗑</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden">
+      <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:4px;transition:width .4s"></div>
+    </div>
+    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}">${pct}%</span>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--t2);align-items:center">
+    <span>現状: <input id="hz-kpi-cur-${k.id}" type="number" value="${k.current||0}" style="width:70px;padding:2px 6px;border:1px solid var(--border);border-radius:6px;background:var(--card2);color:var(--text);font-size:12px"></span>
+    <span>目標: <b style="color:var(--text)">${k.target||0}${esc(k.unit||'')}</b></span>
+  </div>
+</div>`;}).join('');
+    kpiSection=`<div class="card" style="margin-bottom:12px">
+  <div style="font-size:13px;font-weight:700;color:var(--pl);margin-bottom:8px">📝 ${tabDef.l}のビジョン・目標テキスト</div>
+  <textarea id="hz-goal-${div.id}-${tabDef.kpi}" rows="3" placeholder="例：〇〇を実現し、月収〇〇万円を達成する" style="width:100%;box-sizing:border-box;margin-bottom:10px" oninput="autoSaveHorizonGoal('${div.id}','${tabDef.kpi}')">${esc(h.goal||'')}</textarea>
+  <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
+    <span id="hz-goal-saved-${div.id}-${tabDef.kpi}" style="font-size:12px;color:var(--green);opacity:0;transition:opacity .4s">✅ 保存しました</span>
+    <button class="btn btn-p btn-sm" onclick="saveHorizonGoal('${div.id}','${tabDef.kpi}')">💾 保存</button>
+  </div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  <div style="font-size:14px;font-weight:800;color:var(--blue)">📈 KPI指標</div>
+  <button class="btn btn-p btn-sm" onclick="addHorizonKpi('${div.id}','${tabDef.kpi}')">＋ KPI追加</button>
+</div>
+${kpiRows}
+<div style="display:flex;justify-content:flex-end;margin-top:14px">
+  <button class="btn btn-p" onclick="saveHorizon('${div.id}','${tabDef.kpi}')">✅ KPI更新・保存</button>
+</div>`;
+  } else if(tabDef.kpi && !div){
+    kpiSection=`<div class="card" style="text-align:center;padding:24px;color:var(--t2)">
+  <div style="font-size:24px;margin-bottom:8px">📊</div>
+  <div style="font-size:13px">事業部を追加するとKPIを管理できます</div>
+  <button class="btn btn-p btn-sm" style="margin-top:12px" onclick="openDivModal(null)">＋ 事業部追加</button>
+</div>`;
+  }
+
+  return weeklyCtx+goalsSection+kpiSection;
 }
 function rGoalCard(g){
   const ms=g.milestones||[];
@@ -7286,7 +7431,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260601-35';
+const APP_VERSION='20260601-36';
 
 render();
 function forceAppUpdate(){
