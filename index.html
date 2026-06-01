@@ -4383,24 +4383,15 @@ function rKpi(){
 
   const divTabs=divs.map(d=>`<button class="btn btn-sm ${KV===d.id?'btn-p':'btn-g'}" onclick="KV='${d.id}';render()" style="flex-shrink:0">${esc(d.name)}</button>`).join('');
 
-  const horizonTabs=[['5y','🗓 5年後'],['1y','📆 1年後'],['6m','📅 半年後'],['3m','🗒 3ヶ月後'],['1m','📌 今月'],['1w','⚡ 今週']];
-  const innerTabs=[['kgi','🎯 KGI'],['kpi','📈 KPI'],['issues','⚠️ イシュー'],['tasks','✅ タスク']];
-  const allTabs=[...horizonTabs,...innerTabs];
-  const tabBar=allTabs.map(([k,l])=>`<div class="stab${KT===k?' act':''}" onclick="KT='${k}';render()">${l}</div>`).join('');
+  const horizonTabs=[['1w','⚡ 今週'],['1m','📌 今月'],['3m','🗒 3ヶ月後'],['6m','📅 半年後'],['1y','📆 1年後'],['5y','🗓 5年後']];
+  const tabBar=horizonTabs.map(([k,l])=>`<div class="stab${KT===k?' act':''}" onclick="KT='${k}';render()">${l}</div>`).join('');
 
   let content='';
   if(!div){
     content=`<div class="card" style="text-align:center;padding:40px 20px;color:var(--t2)">事業部を追加してKPI/KGI管理を始めましょう</div>`;
-  } else if(['5y','1y','6m','3m','1m','1w'].includes(KT)){
-    content=rHorizonTab(div,KT);
-  } else if(KT==='kgi'){
-    content=rKgiTab(div);
-  } else if(KT==='kpi'){
-    content=rKpiTab(div);
-  } else if(KT==='issues'){
-    content=rIssueTab(div);
   } else {
-    content=rDivTaskTab(div);
+    if(!['1w','1m','3m','6m','1y','5y'].includes(KT))KT='1w';
+    content=rHorizonTab(div,KT);
   }
 
   return`<div class="ph">
@@ -4429,6 +4420,71 @@ function rHorizonTab(div,period){
   const label=HORIZON_LABELS[period]||period;
   const desc=HORIZON_DESC[period]||'';
   const kpis=h.kpis||[];
+
+  // ===今週タブ専用: 今月の目標＋週次目標数値===
+  let weeklyContextSection='';
+  if(period==='1w'){
+    // 今月の目標（S.goals から）
+    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month');
+    // 今月のKPI（1mホライズン）から今週必要な数値を計算
+    const monthKpis=(div.horizons?.['1m']?.kpis||[]);
+    // 残り日数・週数を計算
+    const td=today();
+    const now=new Date(td);
+    const endOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0);
+    const daysLeft=Math.max(1,Math.ceil((endOfMonth-now)/(1000*60*60*24))+1);
+    const weeksLeft=Math.max(1,Math.ceil(daysLeft/7));
+    const daysInMonth=endOfMonth.getDate();
+    const daysPassed=now.getDate()-1;
+    const progressRatio=daysPassed/daysInMonth;
+
+    const monthGoalsHtml=thisMonthGoals.length
+      ?thisMonthGoals.map(g=>{
+          const pct=g.progress||0;
+          const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+          return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+  <span style="font-size:16px">${GOAL_CATS.find(c=>c.v===g.category)?.l.split(' ')[0]||'🎯'}</span>
+  <div style="flex:1;min-width:0">
+    <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g.title)}</div>
+    <div style="height:5px;background:var(--border);border-radius:3px;margin-top:4px;overflow:hidden"><div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px"></div></div>
+  </div>
+  <span style="font-size:12px;font-weight:700;color:var(--${col});flex-shrink:0">${pct}%</span>
+</div>`;
+        }).join('')
+      :`<div style="font-size:13px;color:var(--t2);padding:8px 0">今月の目標がまだ登録されていません</div>`;
+
+    const weeklyKpiRows=monthKpis.length
+      ?monthKpis.map(k=>{
+          const remaining=Math.max(0,(k.target||0)-(k.current||0));
+          const weeklyNeed=Math.ceil(remaining/weeksLeft);
+          const pct=k.target>0?Math.min(100,Math.round((k.current||0)/k.target*100)):0;
+          const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+          return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="flex:1;font-weight:600;font-size:13px">${esc(k.title)}</div>
+    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}" style="font-size:11px">${pct}%</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
+    <div style="background:var(--card2);padding:6px;border-radius:6px"><div style="color:var(--t2);margin-bottom:2px">月間目標</div><div style="font-weight:700">${(k.target||0).toLocaleString()}${esc(k.unit||'')}</div></div>
+    <div style="background:var(--card2);padding:6px;border-radius:6px"><div style="color:var(--t2);margin-bottom:2px">現状</div><div style="font-weight:700;color:var(--${col})">${(k.current||0).toLocaleString()}${esc(k.unit||'')}</div></div>
+    <div style="background:${weeklyNeed>0?'linear-gradient(135deg,#f59e0b18,#ef444412)':'var(--card2)'};padding:6px;border-radius:6px;border:${weeklyNeed>0?'1px solid var(--amber)':'none'}"><div style="color:var(--t2);margin-bottom:2px">今週必要</div><div style="font-weight:800;color:${weeklyNeed>0?'var(--amber)':'var(--t3)'}">${weeklyNeed.toLocaleString()}${esc(k.unit||'')}</div></div>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin-top:4px">残り約${weeksLeft}週 / 月末まで${daysLeft}日</div>
+</div>`;
+        }).join('')
+      :`<div style="font-size:13px;color:var(--t2);padding:8px 0">今月タブにKPIを設定すると今週必要な数値を自動計算します</div>`;
+
+    weeklyContextSection=`
+<div class="card" style="margin-bottom:14px;padding:14px 18px">
+  <div style="font-size:13px;font-weight:800;color:var(--blue);margin-bottom:10px">📅 今月の目標（目標管理より）</div>
+  ${monthGoalsHtml}
+  <button class="btn btn-g btn-xs" style="margin-top:8px" onclick="V='goals';GV='this_month';render()">今月の目標を管理 →</button>
+</div>
+<div style="margin-bottom:14px">
+  <div style="font-size:13px;font-weight:800;color:var(--amber);margin-bottom:8px">⚡ 今週必要な目標数値（今月KPIより自動計算）</div>
+  ${weeklyKpiRows}
+</div>`;
+  }
   const kpiRows=kpis.length===0
     ?`<div style="text-align:center;padding:16px;color:var(--t2);font-size:13px">KPIがまだありません</div>`
     :kpis.map(k=>{
@@ -4461,6 +4517,7 @@ function rHorizonTab(div,period){
     ${h.updatedAt?`<span class="badge bk" style="font-size:11px">最終更新: ${h.updatedAt}</span>`:''}
   </div>
 </div>
+${weeklyContextSection}
 <div class="card" style="margin-bottom:12px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
     <div class="fl">🎯 ${label}の大きな目標・ビジョン</div>
@@ -4478,21 +4535,18 @@ ${kpiRows}
 </div>`;
 }
 
-let _horizonGoalTimer=null;
 function autoSaveHorizonGoal(divId,period){
-  clearTimeout(_horizonGoalTimer);
-  _horizonGoalTimer=setTimeout(()=>{
-    const div=S.divisions.find(d=>d.id===divId);
-    if(!div)return;
-    if(!div.horizons)div.horizons={};
-    if(!div.horizons[period])div.horizons[period]={goal:'',kpis:[]};
-    const goalEl=document.getElementById('hz-goal-'+divId+'-'+period);
-    if(!goalEl)return;
-    div.horizons[period].goal=goalEl.value;
-    save();
-    const indicator=document.getElementById('hz-goal-saved-'+divId+'-'+period);
-    if(indicator){indicator.style.opacity='1';setTimeout(()=>indicator.style.opacity='0',2000);}
-  },800);
+  // 即時保存（debounce廃止）— renderを呼ばないためテキストが消えない
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.horizons)div.horizons={};
+  if(!div.horizons[period])div.horizons[period]={goal:'',kpis:[]};
+  const goalEl=document.getElementById('hz-goal-'+divId+'-'+period);
+  if(!goalEl)return;
+  div.horizons[period].goal=goalEl.value;
+  save(); // renderを呼ばず保存のみ
+  const indicator=document.getElementById('hz-goal-saved-'+divId+'-'+period);
+  if(indicator){indicator.style.opacity='1';setTimeout(()=>indicator.style.opacity='0',1500);}
 }
 function saveHorizon(divId,period){
   const div=S.divisions.find(d=>d.id===divId);
@@ -7219,7 +7273,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260601-33';
+const APP_VERSION='20260601-34';
 
 render();
 function forceAppUpdate(){
