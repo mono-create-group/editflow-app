@@ -1403,7 +1403,7 @@ function defState(){return{
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
   goalReviews:{},
-  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false,timeScheduleLockEnabled:true,goalLockEnabled:true},
+  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false,timeScheduleLockEnabled:true,goalLockEnabled:true,draftLockEnabled:true},
   frogId:null,
   customEx:[],
   navConfig:null,
@@ -1729,6 +1729,63 @@ function saveGoalReview(){
   S.goalReviews[today()]={reflection:ref,reviewedAt:new Date().toISOString()};
   save();render();toast('🎯 目標の振り返りを保存しました');
 }
+function getDraftJobsToday(){
+  const td=today();
+  return(S.jobs||[]).filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'&&(j.editorDraftDate===td||j.clientDraftDate===td));
+}
+function getDraftJobsTomorrow(){
+  const d=new Date();d.setDate(d.getDate()+1);
+  const tmr=d.toISOString().slice(0,10);
+  return(S.jobs||[]).filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'&&(j.editorDraftDate===tmr||j.clientDraftDate===tmr));
+}
+function checkDraftMorningLock(){
+  if(S.settings?.draftLockEnabled===false)return false;
+  const td=today();
+  const hour=new Date().getHours();
+  if(hour<5)return false;
+  if(sessionStorage.getItem('ef_draft_morn_'+td))return false;
+  return getDraftJobsToday().length>0;
+}
+function checkDraftEveLock(){
+  if(S.settings?.draftLockEnabled===false)return false;
+  const td=today();
+  const hour=new Date().getHours();
+  if(hour<19)return false;
+  if(sessionStorage.getItem('ef_draft_eve_'+td))return false;
+  return getDraftJobsTomorrow().length>0;
+}
+function rDraftReminder(){
+  const td=today();
+  if(sessionStorage.getItem('ef_draft_banner_off_'+td))return'';
+  const d=new Date();d.setDate(d.getDate()+1);
+  const tmr=d.toISOString().slice(0,10);
+  const todayJobs=getDraftJobsToday();
+  const tmrJobs=getDraftJobsTomorrow();
+  if(!todayJobs.length&&!tmrJobs.length)return'';
+  const rows=[
+    ...todayJobs.map(j=>{
+      const parts=[];
+      if(j.editorDraftDate===td)parts.push('✏️ 編集者初稿');
+      if(j.clientDraftDate===td)parts.push('📋 クライアント初稿');
+      return`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"><span style="flex:1;font-weight:600">${esc(j.title)}</span><span style="color:var(--red);font-size:11px;font-weight:700;flex-shrink:0">🔴 本日 — ${parts.join(' / ')}</span></div>`;
+    }),
+    ...tmrJobs.map(j=>{
+      const parts=[];
+      const dmr=d.toISOString().slice(0,10);
+      if(j.editorDraftDate===dmr)parts.push('✏️ 編集者初稿');
+      if(j.clientDraftDate===dmr)parts.push('📋 クライアント初稿');
+      return`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"><span style="flex:1;font-weight:600">${esc(j.title)}</span><span style="color:var(--amber);font-size:11px;font-weight:700;flex-shrink:0">🟡 明日 — ${parts.join(' / ')}</span></div>`;
+    })
+  ];
+  return`<div id="draft-remind-banner" style="background:linear-gradient(135deg,#ef444418,#f59e0b12);border:2px solid var(--red);border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:flex-start;gap:14px">
+  <span style="font-size:26px;flex-shrink:0">✏️</span>
+  <div style="flex:1;min-width:0">
+    <div style="font-weight:800;color:var(--red);font-size:14px;letter-spacing:.3px;margin-bottom:8px">初稿・クライアント提出の期限が近い案件があります</div>
+    ${rows.join('')}
+  </div>
+  <button onclick="sessionStorage.setItem('ef_draft_banner_off_'+today(),'1');document.getElementById('draft-remind-banner')?.remove()" style="background:var(--border);border:none;border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;padding:6px 10px;flex-shrink:0;font-weight:700">✕</button>
+</div>`;
+}
 function rGcalReminder(){
   const td=today();
   if(sessionStorage.getItem('ef_gcal_remind_off_'+td))return'';
@@ -1763,6 +1820,8 @@ function checkDailyLock(){
   if(checkTimeScheduleLock())return true;
   // 目標振り返りロック
   if(checkGoalLock())return true;
+  // 朝：当日の初稿・クライアント提出確認ロック
+  if(checkDraftMorningLock())return true;
   const now=new Date();
   const hour=now.getHours();
   const td=today();
@@ -1775,6 +1834,8 @@ function checkDailyLock(){
     // 時間帯に関わらずKPIロックをチェック
     return checkKpiLock();
   }
+  // 夜：翌日（前日）の初稿・クライアント提出確認ロック
+  if(checkDraftEveLock())return true;
   if(!eveningLockOn)return checkKpiLock();
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
@@ -1812,6 +1873,30 @@ function rLockScreen(){
     <div style="font-size:13px;padding:5px 0">③ タスクを時間軸にドラッグ or「＋ 時間付きタスク追加」</div>
   </div>
   <button class="btn btn-p" style="min-width:220px;font-size:15px;padding:12px 24px" onclick="V='tasks';TV='schedule';render()">📅 スケジュールを入力する</button>
+  <div style="font-size:11px;color:var(--t3);margin-top:16px">ロック機能は設定ページでオフにできます</div>
+</div>`;
+  }
+  // ===朝の初稿確認ロック===
+  if(checkDraftMorningLock()){
+    const jobs=getDraftJobsToday();
+    return`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:40px 20px">
+  <div style="font-size:64px;margin-bottom:16px">✏️</div>
+  <div style="font-size:24px;font-weight:700;margin-bottom:8px;color:var(--red)">本日、初稿提出の案件があります</div>
+  <div style="font-size:14px;color:var(--t2);margin-bottom:24px;line-height:1.7">以下の案件の進捗を確認してからアプリが使えます。</div>
+  <div style="width:100%;max-width:520px;margin-bottom:24px;text-align:left">
+    ${jobs.map(j=>{
+      const parts=[];
+      if(j.editorDraftDate===td)parts.push({label:'✏️ 編集者初稿提出日',col:'var(--red)'});
+      if(j.clientDraftDate===td)parts.push({label:'📋 クライアント初稿確認日',col:'var(--purple)'});
+      return parts.map(p=>`<div style="background:var(--card);border:2px solid ${p.col};border-radius:12px;padding:14px 18px;margin-bottom:10px;text-align:left">
+        <div style="font-size:11px;font-weight:700;color:${p.col};margin-bottom:4px">${p.label} — 🔴 本日</div>
+        <div style="font-size:16px;font-weight:700">${esc(j.title)}</div>
+        ${j.status?`<div style="font-size:12px;color:var(--t2);margin-top:4px">ステータス: ${esc(j.status)}</div>`:''}
+      </div>`).join('');
+    }).join('')}
+  </div>
+  <button class="btn btn-p" style="min-width:240px;font-size:15px;padding:14px 24px" onclick="sessionStorage.setItem('ef_draft_morn_'+today(),'1');render()">✅ 確認しました — アプリを開く</button>
+  <button class="btn btn-g btn-sm" style="margin-top:10px" onclick="V='projects';sessionStorage.setItem('ef_draft_morn_'+today(),'1');render()">📁 案件管理ページで確認する</button>
   <div style="font-size:11px;color:var(--t3);margin-top:16px">ロック機能は設定ページでオフにできます</div>
 </div>`;
   }
@@ -1872,6 +1957,32 @@ function rLockScreen(){
   <div style="font-size:11px;color:var(--t3);margin-top:16px">ロック機能は設定ページでオフにできます</div>
 </div>`;
   }
+  // ===夜の翌日初稿確認ロック===
+  if(checkDraftEveLock()){
+    const d2=new Date();d2.setDate(d2.getDate()+1);
+    const tmr=d2.toISOString().slice(0,10);
+    const jobs=getDraftJobsTomorrow();
+    return`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:40px 20px">
+  <div style="font-size:64px;margin-bottom:16px">🌙</div>
+  <div style="font-size:24px;font-weight:700;margin-bottom:8px;color:var(--amber)">明日、初稿提出の案件があります</div>
+  <div style="font-size:14px;color:var(--t2);margin-bottom:24px;line-height:1.7">以下の案件の準備状況を確認してからアプリが使えます。</div>
+  <div style="width:100%;max-width:520px;margin-bottom:24px;text-align:left">
+    ${jobs.map(j=>{
+      const parts=[];
+      if(j.editorDraftDate===tmr)parts.push({label:'✏️ 編集者初稿提出日',col:'var(--amber)'});
+      if(j.clientDraftDate===tmr)parts.push({label:'📋 クライアント初稿確認日',col:'var(--purple)'});
+      return parts.map(p=>`<div style="background:var(--card);border:2px solid ${p.col};border-radius:12px;padding:14px 18px;margin-bottom:10px;text-align:left">
+        <div style="font-size:11px;font-weight:700;color:${p.col};margin-bottom:4px">${p.label} — 🟡 明日（${tmr}）</div>
+        <div style="font-size:16px;font-weight:700">${esc(j.title)}</div>
+        ${j.status?`<div style="font-size:12px;color:var(--t2);margin-top:4px">ステータス: ${esc(j.status)}</div>`:''}
+      </div>`).join('');
+    }).join('')}
+  </div>
+  <button class="btn btn-p" style="min-width:240px;font-size:15px;padding:14px 24px" onclick="sessionStorage.setItem('ef_draft_eve_'+today(),'1');render()">✅ 確認しました — アプリを開く</button>
+  <button class="btn btn-g btn-sm" style="margin-top:10px" onclick="V='projects';sessionStorage.setItem('ef_draft_eve_'+today(),'1');render()">📁 案件管理ページで確認する</button>
+  <div style="font-size:11px;color:var(--t3);margin-top:16px">ロック機能は設定ページでオフにできます</div>
+</div>`;
+  }
   // 夜ロック（19時以降）
   const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
   const todayHabits=S.habits.filter(h=>!h.deleted);
@@ -1914,7 +2025,10 @@ function render(){
       // 夜ロック：ジャーナル・習慣トラッカー・フィットネス・KPIのみ通過許可
       const _kpiOnly=!_tsLock&&!_morningLock&&checkKpiLock()&&!(_lh>=19&&(S.settings?.eveningLockEnabled!==false));
       const _goalLock=!_tsLock&&checkGoalLock();
-      const _pass=_tsLock?(V==='tasks'):_goalLock?(V==='goals'):_kpiOnly?(V==='kpi'):_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness'||V==='kpi');
+      const _draftMornLock=!_tsLock&&!_goalLock&&checkDraftMorningLock();
+      const _draftEveLock=!_tsLock&&!_goalLock&&!_draftMornLock&&checkDraftEveLock();
+      // 初稿確認ロック：案件管理ページへのアクセスを許可（確認後にボタンでアプリを開く）
+      const _pass=_tsLock?(V==='tasks'):_goalLock?(V==='goals'):_draftMornLock?(V==='projects'):_draftEveLock?(V==='projects'):_kpiOnly?(V==='kpi'):_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness'||V==='kpi');
       if(!_pass){
         V='dashboard';
         sessionStorage.setItem('ef_view','dashboard');
@@ -1930,7 +2044,7 @@ function render(){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
       html=page?rCustomPage(page):`<div class="empty"><div class="empty-icon">😕</div><div>ページが見つかりません</div></div>`;
     }else{html=(views[V]||rDash)();}
-    document.getElementById('view').innerHTML=rGcalReminder()+html;
+    document.getElementById('view').innerHTML=rGcalReminder()+rDraftReminder()+html;
     renderNav();
     document.querySelectorAll('.nav-item,.mnav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===V));
     renderGcalUI();
@@ -4845,6 +4959,15 @@ ${secTitle('🔒 ジャーナルロック設定')}
       <div style="position:absolute;top:3px;left:${S.settings.kpiLockEnabled?'23':'3'}px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
     </div>
   </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
+    <div>
+      <div style="font-size:13px;font-weight:600">初稿・クライアント提出確認ロック</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:2px">ONにすると、朝は当日・夜は翌日の初稿期限案件を確認するまでアプリがロックされます</div>
+    </div>
+    <div onclick="S.settings.draftLockEnabled=!(S.settings.draftLockEnabled!==false);save();render()" style="cursor:pointer;width:44px;height:24px;border-radius:12px;background:${S.settings.draftLockEnabled!==false?'var(--purple)':'var(--border)'};position:relative;transition:background .2s;flex-shrink:0">
+      <div style="position:absolute;top:3px;left:${S.settings.draftLockEnabled!==false?'23':'3'}px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s"></div>
+    </div>
+  </div>
 </div>
 
 ${secTitle('💪 筋トレコミットメント')}
@@ -7096,7 +7219,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260601-32';
+const APP_VERSION='20260601-33';
 
 render();
 function forceAppUpdate(){
