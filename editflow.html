@@ -4519,11 +4519,12 @@ function rHorizonTab(div,period){
 </div>
 ${weeklyContextSection}
 <div class="card" style="margin-bottom:12px">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-    <div class="fl">🎯 ${label}の大きな目標・ビジョン</div>
-    <span id="hz-goal-saved-${div.id}-${period}" style="font-size:11px;color:var(--green);opacity:0;transition:opacity .5s">✅ 保存済み</span>
+  <div style="font-size:13px;font-weight:700;color:var(--pl);margin-bottom:8px">🎯 ${label}の大きな目標・ビジョン</div>
+  <textarea id="hz-goal-${div.id}-${period}" rows="4" placeholder="例：〇〇を実現し、月収〇〇万円を達成する" style="width:100%;box-sizing:border-box;margin-bottom:10px">${esc(h.goal||'')}</textarea>
+  <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
+    <span id="hz-goal-saved-${div.id}-${period}" style="font-size:12px;color:var(--green);opacity:0;transition:opacity .4s">✅ 保存しました</span>
+    <button class="btn btn-p btn-sm" onclick="saveHorizonGoal('${div.id}','${period}')">💾 保存</button>
   </div>
-  <textarea id="hz-goal-${div.id}-${period}" rows="4" placeholder="例：〇〇を実現し、月収〇〇万円を達成する" style="width:100%;box-sizing:border-box" oninput="autoSaveHorizonGoal('${div.id}','${period}')">${esc(h.goal||'')}</textarea>
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
   ${secTitle('📈 KPI指標')}
@@ -4544,9 +4545,21 @@ function autoSaveHorizonGoal(divId,period){
   const goalEl=document.getElementById('hz-goal-'+divId+'-'+period);
   if(!goalEl)return;
   div.horizons[period].goal=goalEl.value;
-  save(); // renderを呼ばず保存のみ
+  save();
+}
+function saveHorizonGoal(divId,period){
+  const div=S.divisions.find(d=>d.id===divId);
+  if(!div)return;
+  if(!div.horizons)div.horizons={};
+  if(!div.horizons[period])div.horizons[period]={goal:'',kpis:[]};
+  const goalEl=document.getElementById('hz-goal-'+divId+'-'+period);
+  if(!goalEl){toast('入力欄が見つかりません','err');return;}
+  div.horizons[period].goal=goalEl.value;
+  div.horizons[period].updatedAt=today();
+  save();
+  toast('💾 ビジョンを保存しました');
   const indicator=document.getElementById('hz-goal-saved-'+divId+'-'+period);
-  if(indicator){indicator.style.opacity='1';setTimeout(()=>indicator.style.opacity='0',1500);}
+  if(indicator){indicator.style.opacity='1';setTimeout(()=>indicator.style.opacity='0',2000);}
 }
 function saveHorizon(divId,period){
   const div=S.divisions.find(d=>d.id===divId);
@@ -7273,7 +7286,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260601-34';
+const APP_VERSION='20260601-35';
 
 render();
 function forceAppUpdate(){
