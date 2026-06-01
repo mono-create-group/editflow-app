@@ -1362,7 +1362,14 @@ function sheetsDoImport(allJobs){
 
 const LOG_TYPE_LBL={revenue:'💰 収益',sales:'📞 営業',hire:'👤 採用'};
 const GOAL_CATS=[{v:'revenue',l:'💰 収益'},{v:'skill',l:'📚 スキル'},{v:'habit',l:'🔥 習慣'},{v:'project',l:'🎬 案件'},{v:'sales',l:'📞 営業'},{v:'hire',l:'👤 採用'}];
-const GOAL_HORIZONS=[{v:'this_month',l:'今月の目標',icon:'📅'},{v:'next_month',l:'来月の目標',icon:'🗓'},{v:'monthly',l:'月毎の目標',icon:'📆'},{v:'year1',l:'1年間の目標',icon:'🌱'},{v:'year5',l:'5年後の目標',icon:'🚀'},{v:'year10',l:'10年後の目標',icon:'🌟'}];
+const GOAL_HORIZONS=[{v:'this_month',l:'今月の目標',icon:'📅'},{v:'next_month',l:'来月の目標',icon:'🗓'},{v:'monthly',l:'月毎の目標',icon:'📆'},{v:'year1',l:'1年間の目標',icon:'🌱'},{v:'year5',l:'5年後の目標',icon:'🚀'},{v:'year10',l:'10年後の目標',icon:'🌟'},{v:'tree',l:'ツリー表示',icon:'🌳'}];
+// 時間軸の長さ順（短→長）
+const HORIZON_ORDER=['this_month','next_month','monthly','year1','year5','year10'];
+// 上位目標として選べるホライズン（自分より長い時間軸）
+function eligibleParentHorizons(hz){
+  const i=HORIZON_ORDER.indexOf(hz);
+  return i<0?[]:HORIZON_ORDER.slice(i+1);
+}
 const DEFAULT_FS=[
   {id:'f1',s:'07:00',e:'07:15',t:'起床・朝のルーティン',d:'ゴミ捨て・草の水やり・いその水・餌やり・こまめのトイレ・餌やり',c:'#7c3aed'},
   {id:'f2',s:'07:15',e:'07:30',t:'ジャーナリング',d:'',c:'#3b82f6'},
@@ -3574,8 +3581,53 @@ ${secTitle('💪 今日の筋トレメニュー')}
 }
 // ===GOALS===
 function setGV(v){GV=v;render();}
+function rGoalTree(){
+  const all=S.goals.filter(g=>!g.deleted);
+  if(!all.length)return`<div class="empty"><div class="empty-icon">🌳</div><div class="empty-title">目標がありません</div><div style="color:var(--t2)">各タブから目標を追加し、上位目標を設定すると連動します</div></div>`;
+  const HZ_COLOR={'year10':'#7c3aed','year5':'#3b82f6','year1':'#10b981','monthly':'#f59e0b','next_month':'#f59e0b','this_month':'#ef4444'};
+  function getChildren(pid){return all.filter(g=>g.parentGoalId===pid);}
+  function goalPct(g){const ms=g.milestones||[];const d=ms.filter(m=>m.done).length;return ms.length?Math.round(d/ms.length*100):(g.progress||0);}
+  function renderNode(g,depth){
+    const children=getChildren(g.id);
+    const hz=GOAL_HORIZONS.find(h=>h.v===g.horizon)||{icon:'🎯',l:''};
+    const pct=goalPct(g);
+    const col=HZ_COLOR[g.horizon]||'var(--purple)';
+    return`<div style="margin-left:${depth*20}px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--card);border:1px solid var(--border);border-left:3px solid ${col};border-radius:8px;cursor:pointer" onclick="GV='${g.horizon}';render()">
+        <span style="font-size:16px;flex-shrink:0">${hz.icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.title)}</div>
+          <div style="font-size:11px;color:var(--t2);margin-top:1px">${hz.l}${g.deadline?` · 期限:${g.deadline}`:''}</div>
+        </div>
+        <div style="flex-shrink:0;text-align:right">
+          <div style="font-size:12px;font-weight:700;color:${col}">${pct}%</div>
+          ${children.length?`<div style="font-size:10px;color:var(--t2)">${children.length}件連動</div>`:''}
+        </div>
+      </div>
+      ${depth<5?children.map(c=>renderNode(c,depth+1)).join(''):''}
+    </div>`;
+  }
+  // ルート目標（親なし）を長い時間軸から順に並べる
+  const roots=all.filter(g=>!g.parentGoalId).sort((a,b)=>{
+    const ai=HORIZON_ORDER.indexOf(a.horizon||'this_month');
+    const bi=HORIZON_ORDER.indexOf(b.horizon||'this_month');
+    return bi-ai; // 長い順（year10→this_month）
+  });
+  const linkedIds=new Set(all.filter(g=>g.parentGoalId).map(g=>g.id));
+  const unlinkedCount=all.filter(g=>!g.parentGoalId&&HORIZON_ORDER.indexOf(g.horizon||'this_month')<HORIZON_ORDER.length-1).length;
+  return`<div style="font-size:12px;color:var(--t2);margin-bottom:14px;padding:8px 12px;background:var(--card2);border-radius:8px;line-height:1.6">
+  🌳 目標のつながりをツリー形式で確認できます。各目標編集画面で「上位目標」を設定すると連動します。<br>
+  <span style="color:var(--purple)">▸ ルート目標 ${roots.length}件</span> ${unlinkedCount?`<span style="color:var(--amber)">・未連動 ${unlinkedCount}件あり</span>`:'<span style="color:var(--green)">・すべて連動済み ✓</span>'}
+</div>
+${roots.map(g=>renderNode(g,0)).join('')}`;
+}
 function rGoals(){
   const hz=GOAL_HORIZONS.find(h=>h.v===GV)||GOAL_HORIZONS[0];
+  if(GV==='tree'){
+    return`<div class="ph"><div class="ph-title">目標管理</div></div>
+${subTabs(GOAL_HORIZONS.map(h=>[h.v,h.icon+' '+h.l]),GV,'setGV')}
+${rGoalTree()}`;
+  }
   const goals=S.goals.filter(g=>!g.deleted&&(g.horizon||'this_month')===GV);
   const monthlyGrouped=GV==='monthly'?(()=>{
     const months=[...new Set(goals.map(g=>g.targetMonth||today().slice(0,7)))].sort();
@@ -3600,6 +3652,9 @@ function rGoalCard(g){
   const ms=g.milestones||[];
   const donems=ms.filter(m=>m.done).length;
   const pct=ms.length?Math.round(donems/ms.length*100):(g.progress||0);
+  // 親目標・子目標
+  const parentGoal=g.parentGoalId?S.goals.find(pg=>pg.id===g.parentGoalId&&!pg.deleted):null;
+  const childGoals=S.goals.filter(cg=>!cg.deleted&&cg.parentGoalId===g.id);
   const catCol={revenue:'bg',skill:'bb',habit:'ba',project:'bp',sales:'bb',hire:'bp'};
   const catLbl=Object.fromEntries(GOAL_CATS.map(c=>[c.v,c.l]));
   const isRev=g.category==='revenue'||g.targetAmount>0;
@@ -3613,6 +3668,9 @@ function rGoalCard(g){
   const salesPct=isSales?Math.min(100,Math.round(salesWon/g.targetSalesCount*100)):0;
   const hirePct=isHire?Math.min(100,Math.round(hireCount/g.targetHireCount*100)):0;
   return`<div class="goal-item">
+  ${parentGoal?`<div style="font-size:11px;color:var(--t2);margin-bottom:6px;display:flex;align-items:center;gap:4px;cursor:pointer" onclick="GV='${parentGoal.horizon}';render()">
+    <span>↑</span><span style="color:var(--purple)">${GOAL_HORIZONS.find(h=>h.v===parentGoal.horizon)?.icon||''} ${esc(parentGoal.title)}</span><span style="color:var(--t3)">（上位目標）</span>
+  </div>`:''}
   <div class="goal-hdr">
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -3669,6 +3727,15 @@ function rGoalCard(g){
     ${g.woop.plan?`<div><span class="woop-label">計画</span><span class="woop-text"> ${esc(g.woop.plan)}</span></div>`:''}
   </div>`:''}
   ${g.description?`<div style="font-size:13px;color:var(--t2);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">${esc(g.description)}</div>`:''}
+  ${childGoals.length?`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+    <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:5px">↓ 連動している下位目標 (${childGoals.length})</div>
+    ${childGoals.map(cg=>{const chz=GOAL_HORIZONS.find(h=>h.v===cg.horizon)||{icon:'🎯'};const cms=cg.milestones||[];const cpct=cms.length?Math.round(cms.filter(m=>m.done).length/cms.length*100):(cg.progress||0);
+    return`<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--card2);border-radius:6px;margin-bottom:3px;cursor:pointer" onclick="GV='${cg.horizon}';render()">
+      <span style="font-size:13px">${chz.icon}</span>
+      <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cg.title)}</span>
+      <span style="font-size:11px;color:var(--t2)">${cpct}%</span>
+    </div>`;}).join('')}
+  </div>`:''}
 </div>`;
 }
 // ===JOURNAL===
@@ -5870,11 +5937,14 @@ function openGoalModal(id,defaultHorizon){
   const ms=g?.milestones||[];
   const gcat=g?.category||'';
   const ghz=g?.horizon||defaultHorizon||GV||'this_month';
+  // 上位目標の候補（より長い時間軸の目標）
+  const parentHzs=eligibleParentHorizons(ghz);
+  const parentCandidates=S.goals.filter(pg=>!pg.deleted&&parentHzs.includes(pg.horizon)&&pg.id!==id);
   openModalLg(`<div class="mhdr"><div class="mtitle">${g?'目標編集':'目標追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
 <div class="frow">
   <div class="fg"><div class="fl">時間軸</div>
     <select id="g-hz" onchange="updGoalHzFields()">
-      ${GOAL_HORIZONS.map(h=>`<option value="${h.v}" ${ghz===h.v?'selected':''}>${h.icon} ${h.l}</option>`).join('')}
+      ${GOAL_HORIZONS.filter(h=>h.v!=='tree').map(h=>`<option value="${h.v}" ${ghz===h.v?'selected':''}>${h.icon} ${h.l}</option>`).join('')}
     </select>
   </div>
   <div class="fg" id="g-target-month-row" ${ghz!=='monthly'?'style="display:none"':''}>
@@ -5883,6 +5953,13 @@ function openGoalModal(id,defaultHorizon){
   </div>
 </div>
 <div class="fg"><div class="fl">目標タイトル *</div><input id="g-ttl" value="${esc(g?.title||'')}" placeholder="例: 月収50万円達成"></div>
+<div class="fg" id="g-parent-row" ${!parentCandidates.length?'style="display:none"':''}>
+  <div class="fl">↑ 上位目標（この目標が貢献する長期目標）</div>
+  <select id="g-parent">
+    <option value="">なし</option>
+    ${parentCandidates.map(p=>{const phz=GOAL_HORIZONS.find(h=>h.v===p.horizon)||{};return`<option value="${p.id}" ${g?.parentGoalId===p.id?'selected':''}>${phz.icon||''} ${esc(p.title)}</option>`;}).join('')}
+  </select>
+</div>
 <div class="frow">
   <div class="fg"><div class="fl">カテゴリ</div>
     <select id="g-cat" onchange="updGoalCatFields()">
@@ -5946,7 +6023,8 @@ function saveGoal(){
   const ms=[...document.querySelectorAll('#ms-cont > div')].map(row=>({title:row.querySelector('.ms-inp')?.value.trim()||'',targetAmount:parseInt(row.querySelector('.ms-amt')?.value)||0,deadline:row.querySelector('.ms-dl')?.value||null,done:false})).filter(m=>m.title);
   const woop={outcome:document.getElementById('g-outcome')?.value.trim(),obstacle:document.getElementById('g-obstacle')?.value.trim(),plan:document.getElementById('g-plan')?.value.trim()};
   const hz=document.getElementById('g-hz')?.value||'this_month';
-  const data={title,horizon:hz,targetMonth:hz==='monthly'?(document.getElementById('g-target-month')?.value||today().slice(0,7)):null,category:document.getElementById('g-cat').value,deadline:document.getElementById('g-dl').value||null,targetAmount:parseInt(document.getElementById('g-amt')?.value)||0,targetSalesCount:parseInt(document.getElementById('g-sales-cnt')?.value)||0,targetHireCount:parseInt(document.getElementById('g-hire-cnt')?.value)||0,description:document.getElementById('g-desc').value.trim(),woop,milestones:ms};
+  const parentGoalId=document.getElementById('g-parent')?.value||null;
+  const data={title,horizon:hz,targetMonth:hz==='monthly'?(document.getElementById('g-target-month')?.value||today().slice(0,7)):null,category:document.getElementById('g-cat').value,deadline:document.getElementById('g-dl').value||null,targetAmount:parseInt(document.getElementById('g-amt')?.value)||0,targetSalesCount:parseInt(document.getElementById('g-sales-cnt')?.value)||0,targetHireCount:parseInt(document.getElementById('g-hire-cnt')?.value)||0,description:document.getElementById('g-desc').value.trim(),woop,milestones:ms,parentGoalId};
   if(EID){const g=S.goals.find(g=>g.id===EID);if(g){const oldMs=g.milestones||[];data.milestones=ms.map((m,i)=>({...m,done:oldMs[i]?.done||false}));Object.assign(g,data);}}
   else S.goals.push({id:uid(),...data,progress:0,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('目標を保存しました 🎯');
@@ -7018,7 +7096,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260529-31';
+const APP_VERSION='20260601-32';
 
 render();
 function forceAppUpdate(){
