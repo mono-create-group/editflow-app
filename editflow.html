@@ -6296,6 +6296,7 @@ function openTaskModal(id,preDate,withTime){
       <input type="time" class="ts-start" id="t-start" value="${t?.startTime||withTime||''}" style="flex:1">
       <span style="color:var(--t2);font-size:12px">〜</span>
       <input type="time" class="ts-end" id="t-end" value="${t?.endTime||''}" style="flex:1">
+      <button class="btn btn-g btn-xs" onclick="document.getElementById('t-start').value='';document.getElementById('t-end').value=''" style="flex-shrink:0" title="時間をクリア">✕</button>
     </div>
     ${(t?.timeSlots||[]).map((sl,si)=>`<div class="ts-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
       <span style="font-size:10px;color:var(--purple);font-weight:700;flex-shrink:0;min-width:16px">${['②','③','④','⑤','⑥'][si]||'●'}</span>
@@ -6320,7 +6321,6 @@ function openTaskModal(id,preDate,withTime){
   <button class="btn btn-p" onclick="saveTask()">保存</button>
 </div>`);
   document.getElementById('t-ttl')?.focus();
-  if(withTime){document.getElementById('t-start').value=mToT(Math.round((new Date().getHours()*60+new Date().getMinutes())/30)*30);}
 }
 function addTimeSlot(){
   const cont=document.getElementById('timeslot-cont');
@@ -7965,7 +7965,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-59';
+const APP_VERSION='20260602-60';
 
 render();
 function forceAppUpdate(){
