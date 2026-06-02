@@ -2474,10 +2474,10 @@ function fsDashPanelDrop(e,date){
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
   if(!t){_taskDragId=null;return;}
-  // パネルに戻したらスケジュール割り当てを解除・日付を設定
-  delete t.fsBlockId;delete t.fsSlot;
+  // ブロックに割り当て済みタスクはパネルへのドロップで変更しない（並び替え中の誤操作防止）
+  if(t.fsBlockId){_taskDragId=null;return;}
   if(date)t.dueDate=date;
-  save();render();toast('📋 スケジュール割り当てを解除しました');
+  save();render();
   _taskDragId=null;
 }
 
@@ -2854,9 +2854,31 @@ function schedSideDrop(e,date){
   _schedDragId=null;
 }
 // ===TASK LIST D&D===
-let _taskDragId=null;
-function taskDragStart(e,id){_taskDragId=id;e.dataTransfer.effectAllowed='move';e.currentTarget.classList.add('dragging');}
-function taskDragEnd(e){e.currentTarget.classList.remove('dragging');document.querySelectorAll('.task-item.drag-over,.fs-drop-zone.fs-drag-over').forEach(el=>el.classList.remove('drag-over','fs-drag-over'));}
+let _taskDragId=null,_taskDragSnap=null;
+function taskDragStart(e,id){
+  _taskDragId=id;
+  const t=S.tasks.find(t=>t.id===id);
+  _taskDragSnap=t?{fsBlockId:t.fsBlockId,fsSlot:t.fsSlot,dueDate:t.dueDate,startTime:t.startTime}:null;
+  e.dataTransfer.effectAllowed='move';
+  e.currentTarget.classList.add('dragging');
+}
+function taskDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.task-item.drag-over,.fs-drop-zone.fs-drag-over').forEach(el=>el.classList.remove('drag-over','fs-drag-over'));
+  // dropハンドラが正常処理した場合は_taskDragId=nullになっているので何もしない
+  // ドロップが未処理（キャンセル等）の場合は元の状態に戻す
+  if(_taskDragId&&_taskDragSnap){
+    const t=S.tasks.find(t=>t.id===_taskDragId);
+    if(t){
+      t.fsBlockId=_taskDragSnap.fsBlockId;
+      t.fsSlot=_taskDragSnap.fsSlot;
+      t.dueDate=_taskDragSnap.dueDate;
+      t.startTime=_taskDragSnap.startTime;
+      save();render();
+    }
+  }
+  _taskDragId=null;_taskDragSnap=null;
+}
 function fsBlockDragOver(e,i){e.preventDefault();e.stopPropagation();document.getElementById('fs-block-'+i)?.classList.add('fs-drag-over');}
 function fsBlockDragLeave(e,i){document.getElementById('fs-block-'+i)?.classList.remove('fs-drag-over');}
 function fsBlockDrop(e,startTime,blockId,i,date){
@@ -6400,11 +6422,17 @@ function fsInternalDrop(e,blockId,slot,date,startTime){
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
   if(!t){_taskDragId=null;return;}
+  const wasUnassigned=!t.fsBlockId;
   t.fsBlockId=blockId;
   t.fsSlot=slot;
-  if(date)t.dueDate=date;
-  if(startTime&&startTime!=='-1')t.startTime=startTime;
-  save();render();toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
+  if(wasUnassigned){
+    // パネルからの新規割り当て: 日付とstartTimeを設定
+    if(date)t.dueDate=date;
+    if(startTime&&startTime!=='-1')t.startTime=startTime;
+    toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
+  }
+  // ブロック内タスクの場合はスロット位置変更のみ（日付・startTimeは変更しない）
+  save();render();
   _taskDragId=null;
 }
 function fsInternalDragOver(e){e.preventDefault();e.currentTarget?.classList.add('fs-dz-over');}
@@ -7969,7 +7997,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-62';
+const APP_VERSION='20260602-63';
 
 render();
 function forceAppUpdate(){
