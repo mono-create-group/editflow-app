@@ -3863,6 +3863,88 @@ function rUnifiedHorizonTab(div,tabDef){
 </div>`;
   }
 
+  // ===今月専用: 1年後の目標から今月必要数値を算出===
+  let monthlyCtx='';
+  if(tabDef.v==='this_month'){
+    const year1Goals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='year1'&&(!g.divisionId||g.divisionId===(div?.id||null)));
+    const now=new Date(td);
+    // 残り月数（今月を含む）
+    const endOfYear=g=>g.deadline?new Date(g.deadline):new Date(now.getFullYear(),11,31);
+    const monthsLeft=g=>{
+      const end=endOfYear(g);
+      return Math.max(1,Math.round((end-new Date(now.getFullYear(),now.getMonth(),1))/(1000*60*60*24*30.44)));
+    };
+    const thisM=td.slice(0,7);
+    const monthlyRows=year1Goals.map(g=>{
+      const icon=GOAL_CATS.find(c=>c.v===g.category)?.l.split(' ')[0]||'🌱';
+      const ml=monthsLeft(g);
+      const isRev=(g.category==='revenue'||g.targetAmount>0)&&g.targetAmount>0;
+      const isSales=g.category==='sales'&&g.targetSalesCount>0;
+      const isHire=g.category==='hire'&&g.targetHireCount>0;
+      let target,current,unit,monthlyNeed,pct;
+      if(isRev){
+        const rs=revGoalStats(g);
+        target=g.targetAmount;current=rs.earned;unit='円';
+        pct=rs.pct;monthlyNeed=Math.ceil(rs.remaining/ml);
+      }else if(isSales){
+        const won=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.result==='成約').length;
+        target=g.targetSalesCount;current=won;unit='件';
+        pct=Math.min(100,Math.round(won/target*100));
+        monthlyNeed=Math.ceil(Math.max(0,target-won)/ml);
+      }else if(isHire){
+        const hired=S.logs.filter(l=>!l.deleted&&l.type==='hire'&&l.result==='内定').length;
+        target=g.targetHireCount;current=hired;unit='人';
+        pct=Math.min(100,Math.round(hired/target*100));
+        monthlyNeed=Math.ceil(Math.max(0,target-hired)/ml);
+      }else{
+        target=100;current=g.progress||0;unit='%';
+        pct=g.progress||0;
+        monthlyNeed=Math.ceil(Math.max(0,100-pct)/ml);
+      }
+      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+      const bc=col==='green'?'bg':col==='blue'?'bb':col==='amber'?'ba':'br';
+      const fmtVal=v=>isRev?`¥${v.toLocaleString()}`:v.toLocaleString()+unit;
+      return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">${icon}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;color:var(--t2);margin-bottom:1px">🌱 1年後の目標</div>
+      <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.title)}</div>
+    </div>
+    <span class="badge ${bc}" style="flex-shrink:0">${pct}%</span>
+  </div>
+  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
+    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px;transition:width .4s"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);margin-bottom:2px;font-size:11px">年間目標</div>
+      <div style="font-weight:700;font-size:13px">${fmtVal(target)}</div>
+    </div>
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);margin-bottom:2px;font-size:11px">現状累計</div>
+      <div style="font-weight:700;font-size:13px;color:var(--${col})">${fmtVal(current)}</div>
+    </div>
+    <div style="background:${monthlyNeed>0?'linear-gradient(135deg,#3b82f618,#7c3aed12)':'var(--gdim)'};padding:7px 4px;border-radius:6px;border:1px solid ${monthlyNeed>0?'var(--blue)':'var(--green)'}">
+      <div style="color:var(--t2);margin-bottom:2px;font-size:11px">今月必要</div>
+      <div style="font-weight:800;font-size:13px;color:${monthlyNeed>0?'var(--blue)':'var(--green)'}">${monthlyNeed>0?fmtVal(monthlyNeed):'達成済✓'}</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin-top:6px;text-align:right">残り約${ml}ヶ月${g.deadline?` (期限: ${g.deadline})`:'（年末まで）'}</div>
+</div>`;
+    });
+    monthlyCtx=`<div style="margin-bottom:14px">
+  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">🌱 今月必要な目標数値（1年後の目標より）</div>
+  ${monthlyRows.length
+    ?monthlyRows.join('')
+    :`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px">
+      <div style="font-size:24px;margin-bottom:6px">🌱</div>
+      1年後タブで目標を追加すると<br>今月必要な数値が自動計算されます
+    </div>`}
+  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='year1';render()">1年後の目標を管理 →</button>
+</div>`;
+  }
+
   // ===目標カードセクション===
   let goalsSection='';
   if(tabDef.goals){
@@ -3934,7 +4016,7 @@ ${kpiRows}
 </div>`;
   }
 
-  return weeklyCtx+goalsSection+kpiSection;
+  return weeklyCtx+monthlyCtx+goalsSection+kpiSection;
 }
 function rGoalCard(g){
   const ms=g.milestones||[];
@@ -7465,7 +7547,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-40';
+const APP_VERSION='20260602-41';
 
 render();
 function forceAppUpdate(){
