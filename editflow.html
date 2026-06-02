@@ -2373,18 +2373,40 @@ function rFixedScheduleList(compact=false,droppable=false){
   if(!fs.length)return'';
   const now=new Date();
   const nowM=now.getHours()*60+now.getMinutes();
+  const td=today();
   return fs.map((f,i)=>{
     const sm=tMin(f.s);
     const em=tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e);
     const isNow=nowM>=sm&&nowM<em;
     const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}',${i})" id="fs-block-${i}"`:'';
-    return`<div class="task-item fs-drop-zone" ${dropAttrs} style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'18;':''};margin-bottom:5px;transition:background .15s">
-  <div style="font-size:11px;color:var(--t3);flex-shrink:0;min-width:88px;padding-top:1px">${f.s}〜${f.e}</div>
-  <div class="task-body" style="min-width:0">
-    <div class="task-ttl" style="${isNow?'color:'+f.c+';font-weight:700':'font-weight:500'}">${isNow?'▶ ':''}${esc(f.t)}</div>
-    ${!compact&&f.d?`<div style="font-size:11px;color:var(--t2);margin-top:2px;word-break:break-all">${esc(f.d)}</div>`:''}
+    // このブロックの時間帯に割り当てられた今日のタスク
+    const blockTasks=droppable?(S.tasks||[]).filter(t=>{
+      if(t.deleted||t.done)return false;
+      if(t.dueDate&&t.dueDate!==td)return false;
+      if(!t.startTime)return false;
+      const tm=tMin(t.startTime);
+      return tm>=sm&&tm<em;
+    }):[];
+    const taskRows=blockTasks.map(t=>`<div style="display:flex;align-items:center;gap:7px;padding:5px 8px;margin-top:4px;background:var(--card2);border-radius:8px;border-left:2px solid ${f.c}">
+  <div class="chk ${t.done?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleDone('${t.id}')"></div>
+  <div style="flex:1;min-width:0;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
+  <span style="font-size:10px;color:var(--t3);flex-shrink:0">${t.startTime||''}</span>
+  <button class="tact" style="padding:2px 5px;font-size:11px;opacity:.7" onclick="openTaskModal('${t.id}')">✏️</button>
+  <button class="tact del" style="padding:2px 5px;font-size:11px;opacity:.7" onclick="delTask('${t.id}')">🗑</button>
+</div>`).join('');
+    return`<div class="task-item fs-drop-zone" ${dropAttrs} style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'12;':''};margin-bottom:6px;transition:background .15s;flex-direction:column;align-items:stretch;gap:0;padding:10px 14px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="font-size:11px;color:var(--t3);flex-shrink:0;min-width:88px">${f.s}〜${f.e}</div>
+    <div style="flex:1;min-width:0">
+      <div class="task-ttl" style="${isNow?'color:'+f.c+';font-weight:700':'font-weight:600'}">${isNow?'▶ ':''}${esc(f.t)}</div>
+      ${!compact&&f.d?`<div style="font-size:11px;color:var(--t2);margin-top:1px;word-break:break-all">${esc(f.d)}</div>`:''}
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      ${isNow?`<span style="font-size:10px;background:${f.c}20;color:${f.c};border:1px solid ${f.c}40;border-radius:99px;padding:2px 8px;font-weight:700">進行中</span>`:''}
+      ${droppable?`<button class="btn btn-xs" style="background:${f.c}15;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700" onclick="openTaskModal(null,'${td}','${f.s}')">＋ タスク</button>`:''}
+    </div>
   </div>
-  ${isNow?`<span style="font-size:10px;background:${f.c}30;color:${f.c};border-radius:99px;padding:2px 8px;flex-shrink:0;font-weight:700">進行中</span>`:''}
+  ${taskRows?`<div style="margin-top:2px">${taskRows}</div>`:''}
 </div>`;
   }).join('');
 }
@@ -6162,7 +6184,7 @@ function openTaskModal(id,preDate,withTime){
   </div>
 </div>
 <div class="frow">
-  <div class="fg"><div class="fl">開始時間</div><input type="time" id="t-start" value="${t?.startTime||''}"></div>
+  <div class="fg"><div class="fl">開始時間</div><input type="time" id="t-start" value="${t?.startTime||withTime||''}"></div>
   <div class="fg"><div class="fl">終了時間</div><input type="time" id="t-end" value="${t?.endTime||''}"></div>
 </div>
 <div class="fg"><div class="fl">見積時間（分）</div>
@@ -7773,7 +7795,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-45';
+const APP_VERSION='20260602-46';
 
 render();
 function forceAppUpdate(){
