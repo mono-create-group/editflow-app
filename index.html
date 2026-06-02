@@ -4016,7 +4016,193 @@ ${kpiRows}
 </div>`;
   }
 
-  return weeklyCtx+monthlyCtx+goalsSection+kpiSection;
+  // ===来月: 3ヶ月後のKPIから今月必要数値を算出===
+  let nextMonthCtx='';
+  if(tabDef.v==='next_month'){
+    const now=new Date(td);
+    const nm=new Date(now.getFullYear(),now.getMonth()+1,1);
+    const nmEnd=new Date(now.getFullYear(),now.getMonth()+2,0);
+    const nmStr=`${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}`;
+    // 3ヶ月後のKPIを取得
+    const kpi3m=div?(div.horizons?.['3m']?.kpis||[]):[];
+    // すでに達成した数値（ログ・完了案件から）
+    const {sales:salesNow,hires:hiresNow,profit:profitNow}=getAchievements(null,td);
+    // 3ヶ月後まで残り月数（来月から3ヶ月後 ≈ 2ヶ月）
+    const monthsTo3m=Math.max(1,3);
+    const neededRows=kpi3m.map(k=>{
+      const alreadyDone=k.current||0;
+      const remaining=Math.max(0,(k.target||0)-alreadyDone);
+      const monthlyNeed=Math.ceil(remaining/monthsTo3m);
+      const pct=k.target>0?Math.min(100,Math.round(alreadyDone/k.target*100)):0;
+      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+      return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <div style="flex:1;font-weight:700;font-size:13px">${esc(k.title)}</div>
+    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}">${pct}%</span>
+  </div>
+  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
+    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">3ヶ月後目標</div>
+      <div style="font-weight:700">${(k.target||0).toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">達成済</div>
+      <div style="font-weight:700;color:var(--${col})">${alreadyDone.toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#3b82f618,#7c3aed12);padding:7px 4px;border-radius:6px;border:1px solid var(--blue)">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">来月必要</div>
+      <div style="font-weight:800;color:var(--blue)">${monthlyNeed.toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+  </div>
+</div>`;
+    });
+    nextMonthCtx=`<div style="margin-bottom:14px">
+  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">🗒 来月必要な目標数値（3ヶ月後KPIより）</div>
+  ${neededRows.length?neededRows.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">🗒</div>3ヶ月後タブにKPIを追加すると自動計算されます</div>`}
+  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='3m';render()">3ヶ月後のKPIを管理 →</button>
+</div>
+${rAchievementBox(nmStr+'-01',nmEnd.toISOString().slice(0,10),'来月')}`;
+  }
+
+  // ===3ヶ月後: 1年後の目標から月次必要数値を算出===
+  let q3Ctx='';
+  if(tabDef.v==='3m'){
+    const now=new Date(td);
+    const dt3m=new Date(now.getFullYear(),now.getMonth()+3,0);
+    const monthsLeft3m=Math.max(1,Math.round((dt3m-now)/(1000*60*60*24*30.44)));
+    const year1Goals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='year1'&&(!g.divisionId||g.divisionId===(div?.id||null)));
+    const thisM=td.slice(0,7);
+    const neededRows=year1Goals.map(g=>{
+      const icon=GOAL_CATS.find(c=>c.v===g.category)?.l.split(' ')[0]||'🌱';
+      const isRev=(g.category==='revenue'||g.targetAmount>0)&&g.targetAmount>0;
+      const isSales=g.category==='sales'&&g.targetSalesCount>0;
+      const isHire=g.category==='hire'&&g.targetHireCount>0;
+      let target,current,unit,monthlyNeed,pct;
+      if(isRev){
+        const rs=revGoalStats(g);
+        target=g.targetAmount;current=rs.earned;unit='円';
+        pct=rs.pct;monthlyNeed=Math.ceil(rs.remaining/monthsLeft3m);
+      }else if(isSales){
+        const won=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.result==='成約').length;
+        target=g.targetSalesCount;current=won;unit='件';
+        pct=Math.min(100,Math.round(won/target*100));
+        monthlyNeed=Math.ceil(Math.max(0,target-won)/monthsLeft3m);
+      }else if(isHire){
+        const hired=S.logs.filter(l=>!l.deleted&&l.type==='hire'&&l.result==='内定').length;
+        target=g.targetHireCount;current=hired;unit='人';
+        pct=Math.min(100,Math.round(hired/target*100));
+        monthlyNeed=Math.ceil(Math.max(0,target-hired)/monthsLeft3m);
+      }else{
+        target=100;current=g.progress||0;unit='%';
+        pct=g.progress||0;monthlyNeed=Math.ceil(Math.max(0,100-pct)/monthsLeft3m);
+      }
+      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+      const bc=col==='green'?'bg':col==='blue'?'bb':col==='amber'?'ba':'br';
+      const fmtV=v=>isRev?`¥${v.toLocaleString()}`:v.toLocaleString()+unit;
+      return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">${icon}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;color:var(--t2);margin-bottom:1px">🌱 1年後の目標</div>
+      <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.title)}</div>
+    </div>
+    <span class="badge ${bc}">${pct}%</span>
+  </div>
+  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
+    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">年間目標</div>
+      <div style="font-weight:700">${fmtV(target)}</div>
+    </div>
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">累計達成</div>
+      <div style="font-weight:700;color:var(--${col})">${fmtV(current)}</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#3b82f618,#7c3aed12);padding:7px 4px;border-radius:6px;border:1px solid var(--blue)">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">月次必要</div>
+      <div style="font-weight:800;color:var(--blue)">${monthlyNeed>0?fmtV(monthlyNeed):'達成済✓'}</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin-top:6px;text-align:right">3ヶ月後まで約${monthsLeft3m}ヶ月</div>
+</div>`;
+    });
+    // 直近3ヶ月の達成実績
+    const dt3mAgo=new Date(now.getFullYear(),now.getMonth()-2,1);
+    const from3m=`${dt3mAgo.getFullYear()}-${String(dt3mAgo.getMonth()+1).padStart(2,'0')}-01`;
+    q3Ctx=`<div style="margin-bottom:14px">
+  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">🌱 月次必要な目標数値（1年後の目標より）</div>
+  ${neededRows.length?neededRows.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">🌱</div>1年後タブで目標を追加すると自動計算されます</div>`}
+  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='year1';render()">1年後の目標を管理 →</button>
+</div>
+${rAchievementBox(from3m,td,'直近3ヶ月')}`;
+  }
+
+  // ===達成実績ボックス（今週・今月・1年後タブ）===
+  let achieveBox='';
+  if(tabDef.v==='1w'){
+    const week=getWeekRange();
+    achieveBox=rAchievementBox(week.from,week.to,'今週');
+  } else if(tabDef.v==='this_month'){
+    const mStart=td.slice(0,7)+'-01';
+    const now2=new Date(td);
+    const mEnd=new Date(now2.getFullYear(),now2.getMonth()+1,0).toISOString().slice(0,10);
+    achieveBox=rAchievementBox(mStart,mEnd,'今月');
+  } else if(tabDef.v==='year1'){
+    const yStart=td.slice(0,4)+'-01-01';
+    const yEnd=td.slice(0,4)+'-12-31';
+    achieveBox=rAchievementBox(yStart,yEnd,'今年');
+  }
+
+  return weeklyCtx+monthlyCtx+nextMonthCtx+q3Ctx+achieveBox+goalsSection+kpiSection;
+}
+
+// ===達成実績ヘルパー===
+function getWeekRange(){
+  const now=new Date();
+  const day=now.getDay();
+  const mon=new Date(now);
+  mon.setDate(now.getDate()-(day===0?6:day-1));
+  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  return{from:mon.toISOString().slice(0,10),to:sun.toISOString().slice(0,10)};
+}
+function getAchievements(from,to){
+  const inRange=d=>d&&(!from||d>=from)&&(!to||d<=to);
+  const sales=(S.logs||[]).filter(l=>!l.deleted&&l.type==='sales'&&l.result==='成約'&&inRange(l.date)).length;
+  const hires=(S.logs||[]).filter(l=>!l.deleted&&l.type==='hire'&&l.result==='内定'&&inRange(l.date)).length;
+  const profit=(S.jobs||[]).filter(j=>!j.deleted&&j.status==='完了'&&inRange(j.deliveryDate)).reduce((s,j)=>s+jobProfit(j),0);
+  return{sales,hires,profit};
+}
+function rAchievementBox(from,to,label){
+  const{sales,hires,profit}=getAchievements(from,to);
+  if(!sales&&!hires&&!profit)return`<div class="card" style="margin-bottom:14px;padding:12px 16px">
+  <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:6px">📊 ${label}の達成実績</div>
+  <div style="font-size:12px;color:var(--t3)">まだ実績がありません</div>
+</div>`;
+  return`<div class="card" style="margin-bottom:14px;padding:12px 16px">
+  <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px">📊 ${label}の達成実績</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+    <div style="background:var(--card2);padding:8px 4px;border-radius:8px">
+      <div style="font-size:10px;color:var(--t2);margin-bottom:3px">📞 営業獲得</div>
+      <div style="font-size:18px;font-weight:800;color:var(--blue)">${sales}</div>
+      <div style="font-size:10px;color:var(--t3)">件</div>
+    </div>
+    <div style="background:var(--card2);padding:8px 4px;border-radius:8px">
+      <div style="font-size:10px;color:var(--t2);margin-bottom:3px">👤 採用</div>
+      <div style="font-size:18px;font-weight:800;color:var(--purple)">${hires}</div>
+      <div style="font-size:10px;color:var(--t3)">人</div>
+    </div>
+    <div style="background:var(--card2);padding:8px 4px;border-radius:8px">
+      <div style="font-size:10px;color:var(--t2);margin-bottom:3px">💰 利益(完了)</div>
+      <div style="font-size:16px;font-weight:800;color:var(--green)">¥${profit.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--t3)">完了案件</div>
+    </div>
+  </div>
+</div>`;
 }
 function rGoalCard(g){
   const ms=g.milestones||[];
@@ -7547,7 +7733,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-41';
+const APP_VERSION='20260602-42';
 
 render();
 function forceAppUpdate(){
