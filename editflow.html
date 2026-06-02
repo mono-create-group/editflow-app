@@ -2895,7 +2895,8 @@ function fsBlockDrop(e,startTime,blockId,i,date){
   if(t.fsBlockId){_taskDragId=null;_wdayDragId=null;return;}
   if(startTime)t.startTime=startTime;
   t.fsBlockId=blockId;
-  t.dueDate=date||today();
+  // dueDateが未設定の場合のみ日付をセット（既存のdueDateは保持）
+  if(!t.dueDate)t.dueDate=date||today();
   save();render();toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
   _taskDragId=null;_wdayDragId=null;
 }
@@ -6416,7 +6417,7 @@ function openFsTaskModal(blockId,slot,startTime,date){
   window._fsPendingSlot=slot;
   openTaskModal(null,date,startTime);
 }
-// 固定スケジュール内のドラッグドロップ（スロット移動・並び替え）
+// 固定スケジュール内のドラッグドロップ（スロット移動・並び替え・ブロック間移動）
 function fsInternalDrop(e,blockId,slot,date,startTime){
   e.preventDefault();e.stopPropagation();
   e.currentTarget?.classList.remove('fs-dz-over');
@@ -6424,9 +6425,8 @@ function fsInternalDrop(e,blockId,slot,date,startTime){
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
   if(!t){_taskDragId=null;return;}
-  // 別ブロックに既に割り当て済みのタスクはドロップゾーン経由の移動を禁止
-  if(t.fsBlockId&&t.fsBlockId!==blockId){_taskDragId=null;return;}
   const wasUnassigned=!t.fsBlockId;
+  const isSameBlock=t.fsBlockId===blockId;
   t.fsBlockId=blockId;
   t.fsSlot=slot;
   if(wasUnassigned){
@@ -6434,7 +6434,7 @@ function fsInternalDrop(e,blockId,slot,date,startTime){
     if(date)t.dueDate=date;
     if(startTime&&startTime!=='-1')t.startTime=startTime;
     toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
-  } else {
+  } else if(isSameBlock){
     // 同ブロック内並び替え: S.tasks内の順序も更新
     const from=S.tasks.findIndex(t2=>t2.id===id);
     if(from>=0){
@@ -6455,6 +6455,7 @@ function fsInternalDrop(e,blockId,slot,date,startTime){
       }
     }
   }
+  // 別ブロックへの意図的な移動: fsBlockIdのみ更新、dueDate/startTimeは変えない
   save();render();
   _taskDragId=null;
 }
@@ -8020,7 +8021,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-64';
+const APP_VERSION='20260602-65';
 
 render();
 function forceAppUpdate(){
