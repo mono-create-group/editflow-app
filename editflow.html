@@ -2634,7 +2634,8 @@ function rTaskItem(t,draggable=false){
     ${t.description?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(t.description)}</div>`:''}
     <div class="task-meta">
       ${t.dueDate?`<span class="badge ${isOver?'br':urgCls(t.dueDate)==='soon'?'ba':'bk'}">📅 ${fmt(t.dueDate)}</span>`:''}
-      ${t.startTime?`<span class="badge bb">🕐 ${t.startTime}${t.endTime?'〜'+t.endTime:''}</span>`:''}
+      ${t.startTime?`<span class="badge bb">🕐 ${t.startTime}${t.endTime?'〜'+t.endTime:''}${(t.timeSlots?.length)?` <span style="font-size:9px;opacity:.7">1/${t.timeSlots.length+1}</span>`:''}</span>`:''}
+      ${(t.timeSlots||[]).map((sl,i)=>sl.s?`<span class="badge bb">🕐 ${sl.s}${sl.e?'〜'+sl.e:''} <span style="font-size:9px;opacity:.7">${i+2}/${t.timeSlots.length+1}</span></span>`:'').join('')}
       ${t.priority?`<span class="badge ${pmap[t.priority]}">${plbl[t.priority]}</span>`:''}
       ${stot?`<span class="badge bb">☑ ${sdone}/${stot}</span>`:''}
       ${(t.procCount||0)>0?`<span class="proc-count">⏭ ${t.procCount}回後回し</span>`:''}
@@ -2729,8 +2730,15 @@ function rTasksSchedule(){
       <div class="fixed-blk-title" style="color:${f.c}">${esc(f.t)}</div>
       <div class="fixed-blk-time">${f.s}〜${f.e}</div>
     </div>`;}).join('');
-  // タスクブロックデータ
-  const taskBlkData=tasks.map(t=>({id:t.id,isSubtask:false,sm:tMin(t.startTime),em:t.endTime?tMin(t.endTime):tMin(t.startTime)+60,task:t,sub:null,subIdx:-1}));
+  // タスクブロックデータ（複数時間帯対応）
+  const taskBlkData=[];
+  tasks.forEach(t=>{
+    taskBlkData.push({id:t.id,isSubtask:false,isSlot:false,slotIdx:0,sm:tMin(t.startTime),em:t.endTime?tMin(t.endTime):tMin(t.startTime)+60,task:t,sub:null,subIdx:-1});
+    (t.timeSlots||[]).forEach((sl,si)=>{
+      if(!sl.s)return;
+      taskBlkData.push({id:`${t.id}::ts${si+1}`,isSubtask:false,isSlot:true,slotIdx:si+1,sm:tMin(sl.s),em:sl.e?tMin(sl.e):tMin(sl.s)+60,task:t,sub:null,subIdx:-1});
+    });
+  });
   // サブタスクブロックデータ（startTimeを持つもの）
   const subBlkData=[];
   S.tasks.filter(t=>!t.deleted&&(t.dueDate===d||(!t.dueDate&&isToday))).forEach(t=>{
@@ -2744,12 +2752,13 @@ function rTasksSchedule(){
   const colEnds=[];
   allBlks.forEach(b=>{let c=colEnds.findIndex(e=>e<=b.sm);if(c<0)c=colEnds.length;colEnds[c]=b.em;b.col=c;});
   allBlks.forEach(b=>{const ov=allBlks.filter(b2=>b2.sm<b.em&&b2.em>b.sm);b.numCols=Math.max(...ov.map(b2=>b2.col+1));});
-  const taskBlocks=allBlks.map(({id,isSubtask,sm,em,col,numCols,task:t,sub:s,subIdx})=>{
+  const taskBlocks=allBlks.map(({id,isSubtask,isSlot,slotIdx,sm,em,col,numCols,task:t,sub:s,subIdx})=>{
     const top=mPos(sm),h=Math.max(20,(em-sm)*PPM);
     const colW=44/numCols;
     const left=52+col*colW;
     const right=100-(left+colW)+0.5;
     const isOverlap=numCols>1;
+    const totalSlots=(t.timeSlots?.length||0)+1;
     if(isSubtask){
       return`<div class="task-blk sub-blk${s.done?' done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
         style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute"
@@ -2762,14 +2771,27 @@ function rTasksSchedule(){
         ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
       </div>`;
     }
+    if(isSlot){
+      return`<div class="task-blk${t.done?' done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
+        style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute;border-left:3px dashed rgba(255,255,255,.5)"
+        ondragstart="schedDragStart(event,'${id}')"
+        title="${esc(t.title)} (${slotIdx+1}/${totalSlots}回目)">
+        <div style="overflow:hidden;flex:1">
+          <div style="font-size:9px;opacity:.75;margin-bottom:1px">${slotIdx+1}/${totalSlots}回目</div>
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(t.title)}</div>
+        </div>
+        ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
+      </div>`;
+    }
     return`<div class="task-blk ${t.done?'done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
       style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute"
       ondblclick="event.stopPropagation();delTask('${t.id}')"
       ondragstart="schedDragStart(event,'${t.id}')"
-      title="${esc(t.title)}${isOverlap?` ⚡ ${numCols}件重複`:''} (ダブルクリックで削除)">
-      <span onclick="openTaskModal('${t.id}')" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isOverlap?'⚡ ':''}${esc(t.title)}</span>
+      title="${esc(t.title)}${totalSlots>1?` (${totalSlots}回に分割)`:''}${isOverlap?` ⚡ ${numCols}件重複`:''} (ダブルクリックで削除)">
+      <span onclick="openTaskModal('${t.id}')" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isOverlap?'⚡ ':''}${totalSlots>1?`✂ `:''}${esc(t.title)}</span>
+      ${totalSlots>1?`<div style="font-size:9px;opacity:.7;margin-top:1px">1/${totalSlots}回目</div>`:''}
       ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
-      ${h>=36&&!isOverlap?`<div style="display:flex;gap:3px;margin-top:2px"><button onclick="event.stopPropagation();splitSchedTask('${t.id}')" style="font-size:9px;padding:1px 4px;background:rgba(255,255,255,.15);border:none;border-radius:3px;color:#fff;cursor:pointer" title="タスクを分割">✂</button></div>`:''}
+      ${h>=36&&!isOverlap&&totalSlots===1?`<div style="display:flex;gap:3px;margin-top:2px"><button onclick="event.stopPropagation();splitSchedTask('${t.id}')" style="font-size:9px;padding:1px 4px;background:rgba(255,255,255,.15);border:none;border-radius:3px;color:#fff;cursor:pointer" title="タスクを分割">✂</button></div>`:''}
     </div>`;}).join('');
   const nowLine=(isToday&&nowM>=SS&&nowM<=SE)?`<div class="now-line" style="top:${nowTop}px"></div>`:'';
   // Gcalイベントをタイムラインとサイドパネルへ
@@ -2881,13 +2903,17 @@ function openDayModal(d){
 <button class="btn btn-p btn-sm" onclick="closeModal();openTaskModal(null,'${d}')">＋ この日にタスク追加</button>`);
 }
 // ===SCHEDULE D&D===
-// IDフォーマット: タスク → "taskId" / サブタスク → "taskId::subIdx"
+// IDフォーマット: タスク → "taskId" / サブタスク → "taskId::N" / 追加時間帯 → "taskId::tsN"
 let _schedDragId=null,_schedDragOffset=0;
 function _parseSchedId(id){
-  if(!id)return{isSub:false,taskId:id,subIdx:-1};
+  if(!id)return{isSub:false,isSlot:false,taskId:id,subIdx:-1,slotIdx:-1};
   const sep=id.indexOf('::');
-  if(sep<0)return{isSub:false,taskId:id,subIdx:-1};
-  return{isSub:true,taskId:id.slice(0,sep),subIdx:parseInt(id.slice(sep+2))};
+  if(sep<0)return{isSub:false,isSlot:false,taskId:id,subIdx:-1,slotIdx:-1};
+  const suffix=id.slice(sep+2);
+  if(suffix.startsWith('ts')){
+    return{isSub:false,isSlot:true,taskId:id.slice(0,sep),subIdx:-1,slotIdx:parseInt(suffix.slice(2))};
+  }
+  return{isSub:true,isSlot:false,taskId:id.slice(0,sep),subIdx:parseInt(suffix),slotIdx:-1};
 }
 function schedDragStart(e,id){
   _schedDragId=id;
@@ -2905,7 +2931,7 @@ function schedDrop(e,date){
   const rect=main.getBoundingClientRect();
   const y=e.clientY-rect.top;
   const mins=Math.round(y/PPM/15)*15-_schedDragOffset+SS;
-  const {isSub,taskId,subIdx}=_parseSchedId(_schedDragId);
+  const {isSub,isSlot,taskId,subIdx,slotIdx}=_parseSchedId(_schedDragId);
   const t=S.tasks.find(t=>t.id===taskId);
   if(!t)return;
   if(isSub){
@@ -2917,6 +2943,15 @@ function schedDrop(e,date){
     t.dueDate=date;
     save();render();_schedDragId=null;_schedDragOffset=0;
     toast('サブタスクをスケジュールに配置しました');
+  }else if(isSlot){
+    const sl=(t.timeSlots||[])[slotIdx-1];
+    if(!sl)return;
+    const dur=sl.e?tMin(sl.e)-tMin(sl.s):60;
+    sl.s=mToT(Math.max(SS,Math.min(SE-15,mins)));
+    sl.e=mToT(Math.max(SS+15,Math.min(SE,mins+dur)));
+    t.dueDate=date;
+    save();render();_schedDragId=null;_schedDragOffset=0;
+    toast(`時間帯 ${slotIdx+1}/${(t.timeSlots.length+1)} を更新しました`);
   }else{
     const dur=t.endTime?tMin(t.endTime)-tMin(t.startTime):60;
     t.startTime=mToT(Math.max(SS,Math.min(SE-15,mins)));
@@ -6393,9 +6428,26 @@ function openTaskModal(id,preDate,withTime){
     </select>
   </div>
 </div>
-<div class="frow">
-  <div class="fg"><div class="fl">開始時間</div><input type="time" id="t-start" value="${t?.startTime||withTime||''}"></div>
-  <div class="fg"><div class="fl">終了時間</div><input type="time" id="t-end" value="${t?.endTime||''}"></div>
+<div class="fg">
+  <div class="fl" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <span>時間帯</span>
+    <button class="btn btn-g btn-xs" onclick="addTimeSlot()">＋ 時間帯を追加</button>
+  </div>
+  <div id="timeslot-cont">
+    <div class="ts-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+      <span style="font-size:10px;color:var(--purple);font-weight:700;flex-shrink:0;min-width:16px">①</span>
+      <input type="time" class="ts-start" id="t-start" value="${t?.startTime||withTime||''}" style="flex:1">
+      <span style="color:var(--t2);font-size:12px">〜</span>
+      <input type="time" class="ts-end" id="t-end" value="${t?.endTime||''}" style="flex:1">
+    </div>
+    ${(t?.timeSlots||[]).map((sl,si)=>`<div class="ts-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+      <span style="font-size:10px;color:var(--purple);font-weight:700;flex-shrink:0;min-width:16px">${['②','③','④','⑤','⑥'][si]||'●'}</span>
+      <input type="time" class="ts-start" value="${sl.s||''}" style="flex:1">
+      <span style="color:var(--t2);font-size:12px">〜</span>
+      <input type="time" class="ts-end" value="${sl.e||''}" style="flex:1">
+      <button class="btn btn-g btn-xs" onclick="this.closest('.ts-row').remove()" style="flex-shrink:0">✕</button>
+    </div>`).join('')}
+  </div>
 </div>
 <div class="fg"><div class="fl">見積時間（分）</div>
   <input type="number" id="t-mins" value="${t?.estimatedMinutes||''}" min="1" placeholder="例: 60">
@@ -6412,6 +6464,22 @@ function openTaskModal(id,preDate,withTime){
 </div>`);
   document.getElementById('t-ttl')?.focus();
   if(withTime){document.getElementById('t-start').value=mToT(Math.round((new Date().getHours()*60+new Date().getMinutes())/30)*30);}
+}
+function addTimeSlot(){
+  const cont=document.getElementById('timeslot-cont');
+  if(!cont)return;
+  const nums=['①','②','③','④','⑤','⑥'];
+  const idx=cont.querySelectorAll('.ts-row').length;
+  const d=document.createElement('div');
+  d.className='ts-row';
+  d.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:4px';
+  d.innerHTML=`<span style="font-size:10px;color:var(--purple);font-weight:700;flex-shrink:0;min-width:16px">${nums[idx]||'●'}</span>`
+    +`<input type="time" class="ts-start" style="flex:1">`
+    +`<span style="color:var(--t2);font-size:12px">〜</span>`
+    +`<input type="time" class="ts-end" style="flex:1">`
+    +`<button class="btn btn-g btn-xs" onclick="this.closest('.ts-row').remove()" style="flex-shrink:0">✕</button>`;
+  cont.appendChild(d);
+  d.querySelector('.ts-start').focus();
 }
 function addSubField(){
   const c=document.getElementById('sub-cont');
@@ -6434,12 +6502,18 @@ function saveTask(){
   if(!title){toast('タスク名を入力してください','err');return;}
   const mins=parseInt(document.getElementById('t-mins')?.value)||null;
   const subs=[...document.querySelectorAll('.sub-inp')].map(i=>i.value.trim()).filter(Boolean).map(title=>({title,done:false}));
+  // 複数時間帯: 1行目=primary, 2行目以降=timeSlots
+  const tsRows=[...document.querySelectorAll('#timeslot-cont .ts-row')];
+  const timeSlots=tsRows.slice(1).map(r=>({
+    s:r.querySelector('.ts-start')?.value||'',
+    e:r.querySelector('.ts-end')?.value||''
+  })).filter(sl=>sl.s||sl.e);
   if(EID){
     const t=S.tasks.find(t=>t.id===EID);
-    if(t){Object.assign(t,{title,description:document.getElementById('t-desc').value.trim(),dueDate:document.getElementById('t-due').value||null,priority:document.getElementById('t-pri').value||null,startTime:document.getElementById('t-start').value||null,endTime:document.getElementById('t-end').value||null,estimatedMinutes:mins,subtasks:subs.map((s,i)=>({...s,done:t.subtasks?.[i]?.done||false}))});}
+    if(t){Object.assign(t,{title,description:document.getElementById('t-desc').value.trim(),dueDate:document.getElementById('t-due').value||null,priority:document.getElementById('t-pri').value||null,startTime:document.getElementById('t-start').value||null,endTime:document.getElementById('t-end').value||null,timeSlots,estimatedMinutes:mins,subtasks:subs.map((s,i)=>({...s,done:t.subtasks?.[i]?.done||false}))});}
     toast('タスクを更新しました');
   }else{
-    const t={id:uid(),title,description:document.getElementById('t-desc').value.trim(),dueDate:document.getElementById('t-due').value||null,priority:document.getElementById('t-pri').value||null,startTime:document.getElementById('t-start').value||null,endTime:document.getElementById('t-end').value||null,estimatedMinutes:mins,subtasks:subs,done:false,procCount:0,createdAt:new Date().toISOString()};
+    const t={id:uid(),title,description:document.getElementById('t-desc').value.trim(),dueDate:document.getElementById('t-due').value||null,priority:document.getElementById('t-pri').value||null,startTime:document.getElementById('t-start').value||null,endTime:document.getElementById('t-end').value||null,timeSlots,estimatedMinutes:mins,subtasks:subs,done:false,procCount:0,createdAt:new Date().toISOString()};
     // 固定スケジュール内挿入の場合: fsBlockId/fsSlotをセット
     if(window._fsPendingBlockId!==undefined){
       t.fsBlockId=window._fsPendingBlockId;
@@ -8033,7 +8107,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-52';
+const APP_VERSION='20260602-53';
 
 render();
 function forceAppUpdate(){
