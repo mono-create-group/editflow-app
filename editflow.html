@@ -3718,19 +3718,22 @@ function rGoalTree(){
   function goalPct(g){const ms=g.milestones||[];const d=ms.filter(m=>m.done).length;return ms.length?Math.round(d/ms.length*100):(g.progress||0);}
   function renderNode(g,depth){
     const children=getChildren(g.id);
-    const hz=GOAL_HORIZONS.find(h=>h.v===g.horizon)||{icon:'🎯',l:''};
+    const hz=GOAL_HORIZONS.find(h=>h.v===g.horizon)||{icon:'🎯',l:g.horizon||''};
     const pct=goalPct(g);
     const col=HZ_COLOR[g.horizon]||'var(--purple)';
     return`<div style="margin-left:${depth*20}px;margin-bottom:6px">
-      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--card);border:1px solid var(--border);border-left:3px solid ${col};border-radius:8px;cursor:pointer" onclick="GV='${g.horizon}';render()">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--card);border:1px solid var(--border);border-left:3px solid ${col};border-radius:8px">
         <span style="font-size:16px;flex-shrink:0">${hz.icon}</span>
-        <div style="flex:1;min-width:0">
+        <div style="flex:1;min-width:0;cursor:pointer" onclick="GV='${g.horizon}';render()">
           <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.title)}</div>
           <div style="font-size:11px;color:var(--t2);margin-top:1px">${hz.l}${g.deadline?` · 期限:${g.deadline}`:''}</div>
         </div>
-        <div style="flex-shrink:0;text-align:right">
-          <div style="font-size:12px;font-weight:700;color:${col}">${pct}%</div>
-          ${children.length?`<div style="font-size:10px;color:var(--t2)">${children.length}件連動</div>`:''}
+        <div style="flex-shrink:0;text-align:right;display:flex;align-items:center;gap:8px">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:${col}">${pct}%</div>
+            ${children.length?`<div style="font-size:10px;color:var(--t2)">${children.length}件連動</div>`:''}
+          </div>
+          <button class="tact del" onclick="delGoal('${g.id}')" title="削除">🗑</button>
         </div>
       </div>
       ${depth<5?children.map(c=>renderNode(c,depth+1)).join(''):''}
@@ -7750,7 +7753,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-43';
+const APP_VERSION='20260602-44';
 
 render();
 function forceAppUpdate(){
