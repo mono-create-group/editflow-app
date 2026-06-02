@@ -1534,16 +1534,39 @@ function migrate(d){
   return d;
 }
 function load(){try{const d=Object.assign(defState(),JSON.parse(localStorage.getItem(DB))||{});return migrate(d);}catch{return defState();}}
+// ─── パフォーマンス最適化 ───────────────────────────────────────────
+// localStorageへの書き込みをRAFでバッチ化（同フレーム内の複数save()を1回に集約）
+let _lsPending=false;
 function save(){
   S._savedAt=Date.now();
-  localStorage.setItem(DB,JSON.stringify(S));
   fbSave();
+  if(!_lsPending){
+    _lsPending=true;
+    requestAnimationFrame(()=>{
+      _lsPending=false;
+      try{localStorage.setItem(DB,JSON.stringify(S));}catch(e){console.warn('save error',e);}
+    });
+  }
 }
+// ページを閉じる直前に必ずフラッシュ
+window.addEventListener('beforeunload',()=>{
+  try{localStorage.setItem(DB,JSON.stringify(S));}catch(e){}
+});
+// ─────────────────────────────────────────────────────────────────────
 function allEx(){return [...(S.customEx||[]),'プッシュアップ','ワイドプッシュアップ','スクワット','ジャンプスクワット','ランジ','プランク','サイドプランク','クランチ','レッグレイズ','バーピー','マウンテンクライマー','ヒップリフト','ジャンピングジャック','ランニング'];}
 
 // ===UTILS===
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
-function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+// today()の結果を1秒キャッシュ（render中に何十回も呼ばれるため）
+let _todayCache='',_todayCacheTs=0;
+function today(){
+  const now=Date.now();
+  if(now-_todayCacheTs<1000)return _todayCache;
+  const d=new Date();
+  _todayCache=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  _todayCacheTs=now;
+  return _todayCache;
+}
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmt(d){
@@ -2065,7 +2088,9 @@ function rLockScreen(){
   <div style="font-size:12px;color:var(--t3);margin-top:24px">記録完了後、自動的にアプリが開きます</div>
 </div>`;
 }
-function render(){
+// 同フレーム内の重複render()を1回に集約（初回は即時実行）
+let _renderBusy=false;
+const _origRender=function(){
   try{
     // ロックチェック（朝8時以降・朝ジャーナル未完了、または19時以降・夜の記録未完了）
     if(checkDailyLock()){
@@ -2111,6 +2136,12 @@ function render(){
     if(v)v.innerHTML=`<div style="padding:24px;text-align:center"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="color:var(--red);font-weight:700;margin-bottom:8px">表示エラーが発生しました</div><div style="font-size:12px;color:var(--t2);margin-bottom:16px">${e.message||e}</div><button class="btn btn-p" onclick="V='dashboard';S=load();render()">🔄 再読み込み</button></div>`;
     try{renderNav();}catch{}
   }
+};
+function render(){
+  if(_renderBusy)return; // 同フレーム内の重複呼び出しをスキップ
+  _renderBusy=true;
+  requestAnimationFrame(()=>{_renderBusy=false;}); // 次フレームでフラグをリセット
+  _origRender();
 }
 function subTabs(tabs,cur,fn){return`<div class="sub-tabs">${tabs.map(([k,l])=>`<div class="stab${cur===k?' act':''}" onclick="${fn}('${k}')">${l}</div>`).join('')}</div>`;}
 function secTitle(t){return`<div class="section-ttl">${t}</div>`;}
@@ -8002,7 +8033,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-51';
+const APP_VERSION='20260602-52';
 
 render();
 function forceAppUpdate(){
