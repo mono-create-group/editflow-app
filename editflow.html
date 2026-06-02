@@ -41,7 +41,7 @@
   --shadow-sm:0 1px 3px rgba(15,23,42,.06);
   --shadow-lg:0 8px 32px rgba(15,23,42,.14),0 2px 6px rgba(15,23,42,.06);
 }
-body{background:var(--bg);color:var(--text);font-family:-apple-system,'Hiragino Sans','Yu Gothic',BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;min-height:100vh;display:flex;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Hiragino Sans','Yu Gothic',BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;height:100vh;overflow:hidden;display:flex;-webkit-font-smoothing:antialiased}
 button{cursor:pointer;border:none;background:none;color:inherit;font:inherit}
 input,textarea,select{background:var(--card);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font:inherit;padding:8px 12px;width:100%;outline:none;transition:border-color .2s,box-shadow .2s;box-shadow:var(--shadow-sm)}
 input:focus,textarea:focus,select:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,40,217,0.1)}
@@ -51,7 +51,7 @@ a{color:inherit;text-decoration:none}
 
 /* ─── LAYOUT ─── */
 #sidebar{width:220px;height:100vh;background:var(--surface);border-right:1px solid var(--border);box-shadow:2px 0 12px rgba(15,23,42,.04);display:flex;flex-direction:column;padding:22px 0;position:sticky;top:0;flex-shrink:0;overflow-y:auto;scrollbar-width:none}
-#main{flex:1;overflow-y:auto;padding:32px 36px;max-width:960px}
+#main{flex:1;overflow-y:auto;min-height:0;padding:32px 36px;max-width:960px}
 .logo{padding:0 18px 22px;font-size:16px;font-weight:800;background:linear-gradient(135deg,var(--purple),#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.3px}
 .logo small{display:block;font-size:11px;color:var(--t3);font-weight:500;margin-top:2px;-webkit-text-fill-color:var(--t3)}
 .nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;margin:1px 10px;border-radius:10px;color:var(--t2);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;user-select:none}
@@ -2425,6 +2425,9 @@ function rFsDashPanel(date){
       draggable="true"
       ondragstart="taskDragStart(event,'${t.id}')"
       ondragend="taskDragEnd(event)"
+      ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="panelTaskDrop(event,'${t.id}')"
       style="margin:2px 6px;padding:5px 8px;cursor:grab;box-shadow:none;${t.fsBlockId?'opacity:0.55':''}">
       <div class="chk ${t.done?'done':''}" style="width:14px;height:14px;border-radius:4px;flex-shrink:0" onclick="toggleDone('${t.id}')"></div>
       <div class="task-body" style="min-width:0;gap:1px">
@@ -2441,6 +2444,26 @@ function rFsDashPanel(date){
     ${panel}
     <div style="flex:1;min-width:0">${rFixedScheduleList(false,true,d)}</div>
   </div>`;
+}
+function panelTaskDrop(e,targetId){
+  e.preventDefault();e.stopPropagation();
+  const id=_taskDragId;
+  if(!id||id===targetId){_taskDragId=null;return;}
+  const from=S.tasks.findIndex(t=>t.id===id);
+  const to=S.tasks.findIndex(t=>t.id===targetId);
+  if(from<0||to<0){_taskDragId=null;return;}
+  const[item]=S.tasks.splice(from,1);S.tasks.splice(to,0,item);
+  save();render();_taskDragId=null;
+}
+function blockTaskDrop(e,targetId){
+  e.preventDefault();e.stopPropagation();
+  const id=_taskDragId;
+  if(!id||id===targetId){_taskDragId=null;return;}
+  const from=S.tasks.findIndex(t=>t.id===id);
+  const to=S.tasks.findIndex(t=>t.id===targetId);
+  if(from<0||to<0){_taskDragId=null;return;}
+  const[item]=S.tasks.splice(from,1);S.tasks.splice(to,0,item);
+  save();render();_taskDragId=null;
 }
 function fsDashPanelDragOver(e){e.preventDefault();document.querySelector('.fs-dash-panel')?.classList.add('drag-over');}
 function fsDashPanelDragLeave(e){document.querySelector('.fs-dash-panel')?.classList.remove('drag-over');}
@@ -2473,7 +2496,7 @@ function rFixedScheduleList(compact=false,droppable=false,date){
     const em=tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e);
     const isNow=isTargetToday&&hasStart&&sm!==null&&nowM>=sm&&nowM<em;
     const blockId=f.id||('b'+i);
-    const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}','${blockId}',${i})" id="fs-block-${i}"`:'';
+    const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}','${blockId}',${i},'${td}')" id="fs-block-${i}"`:'';
     // →区切りのサブタスク解析（タイトルと説明、両方）
     const titleParts=f.t.includes('→')?f.t.split('→').map(s=>s.trim()).filter(Boolean):[];
     const descParts=f.d&&f.d.includes('→')?f.d.split('→').map(s=>s.trim()).filter(Boolean):[];
@@ -2502,6 +2525,9 @@ function rFixedScheduleList(compact=false,droppable=false,date){
     // タスクカード生成ヘルパー
     const rBlockTask=t=>`<div class="task-item" id="ti-${t.id}"
   draggable="true" ondragstart="taskDragStart(event,'${t.id}')" ondragend="taskDragEnd(event)"
+  ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+  ondragleave="this.classList.remove('drag-over')"
+  ondrop="blockTaskDrop(event,'${t.id}')"
   style="border-left:2px solid ${f.c};margin:2px 0;padding:6px 10px;cursor:grab;box-shadow:none;flex-shrink:0">
   <div class="chk ${t.done?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleDone('${t.id}')"></div>
   <div class="task-body" style="min-width:0">
@@ -2515,7 +2541,7 @@ function rFixedScheduleList(compact=false,droppable=false,date){
     // ドロップゾーン生成ヘルパー（slot: -1=先頭, 0=sub[0]後, 1=sub[1]後...）
     const rDz=(slot,label)=>droppable?`<div class="fs-dropzone"
   ondragover="fsInternalDragOver(event)" ondragleave="fsInternalDragLeave(event)"
-  ondrop="fsInternalDrop(event,'${blockId}',${slot})"
+  ondrop="fsInternalDrop(event,'${blockId}',${slot},'${td}')"
   onclick="openFsTaskModal('${blockId}',${slot},'${f.s||''}','${td}')">
   <div class="fs-dz-plus">＋ ${label||'ここに追加'}</div>
 </div>`:'';
@@ -2833,7 +2859,7 @@ function taskDragStart(e,id){_taskDragId=id;e.dataTransfer.effectAllowed='move';
 function taskDragEnd(e){e.currentTarget.classList.remove('dragging');document.querySelectorAll('.task-item.drag-over,.fs-drop-zone.fs-drag-over').forEach(el=>el.classList.remove('drag-over','fs-drag-over'));}
 function fsBlockDragOver(e,i){e.preventDefault();e.stopPropagation();document.getElementById('fs-block-'+i)?.classList.add('fs-drag-over');}
 function fsBlockDragLeave(e,i){document.getElementById('fs-block-'+i)?.classList.remove('fs-drag-over');}
-function fsBlockDrop(e,startTime,blockId,i){
+function fsBlockDrop(e,startTime,blockId,i,date){
   e.preventDefault();e.stopPropagation();
   document.getElementById('fs-block-'+i)?.classList.remove('fs-drag-over');
   const id=_taskDragId||_wdayDragId;
@@ -2842,7 +2868,7 @@ function fsBlockDrop(e,startTime,blockId,i){
   if(!t){_taskDragId=null;_wdayDragId=null;return;}
   if(startTime)t.startTime=startTime;
   if(blockId)t.fsBlockId=blockId;
-  t.dueDate=today();
+  t.dueDate=date||today();
   save();render();toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
   _taskDragId=null;_wdayDragId=null;
 }
@@ -6364,7 +6390,7 @@ function openFsTaskModal(blockId,slot,startTime,date){
   openTaskModal(null,date,startTime);
 }
 // 固定スケジュール内のドラッグドロップ（スロット移動）
-function fsInternalDrop(e,blockId,slot){
+function fsInternalDrop(e,blockId,slot,date){
   e.preventDefault();e.stopPropagation();
   e.currentTarget?.classList.remove('fs-dz-over');
   const id=_taskDragId;
@@ -6373,6 +6399,7 @@ function fsInternalDrop(e,blockId,slot){
   if(!t){_taskDragId=null;return;}
   t.fsBlockId=blockId;
   t.fsSlot=slot;
+  if(date)t.dueDate=date;
   save();render();
   _taskDragId=null;
 }
@@ -7938,7 +7965,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-58';
+const APP_VERSION='20260602-59';
 
 render();
 function forceAppUpdate(){
