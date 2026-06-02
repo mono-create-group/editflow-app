@@ -3789,7 +3789,7 @@ function rUnifiedHorizonTab(div,tabDef){
   // ===今週専用コンテキスト===
   let weeklyCtx='';
   if(tabDef.v==='1w'){
-    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month');
+    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&(!g.divisionId||g.divisionId===(div?.id||null)));
     const monthKpis=div?(div.horizons?.['1m']?.kpis||[]):[];
     const now=new Date(td);
     const endOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0);
@@ -3839,7 +3839,9 @@ function rUnifiedHorizonTab(div,tabDef){
   // ===目標カードセクション===
   let goalsSection='';
   if(tabDef.goals){
-    const goals=(S.goals||[]).filter(g=>!g.deleted&&(g.horizon||'this_month')===tabDef.goals);
+    const divId=div?.id||null;
+    // divisionIdが設定済みならその事業部のみ、未設定（旧データ）は全事業部に表示
+    const goals=(S.goals||[]).filter(g=>!g.deleted&&(g.horizon||'this_month')===tabDef.goals&&(!g.divisionId||g.divisionId===divId));
     goalsSection=`<div style="margin-bottom:16px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <div style="font-size:14px;font-weight:800;color:var(--purple)">🎯 ${tabDef.l}の目標</div>
@@ -4570,7 +4572,7 @@ function rHorizonTab(div,period){
   let weeklyContextSection='';
   if(period==='1w'){
     // 今月の目標（S.goals から）
-    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month');
+    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&(!g.divisionId||g.divisionId===div.id));
     // 今月のKPI（1mホライズン）から今週必要な数値を計算
     const monthKpis=(div.horizons?.['1m']?.kpis||[]);
     // 残り日数・週数を計算
@@ -6266,12 +6268,14 @@ function saveHabit(){
   save();closeModal();render();toast('習慣を保存しました 🔥');
 }
 
-function openGoalModal(id,defaultHorizon){
+function openGoalModal(id,defaultHorizon,defaultDivId){
   EID=id||null;
   const g=id?S.goals.find(g=>g.id===id):null;
   const ms=g?.milestones||[];
   const gcat=g?.category||'';
   const ghz=g?.horizon||defaultHorizon||GV||'this_month';
+  // 事業部IDをモーダルに引き渡す（新規時はKVから、編集時は既存値）
+  window._goalModalDivId=g?.divisionId||(defaultDivId??KV??null);
   // 上位目標の候補（より長い時間軸の目標）
   const parentHzs=eligibleParentHorizons(ghz);
   const parentCandidates=S.goals.filter(pg=>!pg.deleted&&parentHzs.includes(pg.horizon)&&pg.id!==id);
@@ -6359,7 +6363,8 @@ function saveGoal(){
   const woop={outcome:document.getElementById('g-outcome')?.value.trim(),obstacle:document.getElementById('g-obstacle')?.value.trim(),plan:document.getElementById('g-plan')?.value.trim()};
   const hz=document.getElementById('g-hz')?.value||'this_month';
   const parentGoalId=document.getElementById('g-parent')?.value||null;
-  const data={title,horizon:hz,targetMonth:hz==='monthly'?(document.getElementById('g-target-month')?.value||today().slice(0,7)):null,category:document.getElementById('g-cat').value,deadline:document.getElementById('g-dl').value||null,targetAmount:parseInt(document.getElementById('g-amt')?.value)||0,targetSalesCount:parseInt(document.getElementById('g-sales-cnt')?.value)||0,targetHireCount:parseInt(document.getElementById('g-hire-cnt')?.value)||0,description:document.getElementById('g-desc').value.trim(),woop,milestones:ms,parentGoalId};
+  const divisionId=window._goalModalDivId||null;
+  const data={title,horizon:hz,targetMonth:hz==='monthly'?(document.getElementById('g-target-month')?.value||today().slice(0,7)):null,category:document.getElementById('g-cat').value,deadline:document.getElementById('g-dl').value||null,targetAmount:parseInt(document.getElementById('g-amt')?.value)||0,targetSalesCount:parseInt(document.getElementById('g-sales-cnt')?.value)||0,targetHireCount:parseInt(document.getElementById('g-hire-cnt')?.value)||0,description:document.getElementById('g-desc').value.trim(),woop,milestones:ms,parentGoalId,divisionId};
   if(EID){const g=S.goals.find(g=>g.id===EID);if(g){const oldMs=g.milestones||[];data.milestones=ms.map((m,i)=>({...m,done:oldMs[i]?.done||false}));Object.assign(g,data);}}
   else S.goals.push({id:uid(),...data,progress:0,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('目標を保存しました 🎯');
@@ -7433,7 +7438,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-38';
+const APP_VERSION='20260602-39';
 
 render();
 function forceAppUpdate(){
