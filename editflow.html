@@ -2866,6 +2866,8 @@ function fsBlockDrop(e,startTime,blockId,i,date){
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
   if(!t){_taskDragId=null;_wdayDragId=null;return;}
+  // すでにこのブロック内のタスクをブロック外にドロップした場合は無視（並び替え中の誤発火防止）
+  if(t.fsBlockId===blockId){_taskDragId=null;_wdayDragId=null;return;}
   if(startTime)t.startTime=startTime;
   if(blockId)t.fsBlockId=blockId;
   t.dueDate=date||today();
@@ -7965,7 +7967,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-60';
+const APP_VERSION='20260602-61';
 
 render();
 function forceAppUpdate(){
