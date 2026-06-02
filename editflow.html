@@ -2567,8 +2567,10 @@ function rFixedScheduleList(compact=false,droppable=false,date){
       const trailing=allBlockTasks.filter(t=>(t.fsSlot??9999)>allParts.length-1&&(t.fsSlot??9999)<9999-(allParts.length));
       subList+=trailing.map(rBlockTask).join('');
     }
-    // サブタスクなしブロックのタスク一覧
-    const plainTasks=hasParts?'':allBlockTasks.map(rBlockTask).join('')+(droppable?rDz(0,'タスクを追加'):'');
+    // サブタスクなしブロックのタスク一覧（ドロップゾーンを各タスクの前後に配置）
+    const plainTasks=hasParts?'':(droppable
+      ?rDz(-1,'先頭に追加')+allBlockTasks.map((t,idx)=>rBlockTask(t)+rDz(idx,'ここに追加')).join('')
+      :allBlockTasks.map(rBlockTask).join(''));
     return`<div class="task-item fs-drop-zone" ${dropAttrs} style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'0e;':''};margin-bottom:6px;transition:background .15s;flex-direction:column;align-items:stretch;gap:0;padding:11px 14px">
   <div style="display:flex;align-items:center;gap:9px">
     <div class="fs-chk ${mainDone?'done':''}" onclick="toggleFsMain('${blockId}')"></div>
@@ -6414,7 +6416,7 @@ function openFsTaskModal(blockId,slot,startTime,date){
   window._fsPendingSlot=slot;
   openTaskModal(null,date,startTime);
 }
-// 固定スケジュール内のドラッグドロップ（スロット移動）
+// 固定スケジュール内のドラッグドロップ（スロット移動・並び替え）
 function fsInternalDrop(e,blockId,slot,date,startTime){
   e.preventDefault();e.stopPropagation();
   e.currentTarget?.classList.remove('fs-dz-over');
@@ -6422,6 +6424,8 @@ function fsInternalDrop(e,blockId,slot,date,startTime){
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
   if(!t){_taskDragId=null;return;}
+  // 別ブロックに既に割り当て済みのタスクはドロップゾーン経由の移動を禁止
+  if(t.fsBlockId&&t.fsBlockId!==blockId){_taskDragId=null;return;}
   const wasUnassigned=!t.fsBlockId;
   t.fsBlockId=blockId;
   t.fsSlot=slot;
@@ -6430,8 +6434,27 @@ function fsInternalDrop(e,blockId,slot,date,startTime){
     if(date)t.dueDate=date;
     if(startTime&&startTime!=='-1')t.startTime=startTime;
     toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
+  } else {
+    // 同ブロック内並び替え: S.tasks内の順序も更新
+    const from=S.tasks.findIndex(t2=>t2.id===id);
+    if(from>=0){
+      const [item]=S.tasks.splice(from,1);
+      const blockTasks=S.tasks.filter(t2=>!t2.deleted&&t2.fsBlockId===blockId);
+      if(slot===-1){
+        // 先頭に移動: ブロック内最初のタスクの前に挿入
+        const firstIdx=S.tasks.findIndex(t2=>!t2.deleted&&t2.fsBlockId===blockId);
+        if(firstIdx>=0)S.tasks.splice(firstIdx,0,item);
+        else S.tasks.push(item);
+      } else {
+        // slot番目のタスクの後に挿入
+        const refTask=blockTasks[slot];
+        if(refTask){
+          const refIdx=S.tasks.findIndex(t2=>t2.id===refTask.id);
+          S.tasks.splice(refIdx+1,0,item);
+        } else S.tasks.push(item);
+      }
+    }
   }
-  // ブロック内タスクの場合はスロット位置変更のみ（日付・startTimeは変更しない）
   save();render();
   _taskDragId=null;
 }
@@ -7997,7 +8020,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-63';
+const APP_VERSION='20260602-64';
 
 render();
 function forceAppUpdate(){
