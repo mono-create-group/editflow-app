@@ -228,7 +228,7 @@ a{color:inherit;text-decoration:none}
 .sched-layout{display:flex;gap:12px;align-items:flex-start}
 .sched-side-panel{width:236px;flex-shrink:0;border:1px solid var(--border);border-radius:var(--rs);background:var(--card);overflow-y:auto;max-height:75vh;min-height:120px;transition:border-color .15s,box-shadow .15s}
 .sched-side-panel.drag-over{border-color:var(--purple);background:var(--pdim);box-shadow:0 0 0 2px var(--purple)40}
-.fs-dash-panel{flex-shrink:0;width:188px;border:1px solid var(--border);border-radius:var(--rs);background:var(--card);overflow-y:auto;max-height:70vh;min-height:80px;transition:border-color .15s,box-shadow .15s;box-shadow:var(--shadow-sm)}
+.fs-dash-panel{flex-shrink:0;width:188px;border:1px solid var(--border);border-radius:var(--rs);background:var(--card);overflow-y:auto;max-height:80vh;min-height:80px;transition:border-color .15s,box-shadow .15s;box-shadow:var(--shadow-sm);position:sticky;top:8px;align-self:flex-start}
 .fs-dash-panel.drag-over{border-color:var(--purple);background:var(--pdim);box-shadow:0 0 0 2px rgba(109,40,217,0.25)}
 .fs-panel-task{border:1px solid var(--border);background:var(--card2);border-radius:7px!important}
 .fs-panel-task:hover{border-color:var(--purple);background:var(--pdim)}
@@ -8002,7 +8002,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-50';
+const APP_VERSION='20260602-51';
 
 render();
 function forceAppUpdate(){
