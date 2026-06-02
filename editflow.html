@@ -3773,7 +3773,8 @@ function rGoals(){
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     ${tabDef.goals?`<button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}')">＋ 目標追加</button>`:''}
     <button class="btn btn-g btn-sm" onclick="openDivModal(null)">＋ 事業部</button>
-    ${div?`<button class="btn btn-g btn-sm" onclick="openDivModal('${div.id}')">✏️ 事業部編集</button>`:''}
+    ${div?`<button class="btn btn-g btn-sm" onclick="openDivModal('${div.id}')">✏️ 編集</button>`:''}
+    ${div?`<button class="btn btn-g btn-sm btn-red" onclick="delDiv('${div.id}')">🗑 削除</button>`:''}
   </div>
 </div>
 ${divTabs}
@@ -7432,7 +7433,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-37';
+const APP_VERSION='20260602-38';
 
 render();
 function forceAppUpdate(){
