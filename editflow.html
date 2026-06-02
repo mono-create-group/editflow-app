@@ -2386,9 +2386,10 @@ function rFixedScheduleList(compact=false,droppable=false){
   const nowM=now.getHours()*60+now.getMinutes();
   const td=today();
   return fs.map((f,i)=>{
-    const sm=tMin(f.s);
+    const hasStart=f.s&&f.s!=='-1'&&f.s!=='';
+    const sm=hasStart?tMin(f.s):null;
     const em=tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e);
-    const isNow=nowM>=sm&&nowM<em;
+    const isNow=hasStart&&sm!==null&&nowM>=sm&&nowM<em;
     const blockId=f.id||('b'+i);
     const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}',${i})" id="fs-block-${i}"`:'';
     // →区切りのサブタスク解析（タイトルと説明、両方）
@@ -2400,8 +2401,8 @@ function rFixedScheduleList(compact=false,droppable=false){
     const ck=getFsCk(blockId);
     const allPartsDone=hasParts&&allParts.every((_,idx)=>!!ck.subs[idx]);
     const mainDone=ck.main||(hasParts&&allPartsDone);
-    // このブロック時間帯の今日タスク
-    const blockTasks=droppable?(S.tasks||[]).filter(t=>{
+    // このブロック時間帯の今日タスク（開始時間が有効な場合のみ）
+    const blockTasks=droppable&&hasStart&&sm!==null?(S.tasks||[]).filter(t=>{
       if(t.deleted)return false;
       if(t.dueDate&&t.dueDate!==td)return false;
       if(!t.startTime)return false;
@@ -7879,7 +7880,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-47';
+const APP_VERSION='20260602-48';
 
 render();
 function forceAppUpdate(){
