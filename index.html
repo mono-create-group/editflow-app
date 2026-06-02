@@ -461,6 +461,16 @@ a{color:inherit;text-decoration:none}
 .inline-input{background:none;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:3px 0;font-size:inherit;width:auto;color:var(--text)}
 .inline-input:focus{border-bottom-color:var(--purple)}
 
+/* ─── FIXED SCHEDULE CHECKBOXES ─── */
+.fs-chk{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;background:var(--card)}
+.fs-chk:hover{border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,40,217,0.1)}
+.fs-chk.done{border-color:var(--green)}
+.fs-chk.done::after{content:'✓';color:var(--green);font-size:13px;font-weight:800}
+.fs-sub-chk{width:16px;height:16px;border-radius:4px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;background:var(--card)}
+.fs-sub-chk:hover{border-color:var(--purple)}
+.fs-sub-chk.done{border-color:var(--green)}
+.fs-sub-chk.done::after{content:'✓';color:var(--green);font-size:10px;font-weight:800}
+
 /* ─── DRAG & DROP ─── */
 .task-item[draggable]{cursor:grab}
 .task-item.drag-over{border:2px dashed var(--purple);background:var(--pdim)}
@@ -1439,6 +1449,7 @@ function defState(){return{
   navConfig:null,
   customPages:[],
   divisions:[],
+  fsChecked:{},
 };}
 function migrate(d){
   // migrate ef_v4 → ef_v5
@@ -2378,35 +2389,65 @@ function rFixedScheduleList(compact=false,droppable=false){
     const sm=tMin(f.s);
     const em=tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e);
     const isNow=nowM>=sm&&nowM<em;
+    const blockId=f.id||('b'+i);
     const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}',${i})" id="fs-block-${i}"`:'';
-    // このブロックの時間帯に割り当てられた今日のタスク
+    // →区切りのサブタスク解析（タイトルと説明、両方）
+    const titleParts=f.t.includes('→')?f.t.split('→').map(s=>s.trim()).filter(Boolean):[];
+    const descParts=f.d&&f.d.includes('→')?f.d.split('→').map(s=>s.trim()).filter(Boolean):[];
+    const allParts=[...titleParts,...descParts];
+    const hasParts=allParts.length>=2;
+    // チェック状態（今日のみ有効・翌日自動リセット）
+    const ck=getFsCk(blockId);
+    const allPartsDone=hasParts&&allParts.every((_,idx)=>!!ck.subs[idx]);
+    const mainDone=ck.main||(hasParts&&allPartsDone);
+    // このブロック時間帯の今日タスク
     const blockTasks=droppable?(S.tasks||[]).filter(t=>{
-      if(t.deleted||t.done)return false;
+      if(t.deleted)return false;
       if(t.dueDate&&t.dueDate!==td)return false;
       if(!t.startTime)return false;
       const tm=tMin(t.startTime);
       return tm>=sm&&tm<em;
     }):[];
-    const taskRows=blockTasks.map(t=>`<div style="display:flex;align-items:center;gap:7px;padding:5px 8px;margin-top:4px;background:var(--card2);border-radius:8px;border-left:2px solid ${f.c}">
+    // サブタスク行（→区切り）
+    const subRows=hasParts?allParts.map((item,idx)=>{
+      const done=!!ck.subs[idx];
+      return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;${idx<allParts.length-1?'border-bottom:1px solid '+f.c+'15;':''}">
+  <div class="fs-sub-chk ${done?'done':''}" onclick="event.stopPropagation();toggleFsSub('${blockId}',${idx})"></div>
+  <span style="font-size:13px;flex:1;${done?'text-decoration:line-through;color:var(--t3)':'color:var(--text)'}">${esc(item)}</span>
+  ${idx<allParts.length-1?`<span style="color:${f.c};opacity:.4;font-size:10px;flex-shrink:0">→</span>`:''}
+</div>`;
+    }).join(''):'';
+    // タスク行（ドラッグ可能）
+    const taskRows=blockTasks.map(t=>`<div class="task-item" id="ti-${t.id}"
+  draggable="true" ondragstart="taskDragStart(event,'${t.id}')" ondragend="taskDragEnd(event)"
+  style="border-left:2px solid ${f.c};margin:3px 0;padding:6px 10px;cursor:grab;box-shadow:none;min-height:0;flex-shrink:0;transform:none!important">
   <div class="chk ${t.done?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleDone('${t.id}')"></div>
-  <div style="flex:1;min-width:0;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
-  <span style="font-size:10px;color:var(--t3);flex-shrink:0">${t.startTime||''}</span>
-  <button class="tact" style="padding:2px 5px;font-size:11px;opacity:.7" onclick="openTaskModal('${t.id}')">✏️</button>
-  <button class="tact del" style="padding:2px 5px;font-size:11px;opacity:.7" onclick="delTask('${t.id}')">🗑</button>
+  <div class="task-body" style="font-size:12px;min-width:0">
+    <div class="task-ttl ${t.done?'done':''}" style="font-size:12px">${esc(t.title)}</div>
+  </div>
+  <div class="task-acts" style="opacity:1;gap:2px">
+    <button class="tact" style="padding:2px 5px;font-size:11px" onclick="openTaskModal('${t.id}')">✏️</button>
+    <button class="tact del" style="padding:2px 5px;font-size:11px" onclick="delTask('${t.id}')">🗑</button>
+  </div>
 </div>`).join('');
-    return`<div class="task-item fs-drop-zone" ${dropAttrs} style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'12;':''};margin-bottom:6px;transition:background .15s;flex-direction:column;align-items:stretch;gap:0;padding:10px 14px">
-  <div style="display:flex;align-items:center;gap:10px">
-    <div style="font-size:11px;color:var(--t3);flex-shrink:0;min-width:88px">${f.s}〜${f.e}</div>
+    return`<div class="task-item fs-drop-zone" ${dropAttrs} style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'0e;':''};margin-bottom:6px;transition:background .15s;flex-direction:column;align-items:stretch;gap:0;padding:11px 14px">
+  <div style="display:flex;align-items:center;gap:9px">
+    <div class="fs-chk ${mainDone?'done':''}" onclick="toggleFsMain('${blockId}')"></div>
+    <div style="font-size:11px;color:var(--t3);flex-shrink:0;min-width:82px;font-variant-numeric:tabular-nums">${f.s}〜${f.e}</div>
     <div style="flex:1;min-width:0">
-      <div class="task-ttl" style="${isNow?'color:'+f.c+';font-weight:700':'font-weight:600'}">${isNow?'▶ ':''}${esc(f.t)}</div>
-      ${!compact&&f.d?`<div style="font-size:11px;color:var(--t2);margin-top:1px;word-break:break-all">${esc(f.d)}</div>`:''}
+      ${hasParts
+        ?`<div style="font-weight:700;font-size:13px;${mainDone?'text-decoration:line-through;color:var(--t3)':'color:var(--text)'}">${isNow?'▶ ':''}<span style="color:${f.c}">${esc(f.t.split('→')[0].trim())}</span><span style="color:var(--t3);font-size:11px;margin-left:4px">→ ${allParts.length}項目</span></div>`
+        :`<div style="font-weight:600;font-size:13px;${mainDone?'text-decoration:line-through;color:var(--t3)':''}${isNow?';color:'+f.c+';font-weight:700':''}">${isNow?'▶ ':''}${esc(f.t)}</div>
+      ${!compact&&f.d&&!descParts.length?`<div style="font-size:11px;color:var(--t2);margin-top:1px">${esc(f.d)}</div>`:''}`
+      }
     </div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
       ${isNow?`<span style="font-size:10px;background:${f.c}20;color:${f.c};border:1px solid ${f.c}40;border-radius:99px;padding:2px 8px;font-weight:700">進行中</span>`:''}
-      ${droppable?`<button class="btn btn-xs" style="background:${f.c}15;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700" onclick="openTaskModal(null,'${td}','${f.s}')">＋ タスク</button>`:''}
+      ${droppable?`<button class="btn btn-xs" style="background:${f.c}12;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700" onclick="openTaskModal(null,'${td}','${f.s}')">＋</button>`:''}
     </div>
   </div>
-  ${taskRows?`<div style="margin-top:2px">${taskRows}</div>`:''}
+  ${hasParts&&!compact?`<div style="margin:8px 0 2px 30px;padding-top:6px;border-top:1px solid ${f.c}18">${subRows}</div>`:''}
+  ${taskRows?`<div style="margin:4px 0 0 30px">${taskRows}</div>`:''}
 </div>`;
   }).join('');
 }
@@ -2813,6 +2854,48 @@ function fsBlockDrop(e,startTime,i){
   t.dueDate=today();
   save();render();toast(`⏰ ${esc(t.title)} を ${startTime} に割り当てました`);
   _taskDragId=null;_wdayDragId=null;
+}
+
+// ===固定スケジュール チェック===
+function playCheckSound(done=true){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();const gain=ctx.createGain();
+    osc.connect(gain);gain.connect(ctx.destination);
+    if(done){
+      osc.type='sine';
+      osc.frequency.setValueAtTime(784,ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1046,ctx.currentTime+0.1);
+      gain.gain.setValueAtTime(0.22,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.28);
+      osc.start();osc.stop(ctx.currentTime+0.28);
+    }else{
+      osc.type='sine';
+      osc.frequency.setValueAtTime(523,ctx.currentTime);
+      gain.gain.setValueAtTime(0.12,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.18);
+      osc.start();osc.stop(ctx.currentTime+0.18);
+    }
+  }catch(ex){}
+}
+function getFsCk(blockId){
+  const td=today();
+  if(!S.fsChecked)S.fsChecked={};
+  if(!S.fsChecked[td])S.fsChecked[td]={};
+  if(!S.fsChecked[td][blockId])S.fsChecked[td][blockId]={main:false,subs:{}};
+  return S.fsChecked[td][blockId];
+}
+function toggleFsMain(blockId){
+  const ck=getFsCk(blockId);
+  ck.main=!ck.main;
+  playCheckSound(ck.main);
+  save();render();
+}
+function toggleFsSub(blockId,subIdx){
+  const ck=getFsCk(blockId);
+  ck.subs[subIdx]=!ck.subs[subIdx];
+  playCheckSound(ck.subs[subIdx]);
+  save();render();
 }
 function taskListDrop(e){
   e.preventDefault();
@@ -6790,6 +6873,7 @@ function saveLog(){
 function toggleDone(id){
   const t=S.tasks.find(t=>t.id===id);if(!t)return;
   t.done=!t.done;t.doneDate=t.done?today():null;
+  playCheckSound(t.done);
   if(t.done&&id===S.frogId){S.frogId=null;toast('🐸 カエルを食べました！お疲れ様！');}
   else toast(t.done?'✅ 完了！':'↩ 未完了に戻しました');
   save();render();
@@ -7795,7 +7879,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-46';
+const APP_VERSION='20260602-47';
 
 render();
 function forceAppUpdate(){
