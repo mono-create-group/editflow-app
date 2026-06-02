@@ -3948,7 +3948,7 @@ function rGoals(){
   return`<div class="ph">
   <div class="ph-title">🎯 目標・KPI管理</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    ${tabDef.goals?`<button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}')">＋ 目標追加</button>`:''}
+    ${tabDef.goals?`<button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}','${div?.id||''}')">＋ 目標追加</button>`:''}
     <button class="btn btn-g btn-sm" onclick="openDivModal(null)">＋ 事業部</button>
     ${div?`<button class="btn btn-g btn-sm" onclick="openDivModal('${div.id}')">✏️ 編集</button>`:''}
     ${div?`<button class="btn btn-g btn-sm btn-red" onclick="delDiv('${div.id}')">🗑 削除</button>`:''}
@@ -3966,7 +3966,7 @@ function rUnifiedHorizonTab(div,tabDef){
   // ===今週専用コンテキスト===
   let weeklyCtx='';
   if(tabDef.v==='1w'){
-    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&(!g.divisionId||g.divisionId===(div?.id||null)));
+    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&(div?.id?g.divisionId===div.id:!g.divisionId));
     const now=new Date(td);
     const endOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0);
     const daysLeft=Math.max(1,Math.ceil((endOfMonth-now)/(1000*60*60*24))+1);
@@ -4087,12 +4087,12 @@ function rUnifiedHorizonTab(div,tabDef){
   let goalsSection='';
   if(tabDef.goals){
     const divId=div?.id||null;
-    // divisionIdが設定済みならその事業部のみ、未設定（旧データ）は全事業部に表示
-    const goals=(S.goals||[]).filter(g=>!g.deleted&&(g.horizon||'this_month')===tabDef.goals&&(!g.divisionId||g.divisionId===divId));
+    // 事業部が選択されている場合はその事業部のみ表示（divisionId未設定の旧データは除外）
+    const goals=(S.goals||[]).filter(g=>!g.deleted&&(g.horizon||'this_month')===tabDef.goals&&(divId?g.divisionId===divId:!g.divisionId));
     goalsSection=`<div style="margin-bottom:16px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <div style="font-size:14px;font-weight:800;color:var(--purple)">🎯 ${tabDef.l}の目標</div>
-    <button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}')">＋ 目標追加</button>
+    <button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}','${divId||''}')">＋ 目標追加</button>
   </div>
   ${goals.length?goals.map(g=>rGoalCard(g)).join('')
     :`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px">
@@ -4256,7 +4256,7 @@ ${rAchievementBox(from3m,td,'直近3ヶ月')}`;
   // ===半年後: 1年後の目標から月次必要数値を算出===
   let halfYearCtx='';
   if(tabDef.v==='6m'){
-    const year1Goals6m=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='year1'&&(!g.divisionId||g.divisionId===(div?.id||null)));
+    const year1Goals6m=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='year1'&&(div?.id?g.divisionId===div.id:!g.divisionId));
     const now=new Date(td);
     const endOfYear6m=g=>g.deadline?new Date(g.deadline):new Date(now.getFullYear(),11,31);
     const monthsLeft6m=g=>{
@@ -5057,7 +5057,7 @@ function rHorizonTab(div,period){
   let weeklyContextSection='';
   if(period==='1w'){
     // 今月の目標（S.goals から）
-    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&(!g.divisionId||g.divisionId===div.id));
+    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&g.divisionId===div.id);
     // 今月のKPI（1mホライズン）から今週必要な数値を計算
     const monthKpis=(div.horizons?.['1m']?.kpis||[]);
     // 残り日数・週数を計算
@@ -6857,11 +6857,17 @@ function openGoalModal(id,defaultHorizon,defaultDivId){
   const gcat=g?.category||'';
   const ghz=g?.horizon||defaultHorizon||GV||'this_month';
   // 事業部IDをモーダルに引き渡す（新規時はKVから、編集時は既存値）
-  window._goalModalDivId=g?.divisionId||(defaultDivId??KV??null);
+  window._goalModalDivId=g?.divisionId||(defaultDivId||KV||null);
   // 上位目標の候補（より長い時間軸の目標）
   const parentHzs=eligibleParentHorizons(ghz);
   const parentCandidates=S.goals.filter(pg=>!pg.deleted&&parentHzs.includes(pg.horizon)&&pg.id!==id);
+  const modalDivs=(S.divisions||[]).filter(d=>!d.deleted);
   openModalLg(`<div class="mhdr"><div class="mtitle">${g?'目標編集':'目標追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+${modalDivs.length>1?`<div class="fg"><div class="fl">事業部</div>
+  <select id="g-div" onchange="window._goalModalDivId=this.value||null">
+    <option value="">なし</option>
+    ${modalDivs.map(d=>`<option value="${d.id}" ${window._goalModalDivId===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}
+  </select></div>`:''}
 <div class="frow">
   <div class="fg"><div class="fl">時間軸</div>
     <select id="g-hz" onchange="updGoalHzFields()">
@@ -6945,7 +6951,8 @@ function saveGoal(){
   const woop={outcome:document.getElementById('g-outcome')?.value.trim(),obstacle:document.getElementById('g-obstacle')?.value.trim(),plan:document.getElementById('g-plan')?.value.trim()};
   const hz=document.getElementById('g-hz')?.value||'this_month';
   const parentGoalId=document.getElementById('g-parent')?.value||null;
-  const divisionId=window._goalModalDivId||null;
+  const divEl=document.getElementById('g-div');
+  const divisionId=(divEl?divEl.value||null:null)??window._goalModalDivId??null;
   const data={title,horizon:hz,targetMonth:hz==='monthly'?(document.getElementById('g-target-month')?.value||today().slice(0,7)):null,category:document.getElementById('g-cat').value,deadline:document.getElementById('g-dl').value||null,targetAmount:parseInt(document.getElementById('g-amt')?.value)||0,targetSalesCount:parseInt(document.getElementById('g-sales-cnt')?.value)||0,targetHireCount:parseInt(document.getElementById('g-hire-cnt')?.value)||0,description:document.getElementById('g-desc').value.trim(),woop,milestones:ms,parentGoalId,divisionId};
   if(EID){const g=S.goals.find(g=>g.id===EID);if(g){const oldMs=g.milestones||[];data.milestones=ms.map((m,i)=>({...m,done:oldMs[i]?.done||false}));Object.assign(g,data);}}
   else S.goals.push({id:uid(),...data,progress:0,createdAt:new Date().toISOString()});
@@ -8021,7 +8028,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-65';
+const APP_VERSION='20260602-66';
 
 render();
 function forceAppUpdate(){
