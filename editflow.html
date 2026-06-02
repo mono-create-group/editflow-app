@@ -2088,9 +2088,7 @@ function rLockScreen(){
   <div style="font-size:12px;color:var(--t3);margin-top:24px">記録完了後、自動的にアプリが開きます</div>
 </div>`;
 }
-// render()の再入ガード（renderの中からrenderが呼ばれる多重呼び出しのみ防止）
-let _renderDepth=0;
-const _origRender=function(){
+function render(){
   try{
     // ロックチェック（朝8時以降・朝ジャーナル未完了、または19時以降・夜の記録未完了）
     if(checkDailyLock()){
@@ -2136,11 +2134,6 @@ const _origRender=function(){
     if(v)v.innerHTML=`<div style="padding:24px;text-align:center"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="color:var(--red);font-weight:700;margin-bottom:8px">表示エラーが発生しました</div><div style="font-size:12px;color:var(--t2);margin-bottom:16px">${e.message||e}</div><button class="btn btn-p" onclick="V='dashboard';S=load();render()">🔄 再読み込み</button></div>`;
     try{renderNav();}catch{}
   }
-};
-function render(){
-  if(_renderDepth>0)return; // renderの中からrenderが呼ばれた場合のみスキップ
-  _renderDepth++;
-  try{_origRender();}finally{_renderDepth--;}
 }
 function subTabs(tabs,cur,fn){return`<div class="sub-tabs">${tabs.map(([k,l])=>`<div class="stab${cur===k?' act':''}" onclick="${fn}('${k}')">${l}</div>`).join('')}</div>`;}
 function secTitle(t){return`<div class="section-ttl">${t}</div>`;}
@@ -8106,7 +8099,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-54';
+const APP_VERSION='20260602-55';
 
 render();
 function forceAppUpdate(){
