@@ -2706,183 +2706,25 @@ function rTasksMonthly(){
 function schedDate(off){const d=new Date();d.setDate(d.getDate()+off);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function rTasksSchedule(){
   const d=schedDate(SD);
-  const isToday=SD===0;
-  const totalH=(SE-SS)*PPM;
-  const now=new Date(),nowM=now.getHours()*60+now.getMinutes();
-  const nowTop=mPos(nowM);
-  const hours=[];for(let h=SS/60;h<=SE/60;h++)hours.push(h);
-  const tasks=S.tasks.filter(t=>!t.deleted&&t.startTime&&(t.dueDate===d||(!t.dueDate&&isToday)));
-  const fixedBlocks=S.fs.map(f=>{
-    const sm=tMin(f.s),em=tMin(f.e==='-1'?'24:00':f.e);
-    const top=mPos(sm),h=Math.max(18,(em-sm)*PPM);
-    return`<div class="fixed-blk" style="top:${top}px;height:${h}px;background:${f.c}18;border-left-color:${f.c}">
-      <div class="fixed-blk-title" style="color:${f.c}">${esc(f.t)}</div>
-      <div class="fixed-blk-time">${f.s}〜${f.e}</div>
-    </div>`;}).join('');
-  // タスクブロックデータ（複数時間帯対応）
-  const taskBlkData=[];
-  tasks.forEach(t=>{
-    taskBlkData.push({id:t.id,isSubtask:false,isSlot:false,slotIdx:0,sm:tMin(t.startTime),em:t.endTime?tMin(t.endTime):tMin(t.startTime)+60,task:t,sub:null,subIdx:-1});
-    (t.timeSlots||[]).forEach((sl,si)=>{
-      if(!sl.s)return;
-      taskBlkData.push({id:`${t.id}::ts${si+1}`,isSubtask:false,isSlot:true,slotIdx:si+1,sm:tMin(sl.s),em:sl.e?tMin(sl.e):tMin(sl.s)+60,task:t,sub:null,subIdx:-1});
-    });
-  });
-  // サブタスクブロックデータ（startTimeを持つもの）
-  const subBlkData=[];
-  S.tasks.filter(t=>!t.deleted&&(t.dueDate===d||(!t.dueDate&&isToday))).forEach(t=>{
-    (t.subtasks||[]).forEach((s,i)=>{
-      if(s.startTime)subBlkData.push({id:`${t.id}::${i}`,isSubtask:true,sm:tMin(s.startTime),em:s.endTime?tMin(s.endTime):tMin(s.startTime)+30,task:t,sub:s,subIdx:i});
-    });
-  });
-  // 全ブロック統合してカラム分け
-  const allBlks=[...taskBlkData,...subBlkData].map(b=>({...b,col:0,numCols:1}));
-  allBlks.sort((a,b)=>a.sm-b.sm);
-  const colEnds=[];
-  allBlks.forEach(b=>{let c=colEnds.findIndex(e=>e<=b.sm);if(c<0)c=colEnds.length;colEnds[c]=b.em;b.col=c;});
-  allBlks.forEach(b=>{const ov=allBlks.filter(b2=>b2.sm<b.em&&b2.em>b.sm);b.numCols=Math.max(...ov.map(b2=>b2.col+1));});
-  const taskBlocks=allBlks.map(({id,isSubtask,isSlot,slotIdx,sm,em,col,numCols,task:t,sub:s,subIdx})=>{
-    const top=mPos(sm),h=Math.max(20,(em-sm)*PPM);
-    const colW=44/numCols;
-    const left=52+col*colW;
-    const right=100-(left+colW)+0.5;
-    const isOverlap=numCols>1;
-    const totalSlots=(t.timeSlots?.length||0)+1;
-    if(isSubtask){
-      return`<div class="task-blk sub-blk${s.done?' done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
-        style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute"
-        ondragstart="schedDragStart(event,'${id}')"
-        title="↳ ${esc(s.title)} (${esc(t.title)})">
-        <div style="overflow:hidden">
-          <div class="sub-blk-label">↳ ${esc(t.title)}</div>
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</div>
-        </div>
-        ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
-      </div>`;
-    }
-    if(isSlot){
-      return`<div class="task-blk${t.done?' done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
-        style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute;border-left:3px dashed rgba(255,255,255,.5)"
-        ondragstart="schedDragStart(event,'${id}')"
-        title="${esc(t.title)} (${slotIdx+1}/${totalSlots}回目)">
-        <div style="overflow:hidden;flex:1">
-          <div style="font-size:9px;opacity:.75;margin-bottom:1px">${slotIdx+1}/${totalSlots}回目</div>
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(t.title)}</div>
-        </div>
-        ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
-      </div>`;
-    }
-    return`<div class="task-blk ${t.done?'done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
-      style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute"
-      ondblclick="event.stopPropagation();delTask('${t.id}')"
-      ondragstart="schedDragStart(event,'${t.id}')"
-      title="${esc(t.title)}${totalSlots>1?` (${totalSlots}回に分割)`:''}${isOverlap?` ⚡ ${numCols}件重複`:''} (ダブルクリックで削除)">
-      <span onclick="openTaskModal('${t.id}')" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isOverlap?'⚡ ':''}${totalSlots>1?`✂ `:''}${esc(t.title)}</span>
-      ${totalSlots>1?`<div style="font-size:9px;opacity:.7;margin-top:1px">1/${totalSlots}回目</div>`:''}
-      ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
-      ${h>=36&&!isOverlap&&totalSlots===1?`<div style="display:flex;gap:3px;margin-top:2px"><button onclick="event.stopPropagation();splitSchedTask('${t.id}')" style="font-size:9px;padding:1px 4px;background:rgba(255,255,255,.15);border:none;border-radius:3px;color:#fff;cursor:pointer" title="タスクを分割">✂</button></div>`:''}
-    </div>`;}).join('');
-  const nowLine=(isToday&&nowM>=SS&&nowM<=SE)?`<div class="now-line" style="top:${nowTop}px"></div>`:'';
-  // Gcalイベントをタイムラインとサイドパネルへ
-  const gcalEvs=gcalEventsForDate(d);
-  const gcalTimedBlocks=gcalEvs.filter(e=>e.start?.dateTime).map(e=>{
-    const sm=tMin(new Date(e.start.dateTime).toTimeString().slice(0,5));
-    const em=e.end?.dateTime?tMin(new Date(e.end.dateTime).toTimeString().slice(0,5)):sm+60;
-    const top=mPos(sm),h=Math.max(18,(em-sm)*PPM);
-    const timeLbl=new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+(e.end?.dateTime?'〜'+new Date(e.end.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'');
-    return`<div style="position:absolute;top:${top}px;height:${h}px;left:52%;right:0.5%;background:var(--blue)22;border-left:3px solid var(--blue);border-radius:5px;padding:2px 5px;overflow:hidden;pointer-events:none;z-index:1">
-      <div style="font-size:10px;color:var(--blue);font-weight:600">📅 ${timeLbl}</div>
-      <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.summary||'(無題)')}</div>
-    </div>`;
-  }).join('');
-  const gcalAllDay=gcalEvs.filter(e=>!e.start?.dateTime);
-  // サイドパネル用：未スケジュールのタスク（startTimeなし）
-  const allDay=S.tasks.filter(t=>!t.deleted&&(t.dueDate===d||(!t.dueDate&&isToday)));
-  const unscheduled=allDay.filter(t=>!t.startTime);
-  const undone=unscheduled.filter(t=>!t.done),doneList=unscheduled.filter(t=>t.done);
-  // 未完了数（タスク＋未スケジュールサブタスク）
-  const undoneSubCount=unscheduled.reduce((s,t)=>{
-    const subs=t.subtasks||[];
-    return s+subs.filter(sub=>!sub.done&&!sub.startTime).length;
-  },0);
-  const totalUndone=undone.length+undoneSubCount;
-  const DH=`<span class="sched-dh">⠿</span>`;
-  const sideItems=[...undone,...doneList].map(t=>{
-    const subs=t.subtasks||[];
-    const subsDone=subs.filter(s=>s.done).length;
-    const progHtml=subs.length?`<span style="font-size:10px;color:var(--t3);font-weight:400">${subsDone}/${subs.length}</span>`:'';
-    // サブタスク行（未スケジュールのみ、完了は最後）
-    const undoneSubs=subs.map((s,i)=>({s,i})).filter(({s})=>!s.done&&!s.startTime);
-    const doneSubs=subs.map((s,i)=>({s,i})).filter(({s})=>s.done&&!s.startTime);
-    const subRows=[...undoneSubs,...doneSubs].map(({s,i})=>`
-      <div class="sched-side-sub${s.done?' done-sub':''}" draggable="true"
-        ondragstart="sideTaskDragStart(event,'${t.id}::${i}')"
-        ondragend="sideSubDragEnd(event)"
-        title="↳ ${esc(s.title)}（ドラッグでスケジュールへ）">
-        ${DH}
-        <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</div>
-        <div style="width:12px;height:12px;border-radius:3px;border:1.5px solid ${s.done?'var(--purple)':'var(--border)'};background:${s.done?'var(--purple)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="event.stopPropagation();toggleSub('${t.id}',${i})">
-          ${s.done?'<svg width="8" height="8" viewBox="0 0 8 8"><polyline points="1,4 3,6 7,2" stroke="#fff" stroke-width="1.5" fill="none"/></svg>':''}
-        </div>
-      </div>`).join('');
-    return`<div class="sched-side-task${t.done?' done-side':''}" draggable="true"
-      ondragstart="sideTaskDragStart(event,'${t.id}')"
-      ondragend="sideTaskDragEnd(event)"
-      onclick="openTaskModal('${t.id}')">
-      ${DH}
-      <div style="flex:1;min-width:0">
-        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:2px;flex-wrap:wrap">
-          ${t.priority?`<span style="font-size:10px">${t.priority==='high'?'🔴 高':'🟡 中'}</span>`:''}
-          ${progHtml}
-        </div>
-      </div>
-    </div>${subRows}`;}).join('');
-  const sidePanel=`<div class="sched-side-panel" id="sched-side-panel"
-    ondragover="schedSideDragOver(event)"
-    ondragleave="schedSideDragLeave(event)"
-    ondrop="schedSideDrop(event,'${d}')">
-    <div class="sched-side-hdr">
-      <span>📋 未配置タスク</span>
-      <span style="font-size:11px;background:var(--border);padding:1px 6px;border-radius:10px">${totalUndone}</span>
-    </div>
-    ${gcalAllDay.map(e=>`<div style="padding:4px 8px;border-left:3px solid var(--blue);margin-bottom:4px;background:var(--blue)11;border-radius:3px">
-      <div style="font-size:10px;color:var(--blue)">📅 終日</div>
-      <div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.summary||'(無題)')}</div>
-    </div>`).join('')}
-    ${sideItems||(!gcalAllDay.length?`<div style="font-size:12px;color:var(--t3);text-align:center;padding:16px 8px">未スケジュールの<br>タスクはありません 🎉</div>`:'')}
-    <div style="font-size:10px;color:var(--t3);text-align:center;padding:6px 8px 8px;border-top:1px solid var(--border);margin-top:4px">⠿ をドラッグしてスケジュールへ配置</div>
-  </div>`;
   const dateLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'long'});
-  return`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+  const dayHabits=habitsForDate(d).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+  const isToday=SD===0,isTomorrow=SD===1;
+  const hasFs=S.fs&&S.fs.length>0;
+  return`
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
   <div style="display:flex;align-items:center;gap:8px">
     <button class="btn btn-g btn-sm" onclick="SD--;render()">‹</button>
-    <div style="font-size:13px;font-weight:600">${dateLabel}${SD===0?' (今日)':SD===1?' (明日)':''}</div>
+    <div style="font-size:13px;font-weight:600">${dateLabel}${isToday?' (今日)':isTomorrow?' (明日)':''}</div>
     <button class="btn btn-g btn-sm" onclick="SD++;render()">›</button>
     ${SD!==0?`<button class="btn btn-g btn-sm" onclick="SD=0;render()">今日</button>`:''}
   </div>
   <div style="display:flex;gap:6px">
-    <button class="btn btn-g btn-sm" onclick="resetSchedTimes('${d}')" title="この日の全タスクの開始・終了時間をクリア">⏱ 時間リセット</button>
-    <button class="btn btn-p btn-sm" onclick="openTaskModal(null,'${d}',true)">＋ 時間付きタスク追加</button>
+    <button class="btn btn-g btn-xs" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>
+    <button class="btn btn-p btn-sm" onclick="openTaskModal(null,'${d}')">＋ タスク追加</button>
   </div>
 </div>
-<div class="sched-layout">
-  ${sidePanel}
-  <div class="sched-col">
-    <div class="sched-wrap" id="sched-main-wrap"
-      ondragover="schedDragOver(event)"
-      ondrop="schedDrop(event,'${d}')">
-      <div class="sched-hours" style="height:${totalH}px">
-        ${hours.map(h=>`<div class="hlabel" style="top:${mPos(h*60)}px">${String(h).padStart(2,'0')}:00</div>`).join('')}
-      </div>
-      <div class="sched-main" style="height:${totalH}px">
-        ${hours.map(h=>`<div class="hline" style="top:${mPos(h*60)}px"></div><div class="hline-half" style="top:${mPos(h*60+30)}px"></div>`).join('')}
-        ${fixedBlocks}${taskBlocks}${gcalTimedBlocks}${nowLine}
-      </div>
-    </div>
-    <div class="sched-add-hint">↑ スケジュールは設定から編集できます</div>
-  </div>
-</div>`;
+${hasFs?rFsDashPanel(d):`<div class="card card-sm" style="color:var(--t2);text-align:center">固定スケジュールが未設定です。<button class="btn btn-g btn-xs" style="margin-left:8px" onclick="V='habits';HV='schedule';render()">設定する →</button></div>`}
+${dayHabits.length?`${secTitle(`🔥 習慣 (${dayHabits.length}件)`)}${dayHabits.map(h=>rHabitInTaskView(h,d,isToday)).join('')}`:''}`;
 }
 
 function openDayModal(d){
@@ -8096,7 +7938,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-57';
+const APP_VERSION='20260602-58';
 
 render();
 function forceAppUpdate(){
