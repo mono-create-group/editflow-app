@@ -5688,6 +5688,10 @@ ${secTitle('📅 固定タイムスケジュール')}
   <div style="font-size:12px;color:var(--t2);margin-bottom:12px">タスク管理のスケジュール表示に使われる固定の時間割です</div>
   <div id="fs-list">
     ${S.fs.map((f,i)=>`<div class="sched-edit-item">
+      <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+        <button class="tact" style="padding:1px 5px;font-size:11px;line-height:1.2;opacity:${i===0?'0.2':'0.7'}" ${i===0?'disabled':''} onclick="fsMove(${i},-1)" title="上へ">▲</button>
+        <button class="tact" style="padding:1px 5px;font-size:11px;line-height:1.2;opacity:${i===S.fs.length-1?'0.2':'0.7'}" ${i===S.fs.length-1?'disabled':''} onclick="fsMove(${i},1)" title="下へ">▼</button>
+      </div>
       <div class="sched-edit-color" style="background:${f.c}"></div>
       <input style="width:54px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${f.s}" onchange="S.fs[${i}].s=this.value" placeholder="開始">
       <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.s?'0.7':'0.2'}" onclick="S.fs[${i}].s='';save();render()" title="開始時間をクリア">✕</button>
@@ -6097,6 +6101,12 @@ function saveTarget(){S.settings.target=parseInt(document.getElementById('set-ta
 function saveSheetsId(){const v=document.getElementById('set-sheets-id')?.value.trim();if(!v){toast('スプレッドシートIDを入力してください','err');return;}S.settings.sheetsId=v;S.settings.sheetsTab=(document.getElementById('set-sheets-tab')?.value||'').trim();save();toast('📊 スプレッドシート設定を保存しました');}
 function saveIdentity(){S.settings.identity=document.getElementById('set-identity').value.trim();save();toast('アイデンティティを保存しました');}
 function saveFS(){save();toast('スケジュールを保存しました');}
+function fsMove(i,dir){
+  const j=i+dir;
+  if(j<0||j>=S.fs.length)return;
+  [S.fs[i],S.fs[j]]=[S.fs[j],S.fs[i]];
+  save();render();
+}
 
 // ===AI CHAT===
 let _chatHistory=[];
@@ -8028,7 +8038,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-66';
+const APP_VERSION='20260602-67';
 
 render();
 function forceAppUpdate(){
