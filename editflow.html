@@ -2193,6 +2193,29 @@ ${!ci?`<div class="checkin-banner">
 
 ${rGoalActionWidget()}
 
+${(()=>{
+  const shortNoEditor=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'&&j.scope==='ショート動画'&&j.clientDraftDate).filter(j=>{
+    const du=daysUntil(j.clientDraftDate);
+    const wids=getJobWorkerIds(j);
+    return du>=0&&du<=3&&(wids.length===0||wids.every(id=>id===SELF_WID));
+  });
+  if(!shortNoEditor.length)return'';
+  return`<div style="margin-bottom:14px;display:flex;flex-direction:column;gap:6px">
+  ${shortNoEditor.map(j=>{
+    const du=daysUntil(j.clientDraftDate);
+    const dayLbl=du===0?'今日':du===1?'明日':`あと${du}日`;
+    return`<div style="background:var(--rdim);border:1.5px solid var(--red);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="V='projects';render()">
+      <span style="font-size:20px">🚨</span>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:13px;color:var(--red)">編集者未定！ ${esc(j.title)}</div>
+        <div style="font-size:12px;color:var(--t2)">クライアント初稿まで${dayLbl}（${j.clientDraftDate}）— ショート動画の編集者が決まっていません</div>
+      </div>
+      <span class="badge br">要対応</span>
+    </div>`;
+  }).join('')}
+</div>`;
+})()}
+
 <div class="two-col">
 <div>
 ${secTitle('今月の収益')}
@@ -3018,6 +3041,23 @@ ${(()=>{
   const warnings=[];
   const activeJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
   for(const j of activeJobs){
+    // ショート動画: クライアント初稿3日前に編集者未定アラーム
+    if(j.scope==='ショート動画'&&j.clientDraftDate){
+      const du=daysUntil(j.clientDraftDate);
+      const wids=getJobWorkerIds(j);
+      const noEditor=wids.length===0||wids.every(id=>id===SELF_WID);
+      if(du<=3&&du>=0&&noEditor){
+        const dayLbl=du===0?'今日':du===1?'明日':`あと${du}日`;
+        warnings.push(`<div style="background:var(--rdim);border:1.5px solid var(--red);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openJobModal('${j.id}')">
+          <span style="font-size:20px">🚨</span>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:13px;color:var(--red)">編集者未定！ ${esc(j.title)}</div>
+            <div style="font-size:12px;color:var(--t2)">クライアント初稿まで${dayLbl}（${j.clientDraftDate}）— ショート動画の編集者が決まっていません</div>
+          </div>
+          <span class="badge br">要対応</span>
+        </div>`);
+      }
+    }
     // クライアント初稿1日前（自分担当のみ）
     if(j.clientDraftDate&&getJobWorkerIds(j).includes(SELF_WID)&&daysUntil(j.clientDraftDate)===1){
       warnings.push(`<div style="background:#3b82f620;border:1px solid var(--blue);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openJobModal('${j.id}')">
@@ -8038,7 +8078,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-67';
+const APP_VERSION='20260602-68';
 
 render();
 function forceAppUpdate(){
