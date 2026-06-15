@@ -1,5 +1,5 @@
-// EditFlow Service Worker v20260615-32
-const CACHE = 'editflow-20260615-69';
+// EditFlow Service Worker v20260615-33
+const CACHE = 'editflow-20260615-70';
 const URLS = ['./', './editflow.html'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(URLS)).then(() => self.skipWaiting()));
@@ -7,6 +7,15 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
+// ネットワーク優先: 常に最新を取得し、取得できた内容をキャッシュへ保存。
+// オフライン時のみキャッシュにフォールバックする。
 self.addEventListener('fetch', e => {
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request).then(r => {
+      const copy = r.clone();
+      caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+      return r;
+    }).catch(() => caches.match(e.request))
+  );
 });
