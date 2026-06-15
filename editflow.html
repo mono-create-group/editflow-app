@@ -3357,7 +3357,12 @@ function jobTotalOut(j){
 function jobProfit(j){return jobTotalIn(j)-jobTotalOut(j);}
 // 利益ページ用：サブタスクを含まずメインタスクの金額のみ
 function jobMainIn(j){return j.unitPrice||j.profit||0;}
-function jobMainOut(j){const wids=getJobWorkerIds(j);if(!wids.length||wids.every(id=>id===SELF_WID))return 0;return j.workerPay||0;}
+function jobMainOut(j){
+  const wids=getJobWorkerIds(j);
+  const mainPay=(wids.length&&!wids.every(id=>id===SELF_WID))?(j.workerPay||0):0;
+  const subPay=(j.subtasks||[]).filter(s=>s.workerId!==SELF_WID).reduce((sum,s)=>sum+(s.workerPay||0),0);
+  return mainPay+subPay;
+}
 function jobMainProfit(j){return jobMainIn(j)-jobMainOut(j);}
 function markJobPaid(id){
   const j=S.jobs.find(j=>j.id===id);if(!j)return;
