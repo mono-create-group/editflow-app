@@ -41,7 +41,7 @@
   --shadow-sm:0 1px 3px rgba(15,23,42,.06);
   --shadow-lg:0 8px 32px rgba(15,23,42,.14),0 2px 6px rgba(15,23,42,.06);
 }
-body{background:var(--bg);color:var(--text);font-family:-apple-system,'Hiragino Sans','Yu Gothic',BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;min-height:100vh;display:flex;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Hiragino Sans','Yu Gothic',BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;height:100vh;overflow:hidden;display:flex;-webkit-font-smoothing:antialiased}
 button{cursor:pointer;border:none;background:none;color:inherit;font:inherit}
 input,textarea,select{background:var(--card);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font:inherit;padding:8px 12px;width:100%;outline:none;transition:border-color .2s,box-shadow .2s;box-shadow:var(--shadow-sm)}
 input:focus,textarea:focus,select:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,40,217,0.1)}
@@ -51,7 +51,7 @@ a{color:inherit;text-decoration:none}
 
 /* ─── LAYOUT ─── */
 #sidebar{width:220px;height:100vh;background:var(--surface);border-right:1px solid var(--border);box-shadow:2px 0 12px rgba(15,23,42,.04);display:flex;flex-direction:column;padding:22px 0;position:sticky;top:0;flex-shrink:0;overflow-y:auto;scrollbar-width:none}
-#main{flex:1;overflow-y:auto;padding:32px 36px;max-width:960px}
+#main{flex:1;overflow-y:auto;min-height:0;padding:32px 36px;max-width:960px}
 .logo{padding:0 18px 22px;font-size:16px;font-weight:800;background:linear-gradient(135deg,var(--purple),#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.3px}
 .logo small{display:block;font-size:11px;color:var(--t3);font-weight:500;margin-top:2px;-webkit-text-fill-color:var(--t3)}
 .nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;margin:1px 10px;border-radius:10px;color:var(--t2);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;user-select:none}
@@ -2193,6 +2193,29 @@ ${!ci?`<div class="checkin-banner">
 
 ${rGoalActionWidget()}
 
+${(()=>{
+  const shortNoEditor=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'&&j.scope==='ショート動画'&&j.clientDraftDate).filter(j=>{
+    const du=daysUntil(j.clientDraftDate);
+    const wids=getJobWorkerIds(j);
+    return du>=0&&du<=3&&(wids.length===0||wids.every(id=>id===SELF_WID));
+  });
+  if(!shortNoEditor.length)return'';
+  return`<div style="margin-bottom:14px;display:flex;flex-direction:column;gap:6px">
+  ${shortNoEditor.map(j=>{
+    const du=daysUntil(j.clientDraftDate);
+    const dayLbl=du===0?'今日':du===1?'明日':`あと${du}日`;
+    return`<div style="background:var(--rdim);border:1.5px solid var(--red);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="V='projects';render()">
+      <span style="font-size:20px">🚨</span>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:13px;color:var(--red)">編集者未定！ ${esc(j.title)}</div>
+        <div style="font-size:12px;color:var(--t2)">クライアント初稿まで${dayLbl}（${j.clientDraftDate}）— ショート動画の編集者が決まっていません</div>
+      </div>
+      <span class="badge br">要対応</span>
+    </div>`;
+  }).join('')}
+</div>`;
+})()}
+
 <div class="two-col">
 <div>
 ${secTitle('今月の収益')}
@@ -2425,6 +2448,9 @@ function rFsDashPanel(date){
       draggable="true"
       ondragstart="taskDragStart(event,'${t.id}')"
       ondragend="taskDragEnd(event)"
+      ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="panelTaskDrop(event,'${t.id}')"
       style="margin:2px 6px;padding:5px 8px;cursor:grab;box-shadow:none;${t.fsBlockId?'opacity:0.55':''}">
       <div class="chk ${t.done?'done':''}" style="width:14px;height:14px;border-radius:4px;flex-shrink:0" onclick="toggleDone('${t.id}')"></div>
       <div class="task-body" style="min-width:0;gap:1px">
@@ -2442,6 +2468,37 @@ function rFsDashPanel(date){
     <div style="flex:1;min-width:0">${rFixedScheduleList(false,true,d)}</div>
   </div>`;
 }
+function panelTaskDrop(e,targetId){
+  e.preventDefault();e.stopPropagation();
+  const id=_taskDragId;
+  if(!id||id===targetId){_taskDragId=null;return;}
+  const from=S.tasks.findIndex(t=>t.id===id);
+  const to=S.tasks.findIndex(t=>t.id===targetId);
+  if(from<0||to<0){_taskDragId=null;return;}
+  const[item]=S.tasks.splice(from,1);S.tasks.splice(to,0,item);
+  save();render();_taskDragId=null;
+}
+function blockTaskDrop(e,targetId){
+  e.preventDefault();e.stopPropagation();
+  const id=_taskDragId;
+  if(!id||id===targetId){_taskDragId=null;return;}
+  const src=S.tasks.find(t=>t.id===id);
+  const tgt=S.tasks.find(t=>t.id===targetId);
+  if(!src||!tgt){_taskDragId=null;return;}
+  // 別ブロックのタスクの上に載せた → そのブロックへ移動（時間帯またぎの入れ替え）
+  if(tgt.fsBlockId&&src.fsBlockId!==tgt.fsBlockId){
+    src.fsBlockId=tgt.fsBlockId;
+    if(tgt.startTime)src.startTime=tgt.startTime;
+    src.fsSlot=tgt.fsSlot;
+  }
+  // 配列内の順序を入れ替え（splice後にインデックスがずれるため再取得）
+  const from=S.tasks.findIndex(t=>t.id===id);
+  if(from<0){_taskDragId=null;return;}
+  const[item]=S.tasks.splice(from,1);
+  const to=S.tasks.findIndex(t=>t.id===targetId);
+  if(to<0){S.tasks.push(item);}else{S.tasks.splice(to,0,item);}
+  save();render();_taskDragId=null;
+}
 function fsDashPanelDragOver(e){e.preventDefault();document.querySelector('.fs-dash-panel')?.classList.add('drag-over');}
 function fsDashPanelDragLeave(e){document.querySelector('.fs-dash-panel')?.classList.remove('drag-over');}
 function fsDashPanelDrop(e,date){
@@ -2451,10 +2508,10 @@ function fsDashPanelDrop(e,date){
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
   if(!t){_taskDragId=null;return;}
-  // パネルに戻したらスケジュール割り当てを解除・日付を設定
-  delete t.fsBlockId;delete t.fsSlot;
+  // ブロックに割り当て済みタスクはパネルへのドロップで変更しない（並び替え中の誤操作防止）
+  if(t.fsBlockId){_taskDragId=null;return;}
   if(date)t.dueDate=date;
-  save();render();toast('📋 スケジュール割り当てを解除しました');
+  save();render();
   _taskDragId=null;
 }
 
@@ -2473,7 +2530,7 @@ function rFixedScheduleList(compact=false,droppable=false,date){
     const em=tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e);
     const isNow=isTargetToday&&hasStart&&sm!==null&&nowM>=sm&&nowM<em;
     const blockId=f.id||('b'+i);
-    const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}','${blockId}',${i})" id="fs-block-${i}"`:'';
+    const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}','${blockId}',${i},'${td}')" id="fs-block-${i}"`:'';
     // →区切りのサブタスク解析（タイトルと説明、両方）
     const titleParts=f.t.includes('→')?f.t.split('→').map(s=>s.trim()).filter(Boolean):[];
     const descParts=f.d&&f.d.includes('→')?f.d.split('→').map(s=>s.trim()).filter(Boolean):[];
@@ -2502,6 +2559,9 @@ function rFixedScheduleList(compact=false,droppable=false,date){
     // タスクカード生成ヘルパー
     const rBlockTask=t=>`<div class="task-item" id="ti-${t.id}"
   draggable="true" ondragstart="taskDragStart(event,'${t.id}')" ondragend="taskDragEnd(event)"
+  ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+  ondragleave="this.classList.remove('drag-over')"
+  ondrop="blockTaskDrop(event,'${t.id}')"
   style="border-left:2px solid ${f.c};margin:2px 0;padding:6px 10px;cursor:grab;box-shadow:none;flex-shrink:0">
   <div class="chk ${t.done?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleDone('${t.id}')"></div>
   <div class="task-body" style="min-width:0">
@@ -2515,7 +2575,7 @@ function rFixedScheduleList(compact=false,droppable=false,date){
     // ドロップゾーン生成ヘルパー（slot: -1=先頭, 0=sub[0]後, 1=sub[1]後...）
     const rDz=(slot,label)=>droppable?`<div class="fs-dropzone"
   ondragover="fsInternalDragOver(event)" ondragleave="fsInternalDragLeave(event)"
-  ondrop="fsInternalDrop(event,'${blockId}',${slot})"
+  ondrop="fsInternalDrop(event,'${blockId}',${slot},'${td}','${f.s||''}')"
   onclick="openFsTaskModal('${blockId}',${slot},'${f.s||''}','${td}')">
   <div class="fs-dz-plus">＋ ${label||'ここに追加'}</div>
 </div>`:'';
@@ -2541,8 +2601,10 @@ function rFixedScheduleList(compact=false,droppable=false,date){
       const trailing=allBlockTasks.filter(t=>(t.fsSlot??9999)>allParts.length-1&&(t.fsSlot??9999)<9999-(allParts.length));
       subList+=trailing.map(rBlockTask).join('');
     }
-    // サブタスクなしブロックのタスク一覧
-    const plainTasks=hasParts?'':allBlockTasks.map(rBlockTask).join('')+(droppable?rDz(0,'タスクを追加'):'');
+    // サブタスクなしブロックのタスク一覧（ドロップゾーンを各タスクの前後に配置）
+    const plainTasks=hasParts?'':(droppable
+      ?rDz(-1,'先頭に追加')+allBlockTasks.map((t,idx)=>rBlockTask(t)+rDz(idx,'ここに追加')).join('')
+      :allBlockTasks.map(rBlockTask).join(''));
     return`<div class="task-item fs-drop-zone" ${dropAttrs} style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'0e;':''};margin-bottom:6px;transition:background .15s;flex-direction:column;align-items:stretch;gap:0;padding:11px 14px">
   <div style="display:flex;align-items:center;gap:9px">
     <div class="fs-chk ${mainDone?'done':''}" onclick="toggleFsMain('${blockId}')"></div>
@@ -2706,183 +2768,25 @@ function rTasksMonthly(){
 function schedDate(off){const d=new Date();d.setDate(d.getDate()+off);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function rTasksSchedule(){
   const d=schedDate(SD);
-  const isToday=SD===0;
-  const totalH=(SE-SS)*PPM;
-  const now=new Date(),nowM=now.getHours()*60+now.getMinutes();
-  const nowTop=mPos(nowM);
-  const hours=[];for(let h=SS/60;h<=SE/60;h++)hours.push(h);
-  const tasks=S.tasks.filter(t=>!t.deleted&&t.startTime&&(t.dueDate===d||(!t.dueDate&&isToday)));
-  const fixedBlocks=S.fs.map(f=>{
-    const sm=tMin(f.s),em=tMin(f.e==='-1'?'24:00':f.e);
-    const top=mPos(sm),h=Math.max(18,(em-sm)*PPM);
-    return`<div class="fixed-blk" style="top:${top}px;height:${h}px;background:${f.c}18;border-left-color:${f.c}">
-      <div class="fixed-blk-title" style="color:${f.c}">${esc(f.t)}</div>
-      <div class="fixed-blk-time">${f.s}〜${f.e}</div>
-    </div>`;}).join('');
-  // タスクブロックデータ（複数時間帯対応）
-  const taskBlkData=[];
-  tasks.forEach(t=>{
-    taskBlkData.push({id:t.id,isSubtask:false,isSlot:false,slotIdx:0,sm:tMin(t.startTime),em:t.endTime?tMin(t.endTime):tMin(t.startTime)+60,task:t,sub:null,subIdx:-1});
-    (t.timeSlots||[]).forEach((sl,si)=>{
-      if(!sl.s)return;
-      taskBlkData.push({id:`${t.id}::ts${si+1}`,isSubtask:false,isSlot:true,slotIdx:si+1,sm:tMin(sl.s),em:sl.e?tMin(sl.e):tMin(sl.s)+60,task:t,sub:null,subIdx:-1});
-    });
-  });
-  // サブタスクブロックデータ（startTimeを持つもの）
-  const subBlkData=[];
-  S.tasks.filter(t=>!t.deleted&&(t.dueDate===d||(!t.dueDate&&isToday))).forEach(t=>{
-    (t.subtasks||[]).forEach((s,i)=>{
-      if(s.startTime)subBlkData.push({id:`${t.id}::${i}`,isSubtask:true,sm:tMin(s.startTime),em:s.endTime?tMin(s.endTime):tMin(s.startTime)+30,task:t,sub:s,subIdx:i});
-    });
-  });
-  // 全ブロック統合してカラム分け
-  const allBlks=[...taskBlkData,...subBlkData].map(b=>({...b,col:0,numCols:1}));
-  allBlks.sort((a,b)=>a.sm-b.sm);
-  const colEnds=[];
-  allBlks.forEach(b=>{let c=colEnds.findIndex(e=>e<=b.sm);if(c<0)c=colEnds.length;colEnds[c]=b.em;b.col=c;});
-  allBlks.forEach(b=>{const ov=allBlks.filter(b2=>b2.sm<b.em&&b2.em>b.sm);b.numCols=Math.max(...ov.map(b2=>b2.col+1));});
-  const taskBlocks=allBlks.map(({id,isSubtask,isSlot,slotIdx,sm,em,col,numCols,task:t,sub:s,subIdx})=>{
-    const top=mPos(sm),h=Math.max(20,(em-sm)*PPM);
-    const colW=44/numCols;
-    const left=52+col*colW;
-    const right=100-(left+colW)+0.5;
-    const isOverlap=numCols>1;
-    const totalSlots=(t.timeSlots?.length||0)+1;
-    if(isSubtask){
-      return`<div class="task-blk sub-blk${s.done?' done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
-        style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute"
-        ondragstart="schedDragStart(event,'${id}')"
-        title="↳ ${esc(s.title)} (${esc(t.title)})">
-        <div style="overflow:hidden">
-          <div class="sub-blk-label">↳ ${esc(t.title)}</div>
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</div>
-        </div>
-        ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
-      </div>`;
-    }
-    if(isSlot){
-      return`<div class="task-blk${t.done?' done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
-        style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute;border-left:3px dashed rgba(255,255,255,.5)"
-        ondragstart="schedDragStart(event,'${id}')"
-        title="${esc(t.title)} (${slotIdx+1}/${totalSlots}回目)">
-        <div style="overflow:hidden;flex:1">
-          <div style="font-size:9px;opacity:.75;margin-bottom:1px">${slotIdx+1}/${totalSlots}回目</div>
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(t.title)}</div>
-        </div>
-        ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
-      </div>`;
-    }
-    return`<div class="task-blk ${t.done?'done-blk':''}${isOverlap?' overlap-blk':''}" draggable="true"
-      style="top:${top}px;height:${h}px;cursor:grab;left:${left}%;right:${right}%;display:flex;flex-direction:column;justify-content:space-between;position:absolute"
-      ondblclick="event.stopPropagation();delTask('${t.id}')"
-      ondragstart="schedDragStart(event,'${t.id}')"
-      title="${esc(t.title)}${totalSlots>1?` (${totalSlots}回に分割)`:''}${isOverlap?` ⚡ ${numCols}件重複`:''} (ダブルクリックで削除)">
-      <span onclick="openTaskModal('${t.id}')" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isOverlap?'⚡ ':''}${totalSlots>1?`✂ `:''}${esc(t.title)}</span>
-      ${totalSlots>1?`<div style="font-size:9px;opacity:.7;margin-top:1px">1/${totalSlots}回目</div>`:''}
-      ${isOverlap?`<div class="overlap-badge">×${numCols}</div>`:''}
-      ${h>=36&&!isOverlap&&totalSlots===1?`<div style="display:flex;gap:3px;margin-top:2px"><button onclick="event.stopPropagation();splitSchedTask('${t.id}')" style="font-size:9px;padding:1px 4px;background:rgba(255,255,255,.15);border:none;border-radius:3px;color:#fff;cursor:pointer" title="タスクを分割">✂</button></div>`:''}
-    </div>`;}).join('');
-  const nowLine=(isToday&&nowM>=SS&&nowM<=SE)?`<div class="now-line" style="top:${nowTop}px"></div>`:'';
-  // Gcalイベントをタイムラインとサイドパネルへ
-  const gcalEvs=gcalEventsForDate(d);
-  const gcalTimedBlocks=gcalEvs.filter(e=>e.start?.dateTime).map(e=>{
-    const sm=tMin(new Date(e.start.dateTime).toTimeString().slice(0,5));
-    const em=e.end?.dateTime?tMin(new Date(e.end.dateTime).toTimeString().slice(0,5)):sm+60;
-    const top=mPos(sm),h=Math.max(18,(em-sm)*PPM);
-    const timeLbl=new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+(e.end?.dateTime?'〜'+new Date(e.end.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'');
-    return`<div style="position:absolute;top:${top}px;height:${h}px;left:52%;right:0.5%;background:var(--blue)22;border-left:3px solid var(--blue);border-radius:5px;padding:2px 5px;overflow:hidden;pointer-events:none;z-index:1">
-      <div style="font-size:10px;color:var(--blue);font-weight:600">📅 ${timeLbl}</div>
-      <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.summary||'(無題)')}</div>
-    </div>`;
-  }).join('');
-  const gcalAllDay=gcalEvs.filter(e=>!e.start?.dateTime);
-  // サイドパネル用：未スケジュールのタスク（startTimeなし）
-  const allDay=S.tasks.filter(t=>!t.deleted&&(t.dueDate===d||(!t.dueDate&&isToday)));
-  const unscheduled=allDay.filter(t=>!t.startTime);
-  const undone=unscheduled.filter(t=>!t.done),doneList=unscheduled.filter(t=>t.done);
-  // 未完了数（タスク＋未スケジュールサブタスク）
-  const undoneSubCount=unscheduled.reduce((s,t)=>{
-    const subs=t.subtasks||[];
-    return s+subs.filter(sub=>!sub.done&&!sub.startTime).length;
-  },0);
-  const totalUndone=undone.length+undoneSubCount;
-  const DH=`<span class="sched-dh">⠿</span>`;
-  const sideItems=[...undone,...doneList].map(t=>{
-    const subs=t.subtasks||[];
-    const subsDone=subs.filter(s=>s.done).length;
-    const progHtml=subs.length?`<span style="font-size:10px;color:var(--t3);font-weight:400">${subsDone}/${subs.length}</span>`:'';
-    // サブタスク行（未スケジュールのみ、完了は最後）
-    const undoneSubs=subs.map((s,i)=>({s,i})).filter(({s})=>!s.done&&!s.startTime);
-    const doneSubs=subs.map((s,i)=>({s,i})).filter(({s})=>s.done&&!s.startTime);
-    const subRows=[...undoneSubs,...doneSubs].map(({s,i})=>`
-      <div class="sched-side-sub${s.done?' done-sub':''}" draggable="true"
-        ondragstart="sideTaskDragStart(event,'${t.id}::${i}')"
-        ondragend="sideSubDragEnd(event)"
-        title="↳ ${esc(s.title)}（ドラッグでスケジュールへ）">
-        ${DH}
-        <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</div>
-        <div style="width:12px;height:12px;border-radius:3px;border:1.5px solid ${s.done?'var(--purple)':'var(--border)'};background:${s.done?'var(--purple)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="event.stopPropagation();toggleSub('${t.id}',${i})">
-          ${s.done?'<svg width="8" height="8" viewBox="0 0 8 8"><polyline points="1,4 3,6 7,2" stroke="#fff" stroke-width="1.5" fill="none"/></svg>':''}
-        </div>
-      </div>`).join('');
-    return`<div class="sched-side-task${t.done?' done-side':''}" draggable="true"
-      ondragstart="sideTaskDragStart(event,'${t.id}')"
-      ondragend="sideTaskDragEnd(event)"
-      onclick="openTaskModal('${t.id}')">
-      ${DH}
-      <div style="flex:1;min-width:0">
-        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:2px;flex-wrap:wrap">
-          ${t.priority?`<span style="font-size:10px">${t.priority==='high'?'🔴 高':'🟡 中'}</span>`:''}
-          ${progHtml}
-        </div>
-      </div>
-    </div>${subRows}`;}).join('');
-  const sidePanel=`<div class="sched-side-panel" id="sched-side-panel"
-    ondragover="schedSideDragOver(event)"
-    ondragleave="schedSideDragLeave(event)"
-    ondrop="schedSideDrop(event,'${d}')">
-    <div class="sched-side-hdr">
-      <span>📋 未配置タスク</span>
-      <span style="font-size:11px;background:var(--border);padding:1px 6px;border-radius:10px">${totalUndone}</span>
-    </div>
-    ${gcalAllDay.map(e=>`<div style="padding:4px 8px;border-left:3px solid var(--blue);margin-bottom:4px;background:var(--blue)11;border-radius:3px">
-      <div style="font-size:10px;color:var(--blue)">📅 終日</div>
-      <div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.summary||'(無題)')}</div>
-    </div>`).join('')}
-    ${sideItems||(!gcalAllDay.length?`<div style="font-size:12px;color:var(--t3);text-align:center;padding:16px 8px">未スケジュールの<br>タスクはありません 🎉</div>`:'')}
-    <div style="font-size:10px;color:var(--t3);text-align:center;padding:6px 8px 8px;border-top:1px solid var(--border);margin-top:4px">⠿ をドラッグしてスケジュールへ配置</div>
-  </div>`;
   const dateLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'long'});
-  return`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+  const dayHabits=habitsForDate(d).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+  const isToday=SD===0,isTomorrow=SD===1;
+  const hasFs=S.fs&&S.fs.length>0;
+  return`
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
   <div style="display:flex;align-items:center;gap:8px">
     <button class="btn btn-g btn-sm" onclick="SD--;render()">‹</button>
-    <div style="font-size:13px;font-weight:600">${dateLabel}${SD===0?' (今日)':SD===1?' (明日)':''}</div>
+    <div style="font-size:13px;font-weight:600">${dateLabel}${isToday?' (今日)':isTomorrow?' (明日)':''}</div>
     <button class="btn btn-g btn-sm" onclick="SD++;render()">›</button>
     ${SD!==0?`<button class="btn btn-g btn-sm" onclick="SD=0;render()">今日</button>`:''}
   </div>
   <div style="display:flex;gap:6px">
-    <button class="btn btn-g btn-sm" onclick="resetSchedTimes('${d}')" title="この日の全タスクの開始・終了時間をクリア">⏱ 時間リセット</button>
-    <button class="btn btn-p btn-sm" onclick="openTaskModal(null,'${d}',true)">＋ 時間付きタスク追加</button>
+    <button class="btn btn-g btn-xs" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>
+    <button class="btn btn-p btn-sm" onclick="openTaskModal(null,'${d}')">＋ タスク追加</button>
   </div>
 </div>
-<div class="sched-layout">
-  ${sidePanel}
-  <div class="sched-col">
-    <div class="sched-wrap" id="sched-main-wrap"
-      ondragover="schedDragOver(event)"
-      ondrop="schedDrop(event,'${d}')">
-      <div class="sched-hours" style="height:${totalH}px">
-        ${hours.map(h=>`<div class="hlabel" style="top:${mPos(h*60)}px">${String(h).padStart(2,'0')}:00</div>`).join('')}
-      </div>
-      <div class="sched-main" style="height:${totalH}px">
-        ${hours.map(h=>`<div class="hline" style="top:${mPos(h*60)}px"></div><div class="hline-half" style="top:${mPos(h*60+30)}px"></div>`).join('')}
-        ${fixedBlocks}${taskBlocks}${gcalTimedBlocks}${nowLine}
-      </div>
-    </div>
-    <div class="sched-add-hint">↑ スケジュールは設定から編集できます</div>
-  </div>
-</div>`;
+${hasFs?rFsDashPanel(d):`<div class="card card-sm" style="color:var(--t2);text-align:center">固定スケジュールが未設定です。<button class="btn btn-g btn-xs" style="margin-left:8px" onclick="V='habits';HV='schedule';render()">設定する →</button></div>`}
+${dayHabits.length?`${secTitle(`🔥 習慣 (${dayHabits.length}件)`)}${dayHabits.map(h=>rHabitInTaskView(h,d,isToday)).join('')}`:''}`;
 }
 
 function openDayModal(d){
@@ -2986,22 +2890,57 @@ function schedSideDrop(e,date){
   _schedDragId=null;
 }
 // ===TASK LIST D&D===
-let _taskDragId=null;
-function taskDragStart(e,id){_taskDragId=id;e.dataTransfer.effectAllowed='move';e.currentTarget.classList.add('dragging');}
-function taskDragEnd(e){e.currentTarget.classList.remove('dragging');document.querySelectorAll('.task-item.drag-over,.fs-drop-zone.fs-drag-over').forEach(el=>el.classList.remove('drag-over','fs-drag-over'));}
+let _taskDragId=null,_taskDragSnap=null;
+// 安全網: ドラッグがどんな終わり方をしても（枠外ドロップ・タッチ中断等）
+// 残留状態を必ずリセットし、次のドラッグが誤動作しないようにする。
+document.addEventListener('dragend',()=>{
+  setTimeout(()=>{
+    _taskDragId=null;_taskDragSnap=null;_wdayDragId=null;_schedDragId=null;_schedDragOffset=0;
+    document.querySelectorAll('.dragging,.drag-over,.fs-drag-over,.fs-dz-over').forEach(el=>el.classList.remove('dragging','drag-over','fs-drag-over','fs-dz-over'));
+  },0);
+});
+function taskDragStart(e,id){
+  _taskDragId=id;
+  const t=S.tasks.find(t=>t.id===id);
+  _taskDragSnap=t?{fsBlockId:t.fsBlockId,fsSlot:t.fsSlot,dueDate:t.dueDate,startTime:t.startTime}:null;
+  e.dataTransfer.effectAllowed='move';
+  e.currentTarget.classList.add('dragging');
+}
+function taskDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.task-item.drag-over,.fs-drop-zone.fs-drag-over').forEach(el=>el.classList.remove('drag-over','fs-drag-over'));
+  // dropハンドラが正常処理した場合は_taskDragId=nullになっているので何もしない
+  // ドロップが未処理（キャンセル等）の場合は元の状態に戻す
+  if(_taskDragId&&_taskDragSnap){
+    const t=S.tasks.find(t=>t.id===_taskDragId);
+    if(t){
+      t.fsBlockId=_taskDragSnap.fsBlockId;
+      t.fsSlot=_taskDragSnap.fsSlot;
+      t.dueDate=_taskDragSnap.dueDate;
+      t.startTime=_taskDragSnap.startTime;
+      save();render();
+    }
+  }
+  _taskDragId=null;_taskDragSnap=null;
+}
 function fsBlockDragOver(e,i){e.preventDefault();e.stopPropagation();document.getElementById('fs-block-'+i)?.classList.add('fs-drag-over');}
 function fsBlockDragLeave(e,i){document.getElementById('fs-block-'+i)?.classList.remove('fs-drag-over');}
-function fsBlockDrop(e,startTime,blockId,i){
+function fsBlockDrop(e,startTime,blockId,i,date){
   e.preventDefault();e.stopPropagation();
   document.getElementById('fs-block-'+i)?.classList.remove('fs-drag-over');
   const id=_taskDragId||_wdayDragId;
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
   if(!t){_taskDragId=null;_wdayDragId=null;return;}
-  if(startTime)t.startTime=startTime;
-  if(blockId)t.fsBlockId=blockId;
-  t.dueDate=today();
-  save();render();toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
+  // 既に同じブロックに居る場合のみ何もしない（並び替えはドロップゾーンで）
+  if(t.fsBlockId===blockId){_taskDragId=null;_wdayDragId=null;return;}
+  const moving=!!t.fsBlockId; // 別ブロックからの移動か、未割り当てからの新規割り当てか
+  if(startTime&&startTime!=='-1'&&startTime!=='')t.startTime=startTime;
+  t.fsBlockId=blockId;
+  t.fsSlot=undefined; // スロット位置はリセット
+  // dueDateが未設定の場合のみ日付をセット（既存のdueDateは保持）
+  if(!t.dueDate)t.dueDate=date||today();
+  save();render();toast(moving?`🔀 ${esc(t.title)} を移動しました`:`📌 ${esc(t.title)} をスケジュールに割り当てました`);
   _taskDragId=null;_wdayDragId=null;
 }
 
@@ -3122,6 +3061,23 @@ ${(()=>{
   const warnings=[];
   const activeJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
   for(const j of activeJobs){
+    // ショート動画: クライアント初稿3日前に編集者未定アラーム
+    if(j.scope==='ショート動画'&&j.clientDraftDate){
+      const du=daysUntil(j.clientDraftDate);
+      const wids=getJobWorkerIds(j);
+      const noEditor=wids.length===0||wids.every(id=>id===SELF_WID);
+      if(du<=3&&du>=0&&noEditor){
+        const dayLbl=du===0?'今日':du===1?'明日':`あと${du}日`;
+        warnings.push(`<div style="background:var(--rdim);border:1.5px solid var(--red);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openJobModal('${j.id}')">
+          <span style="font-size:20px">🚨</span>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:13px;color:var(--red)">編集者未定！ ${esc(j.title)}</div>
+            <div style="font-size:12px;color:var(--t2)">クライアント初稿まで${dayLbl}（${j.clientDraftDate}）— ショート動画の編集者が決まっていません</div>
+          </div>
+          <span class="badge br">要対応</span>
+        </div>`);
+      }
+    }
     // クライアント初稿1日前（自分担当のみ）
     if(j.clientDraftDate&&getJobWorkerIds(j).includes(SELF_WID)&&daysUntil(j.clientDraftDate)===1){
       warnings.push(`<div style="background:#3b82f620;border:1px solid var(--blue);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openJobModal('${j.id}')">
@@ -4057,7 +4013,7 @@ function rGoals(){
   return`<div class="ph">
   <div class="ph-title">🎯 目標・KPI管理</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    ${tabDef.goals?`<button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}')">＋ 目標追加</button>`:''}
+    ${tabDef.goals?`<button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}','${div?.id||''}')">＋ 目標追加</button>`:''}
     <button class="btn btn-g btn-sm" onclick="openDivModal(null)">＋ 事業部</button>
     ${div?`<button class="btn btn-g btn-sm" onclick="openDivModal('${div.id}')">✏️ 編集</button>`:''}
     ${div?`<button class="btn btn-g btn-sm btn-red" onclick="delDiv('${div.id}')">🗑 削除</button>`:''}
@@ -4075,7 +4031,7 @@ function rUnifiedHorizonTab(div,tabDef){
   // ===今週専用コンテキスト===
   let weeklyCtx='';
   if(tabDef.v==='1w'){
-    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&(!g.divisionId||g.divisionId===(div?.id||null)));
+    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&(div?.id?g.divisionId===div.id:!g.divisionId));
     const now=new Date(td);
     const endOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0);
     const daysLeft=Math.max(1,Math.ceil((endOfMonth-now)/(1000*60*60*24))+1);
@@ -4196,12 +4152,12 @@ function rUnifiedHorizonTab(div,tabDef){
   let goalsSection='';
   if(tabDef.goals){
     const divId=div?.id||null;
-    // divisionIdが設定済みならその事業部のみ、未設定（旧データ）は全事業部に表示
-    const goals=(S.goals||[]).filter(g=>!g.deleted&&(g.horizon||'this_month')===tabDef.goals&&(!g.divisionId||g.divisionId===divId));
+    // 事業部が選択されている場合はその事業部のみ表示（divisionId未設定の旧データは除外）
+    const goals=(S.goals||[]).filter(g=>!g.deleted&&(g.horizon||'this_month')===tabDef.goals&&(divId?g.divisionId===divId:!g.divisionId));
     goalsSection=`<div style="margin-bottom:16px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <div style="font-size:14px;font-weight:800;color:var(--purple)">🎯 ${tabDef.l}の目標</div>
-    <button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}')">＋ 目標追加</button>
+    <button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}','${divId||''}')">＋ 目標追加</button>
   </div>
   ${goals.length?goals.map(g=>rGoalCard(g)).join('')
     :`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px">
@@ -4365,7 +4321,7 @@ ${rAchievementBox(from3m,td,'直近3ヶ月')}`;
   // ===半年後: 1年後の目標から月次必要数値を算出===
   let halfYearCtx='';
   if(tabDef.v==='6m'){
-    const year1Goals6m=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='year1'&&(!g.divisionId||g.divisionId===(div?.id||null)));
+    const year1Goals6m=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='year1'&&(div?.id?g.divisionId===div.id:!g.divisionId));
     const now=new Date(td);
     const endOfYear6m=g=>g.deadline?new Date(g.deadline):new Date(now.getFullYear(),11,31);
     const monthsLeft6m=g=>{
@@ -5166,7 +5122,7 @@ function rHorizonTab(div,period){
   let weeklyContextSection='';
   if(period==='1w'){
     // 今月の目標（S.goals から）
-    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&(!g.divisionId||g.divisionId===div.id));
+    const thisMonthGoals=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='this_month'&&g.divisionId===div.id);
     // 今月のKPI（1mホライズン）から今週必要な数値を計算
     const monthKpis=(div.horizons?.['1m']?.kpis||[]);
     // 残り日数・週数を計算
@@ -5797,6 +5753,10 @@ ${secTitle('📅 固定タイムスケジュール')}
   <div style="font-size:12px;color:var(--t2);margin-bottom:12px">タスク管理のスケジュール表示に使われる固定の時間割です</div>
   <div id="fs-list">
     ${S.fs.map((f,i)=>`<div class="sched-edit-item">
+      <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+        <button class="tact" style="padding:1px 5px;font-size:11px;line-height:1.2;opacity:${i===0?'0.2':'0.7'}" ${i===0?'disabled':''} onclick="fsMove(${i},-1)" title="上へ">▲</button>
+        <button class="tact" style="padding:1px 5px;font-size:11px;line-height:1.2;opacity:${i===S.fs.length-1?'0.2':'0.7'}" ${i===S.fs.length-1?'disabled':''} onclick="fsMove(${i},1)" title="下へ">▼</button>
+      </div>
       <div class="sched-edit-color" style="background:${f.c}"></div>
       <input style="width:54px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${f.s}" onchange="S.fs[${i}].s=this.value" placeholder="開始">
       <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.s?'0.7':'0.2'}" onclick="S.fs[${i}].s='';save();render()" title="開始時間をクリア">✕</button>
@@ -6206,6 +6166,12 @@ function saveTarget(){S.settings.target=parseInt(document.getElementById('set-ta
 function saveSheetsId(){const v=document.getElementById('set-sheets-id')?.value.trim();if(!v){toast('スプレッドシートIDを入力してください','err');return;}S.settings.sheetsId=v;S.settings.sheetsTab=(document.getElementById('set-sheets-tab')?.value||'').trim();save();toast('📊 スプレッドシート設定を保存しました');}
 function saveIdentity(){S.settings.identity=document.getElementById('set-identity').value.trim();save();toast('アイデンティティを保存しました');}
 function saveFS(){save();toast('スケジュールを保存しました');}
+function fsMove(i,dir){
+  const j=i+dir;
+  if(j<0||j>=S.fs.length)return;
+  [S.fs[i],S.fs[j]]=[S.fs[j],S.fs[i]];
+  save();render();
+}
 
 // ===AI CHAT===
 let _chatHistory=[];
@@ -6433,6 +6399,7 @@ function openTaskModal(id,preDate,withTime){
       <input type="time" class="ts-start" id="t-start" value="${t?.startTime||withTime||''}" style="flex:1">
       <span style="color:var(--t2);font-size:12px">〜</span>
       <input type="time" class="ts-end" id="t-end" value="${t?.endTime||''}" style="flex:1">
+      <button class="btn btn-g btn-xs" onclick="document.getElementById('t-start').value='';document.getElementById('t-end').value=''" style="flex-shrink:0" title="時間をクリア">✕</button>
     </div>
     ${(t?.timeSlots||[]).map((sl,si)=>`<div class="ts-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
       <span style="font-size:10px;color:var(--purple);font-weight:700;flex-shrink:0;min-width:16px">${['②','③','④','⑤','⑥'][si]||'●'}</span>
@@ -6457,7 +6424,6 @@ function openTaskModal(id,preDate,withTime){
   <button class="btn btn-p" onclick="saveTask()">保存</button>
 </div>`);
   document.getElementById('t-ttl')?.focus();
-  if(withTime){document.getElementById('t-start').value=mToT(Math.round((new Date().getHours()*60+new Date().getMinutes())/30)*30);}
 }
 function addTimeSlot(){
   const cont=document.getElementById('timeslot-cont');
@@ -6526,16 +6492,48 @@ function openFsTaskModal(blockId,slot,startTime,date){
   window._fsPendingSlot=slot;
   openTaskModal(null,date,startTime);
 }
-// 固定スケジュール内のドラッグドロップ（スロット移動）
-function fsInternalDrop(e,blockId,slot){
+// 固定スケジュール内のドラッグドロップ（スロット移動・並び替え・ブロック間移動）
+function fsInternalDrop(e,blockId,slot,date,startTime){
   e.preventDefault();e.stopPropagation();
   e.currentTarget?.classList.remove('fs-dz-over');
   const id=_taskDragId;
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
   if(!t){_taskDragId=null;return;}
+  const wasUnassigned=!t.fsBlockId;
+  const isSameBlock=t.fsBlockId===blockId;
   t.fsBlockId=blockId;
   t.fsSlot=slot;
+  if(wasUnassigned){
+    // パネルからの新規割り当て: 日付とstartTimeを設定
+    if(date)t.dueDate=date;
+    if(startTime&&startTime!=='-1')t.startTime=startTime;
+    toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
+  } else if(isSameBlock){
+    // 同ブロック内並び替え: S.tasks内の順序も更新
+    const from=S.tasks.findIndex(t2=>t2.id===id);
+    if(from>=0){
+      const [item]=S.tasks.splice(from,1);
+      const blockTasks=S.tasks.filter(t2=>!t2.deleted&&t2.fsBlockId===blockId);
+      if(slot===-1){
+        // 先頭に移動: ブロック内最初のタスクの前に挿入
+        const firstIdx=S.tasks.findIndex(t2=>!t2.deleted&&t2.fsBlockId===blockId);
+        if(firstIdx>=0)S.tasks.splice(firstIdx,0,item);
+        else S.tasks.push(item);
+      } else {
+        // slot番目のタスクの後に挿入
+        const refTask=blockTasks[slot];
+        if(refTask){
+          const refIdx=S.tasks.findIndex(t2=>t2.id===refTask.id);
+          S.tasks.splice(refIdx+1,0,item);
+        } else S.tasks.push(item);
+      }
+    }
+  } else {
+    // 別ブロックへの移動: 時間帯も移動先ブロックに合わせる（dueDateは保持）
+    if(startTime&&startTime!=='-1'&&startTime!=='')t.startTime=startTime;
+    toast(`🔀 ${esc(t.title)} を移動しました`);
+  }
   save();render();
   _taskDragId=null;
 }
@@ -6937,11 +6935,17 @@ function openGoalModal(id,defaultHorizon,defaultDivId){
   const gcat=g?.category||'';
   const ghz=g?.horizon||defaultHorizon||GV||'this_month';
   // 事業部IDをモーダルに引き渡す（新規時はKVから、編集時は既存値）
-  window._goalModalDivId=g?.divisionId||(defaultDivId??KV??null);
+  window._goalModalDivId=g?.divisionId||(defaultDivId||KV||null);
   // 上位目標の候補（より長い時間軸の目標）
   const parentHzs=eligibleParentHorizons(ghz);
   const parentCandidates=S.goals.filter(pg=>!pg.deleted&&parentHzs.includes(pg.horizon)&&pg.id!==id);
+  const modalDivs=(S.divisions||[]).filter(d=>!d.deleted);
   openModalLg(`<div class="mhdr"><div class="mtitle">${g?'目標編集':'目標追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+${modalDivs.length>1?`<div class="fg"><div class="fl">事業部</div>
+  <select id="g-div" onchange="window._goalModalDivId=this.value||null">
+    <option value="">なし</option>
+    ${modalDivs.map(d=>`<option value="${d.id}" ${window._goalModalDivId===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}
+  </select></div>`:''}
 <div class="frow">
   <div class="fg"><div class="fl">時間軸</div>
     <select id="g-hz" onchange="updGoalHzFields()">
@@ -7025,7 +7029,8 @@ function saveGoal(){
   const woop={outcome:document.getElementById('g-outcome')?.value.trim(),obstacle:document.getElementById('g-obstacle')?.value.trim(),plan:document.getElementById('g-plan')?.value.trim()};
   const hz=document.getElementById('g-hz')?.value||'this_month';
   const parentGoalId=document.getElementById('g-parent')?.value||null;
-  const divisionId=window._goalModalDivId||null;
+  const divEl=document.getElementById('g-div');
+  const divisionId=(divEl?divEl.value||null:null)??window._goalModalDivId??null;
   const data={title,horizon:hz,targetMonth:hz==='monthly'?(document.getElementById('g-target-month')?.value||today().slice(0,7)):null,category:document.getElementById('g-cat').value,deadline:document.getElementById('g-dl').value||null,targetAmount:parseInt(document.getElementById('g-amt')?.value)||0,targetSalesCount:parseInt(document.getElementById('g-sales-cnt')?.value)||0,targetHireCount:parseInt(document.getElementById('g-hire-cnt')?.value)||0,description:document.getElementById('g-desc').value.trim(),woop,milestones:ms,parentGoalId,divisionId};
   if(EID){const g=S.goals.find(g=>g.id===EID);if(g){const oldMs=g.milestones||[];data.milestones=ms.map((m,i)=>({...m,done:oldMs[i]?.done||false}));Object.assign(g,data);}}
   else S.goals.push({id:uid(),...data,progress:0,createdAt:new Date().toISOString()});
@@ -8101,7 +8106,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260602-57';
+const APP_VERSION='20260616-69';
 
 render();
 function forceAppUpdate(){
