@@ -2482,10 +2482,21 @@ function blockTaskDrop(e,targetId){
   e.preventDefault();e.stopPropagation();
   const id=_taskDragId;
   if(!id||id===targetId){_taskDragId=null;return;}
+  const src=S.tasks.find(t=>t.id===id);
+  const tgt=S.tasks.find(t=>t.id===targetId);
+  if(!src||!tgt){_taskDragId=null;return;}
+  // 別ブロックのタスクの上に載せた → そのブロックへ移動（時間帯またぎの入れ替え）
+  if(tgt.fsBlockId&&src.fsBlockId!==tgt.fsBlockId){
+    src.fsBlockId=tgt.fsBlockId;
+    if(tgt.startTime)src.startTime=tgt.startTime;
+    src.fsSlot=tgt.fsSlot;
+  }
+  // 配列内の順序を入れ替え（splice後にインデックスがずれるため再取得）
   const from=S.tasks.findIndex(t=>t.id===id);
+  if(from<0){_taskDragId=null;return;}
+  const[item]=S.tasks.splice(from,1);
   const to=S.tasks.findIndex(t=>t.id===targetId);
-  if(from<0||to<0){_taskDragId=null;return;}
-  const[item]=S.tasks.splice(from,1);S.tasks.splice(to,0,item);
+  if(to<0){S.tasks.push(item);}else{S.tasks.splice(to,0,item);}
   save();render();_taskDragId=null;
 }
 function fsDashPanelDragOver(e){e.preventDefault();document.querySelector('.fs-dash-panel')?.classList.add('drag-over');}
@@ -2880,6 +2891,14 @@ function schedSideDrop(e,date){
 }
 // ===TASK LIST D&D===
 let _taskDragId=null,_taskDragSnap=null;
+// 安全網: ドラッグがどんな終わり方をしても（枠外ドロップ・タッチ中断等）
+// 残留状態を必ずリセットし、次のドラッグが誤動作しないようにする。
+document.addEventListener('dragend',()=>{
+  setTimeout(()=>{
+    _taskDragId=null;_taskDragSnap=null;_wdayDragId=null;_schedDragId=null;_schedDragOffset=0;
+    document.querySelectorAll('.dragging,.drag-over,.fs-drag-over,.fs-dz-over').forEach(el=>el.classList.remove('dragging','drag-over','fs-drag-over','fs-dz-over'));
+  },0);
+});
 function taskDragStart(e,id){
   _taskDragId=id;
   const t=S.tasks.find(t=>t.id===id);
@@ -2913,14 +2932,15 @@ function fsBlockDrop(e,startTime,blockId,i,date){
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
   if(!t){_taskDragId=null;_wdayDragId=null;return;}
-  // fsBlockIdが設定済み（ブロック内タスク）は一切無視
-  // ブロック間移動はドロップゾーン経由で行う
-  if(t.fsBlockId){_taskDragId=null;_wdayDragId=null;return;}
-  if(startTime)t.startTime=startTime;
+  // 既に同じブロックに居る場合のみ何もしない（並び替えはドロップゾーンで）
+  if(t.fsBlockId===blockId){_taskDragId=null;_wdayDragId=null;return;}
+  const moving=!!t.fsBlockId; // 別ブロックからの移動か、未割り当てからの新規割り当てか
+  if(startTime&&startTime!=='-1'&&startTime!=='')t.startTime=startTime;
   t.fsBlockId=blockId;
+  t.fsSlot=undefined; // スロット位置はリセット
   // dueDateが未設定の場合のみ日付をセット（既存のdueDateは保持）
   if(!t.dueDate)t.dueDate=date||today();
-  save();render();toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
+  save();render();toast(moving?`🔀 ${esc(t.title)} を移動しました`:`📌 ${esc(t.title)} をスケジュールに割り当てました`);
   _taskDragId=null;_wdayDragId=null;
 }
 
@@ -6509,8 +6529,11 @@ function fsInternalDrop(e,blockId,slot,date,startTime){
         } else S.tasks.push(item);
       }
     }
+  } else {
+    // 別ブロックへの移動: 時間帯も移動先ブロックに合わせる（dueDateは保持）
+    if(startTime&&startTime!=='-1'&&startTime!=='')t.startTime=startTime;
+    toast(`🔀 ${esc(t.title)} を移動しました`);
   }
-  // 別ブロックへの意図的な移動: fsBlockIdのみ更新、dueDate/startTimeは変えない
   save();render();
   _taskDragId=null;
 }
