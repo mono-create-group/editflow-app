@@ -1723,30 +1723,30 @@ function rGoalActionWidget(){
   </div>`;
 }
 function revGoalStats(g){
-  // 収益目標 = paymentDateベース（案件管理の月別利益と同じ基準）
+  // 収益目標 = 売上ベース（paymentDate基準・単価/売上合計、外注費は引かない）
   const n=new Date(),td=today(),yr=n.getFullYear(),mo=n.getMonth();
   const hz=g.horizon||'this_month';
   const paidJobs=(S.jobs||[]).filter(j=>!j.deleted&&j.paymentDate);
   let earned=0,endDate;
   if(hz==='this_month'){
     const ym=td.slice(0,7);
-    earned=paidJobs.filter(j=>j.paymentDate.startsWith(ym)).reduce((s,j)=>s+jobMainProfit(j),0);
+    earned=paidJobs.filter(j=>j.paymentDate.startsWith(ym)).reduce((s,j)=>s+jobMainIn(j),0);
     endDate=new Date(yr,mo+1,0);
   }else if(hz==='next_month'){
     const nm=new Date(yr,mo+1,1);
     const ym=`${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}`;
-    earned=paidJobs.filter(j=>j.paymentDate.startsWith(ym)).reduce((s,j)=>s+jobMainProfit(j),0);
+    earned=paidJobs.filter(j=>j.paymentDate.startsWith(ym)).reduce((s,j)=>s+jobMainIn(j),0);
     endDate=new Date(yr,mo+2,0);
   }else if(hz==='monthly'){
     const tm=g.targetMonth||td.slice(0,7);
-    earned=paidJobs.filter(j=>j.paymentDate.startsWith(tm)).reduce((s,j)=>s+jobMainProfit(j),0);
+    earned=paidJobs.filter(j=>j.paymentDate.startsWith(tm)).reduce((s,j)=>s+jobMainIn(j),0);
     const[tyr,tmo]=tm.split('-').map(Number);
     endDate=new Date(tyr,tmo,0);
   }else if(hz==='year1'){
-    earned=paidJobs.filter(j=>j.paymentDate.startsWith(String(yr))).reduce((s,j)=>s+jobMainProfit(j),0);
+    earned=paidJobs.filter(j=>j.paymentDate.startsWith(String(yr))).reduce((s,j)=>s+jobMainIn(j),0);
     endDate=new Date(yr,11,31);
   }else{
-    earned=paidJobs.reduce((s,j)=>s+jobMainProfit(j),0);
+    earned=paidJobs.reduce((s,j)=>s+jobMainIn(j),0);
     endDate=g.deadline?new Date(g.deadline):new Date(n.getTime()+(hz==='year5'?5:10)*365.25*86400000);
   }
   const remaining=Math.max(0,(g.targetAmount||0)-earned);
@@ -8113,7 +8113,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260616-69';
+const APP_VERSION='20260619-02';
 
 render();
 function forceAppUpdate(){
