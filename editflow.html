@@ -3139,6 +3139,31 @@ ${(()=>{
   if(!warnings.length)return'';
   return`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px">${warnings.join('')}</div>`;
 })()}
+${(()=>{
+  const td=today(),_tmD=new Date(),_=_tmD.setDate(_tmD.getDate()+1),tm=_tmD.toLocaleDateString('sv-SE');
+  const active=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
+  const rows=[];
+  const fmt2=d=>{if(!d)return'';const[,m,day]=d.split('-');return`${+m}/${+day}`;};
+  const jobLink=(j,labels)=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onclick="openJobModal('${j.id}')">
+    <span style="font-size:12px;min-width:60px;color:var(--t2)">${labels.join(' ')}</span>
+    <span style="font-size:13px;font-weight:600;flex:1">${esc(j.title)}</span>
+    ${j.clientName?`<span style="font-size:11px;color:var(--t3)">${esc(j.clientName)}</span>`:''}
+  </div>`;
+  for(const day of[td,tm]){
+    const label=day===td?'今日':'明日';
+    const col=day===td?'var(--red)':'var(--amber)';
+    const editorJobs=active.filter(j=>j.editorDraftDate===day);
+    const clientJobs=active.filter(j=>j.deliveryDate===day);
+    if(!editorJobs.length&&!clientJobs.length)continue;
+    rows.push(`<div style="background:var(--card);border:1.5px solid ${col};border-radius:10px;padding:12px 14px">
+      <div style="font-weight:700;font-size:13px;color:${col};margin-bottom:8px">📅 ${label}の納品予定</div>
+      ${editorJobs.length?`<div style="margin-bottom:6px"><div style="font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.5px;margin-bottom:3px">✏️ 編集者納品</div>${editorJobs.map(j=>jobLink(j,[fmt2(j.editorDraftDate)])).join('')}</div>`:''}
+      ${clientJobs.length?`<div><div style="font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.5px;margin-bottom:3px">🎬 クライアント最終納品</div>${clientJobs.map(j=>jobLink(j,[fmt2(j.deliveryDate)])).join('')}</div>`:''}
+    </div>`);
+  }
+  if(!rows.length)return'';
+  return`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:8px">${rows.join('')}</div>`;
+})()}
 ${{board:rProjBoard,listing:rProjListing,list:()=>rProjList(clients),clients:rProjClients,profit:rProjProfit,payment:rProjPayment,completed:rProjCompleted,worker:rProjWorker,priority:rProjPriority}[PVMT]?.()??rProjBoard()}`;
 }
 
