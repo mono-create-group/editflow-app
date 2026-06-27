@@ -1420,8 +1420,7 @@ const GOAL_HORIZONS=[{v:'this_month',l:'今月の目標',icon:'📅'},{v:'next_m
 const UNIFIED_HORIZONS=[
   {v:'1w',         l:'今週',   icon:'⚡', kpi:'1w',  goals:null},
   {v:'this_month', l:'今月',   icon:'📅', kpi:'1m',  goals:'this_month'},
-  {v:'next_month', l:'来月',   icon:'🗓', kpi:null,  goals:'next_month'},
-  {v:'3m',         l:'3ヶ月後', icon:'🗒', kpi:'3m',  goals:null},
+  {v:'next_month', l:'来月',   icon:'🗓', kpi:'nm',  goals:'next_month'},
   {v:'6m',         l:'半年後',  icon:'📆', kpi:'6m',  goals:null},
   {v:'year1',      l:'1年後',  icon:'🌱', kpi:'1y',  goals:'year1'},
   {v:'year5',      l:'5年後',  icon:'🚀', kpi:'5y',  goals:'year5'},
@@ -1602,7 +1601,7 @@ function getMonthDays(off){
   const first=new Date(y,m,1),last=new Date(y,m+1,0);
   const sd=(first.getDay()+6)%7;
   const days=Array(sd).fill(null);
-  for(let i=1;i<=last.getDate();i++)days.push(new Date(y,m,i).toISOString().slice(0,10));
+  for(let i=1;i<=last.getDate();i++){const d=new Date(y,m,i);days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);}}
   while(days.length%7!==0)days.push(null);
   return{y:first.getFullYear(),m:first.getMonth(),days};
 }
@@ -4119,49 +4118,6 @@ function rUnifiedHorizonTab(div,tabDef){
 </div>`;
   }
 
-  // ===今月専用: 3ヶ月後のKPIから今月必要数値を算出===
-  let monthlyCtx='';
-  if(tabDef.v==='this_month'){
-    const kpi3m=div?(div.horizons?.['3m']?.kpis||[]):[];
-    // 3ヶ月後まで残り月数（今月含む）≈ 3
-    const monthsTo3m=Math.max(1,3);
-    const neededRows3m=kpi3m.map(k=>{
-      const alreadyDone=k.current||0;
-      const remaining=Math.max(0,(k.target||0)-alreadyDone);
-      const monthlyNeed=Math.ceil(remaining/monthsTo3m);
-      const pct=k.target>0?Math.min(100,Math.round(alreadyDone/k.target*100)):0;
-      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
-      return`<div class="card card-sm" style="margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-    <div style="flex:1;font-weight:700;font-size:13px">${esc(k.title)}</div>
-    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}">${pct}%</span>
-  </div>
-  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
-    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px"></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
-    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
-      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">3ヶ月後目標</div>
-      <div style="font-weight:700">${(k.target||0).toLocaleString()}${esc(k.unit||'')}</div>
-    </div>
-    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
-      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">達成済</div>
-      <div style="font-weight:700;color:var(--${col})">${alreadyDone.toLocaleString()}${esc(k.unit||'')}</div>
-    </div>
-    <div style="background:${monthlyNeed>0?'linear-gradient(135deg,#3b82f618,#7c3aed12)':'var(--gdim)'};padding:7px 4px;border-radius:6px;border:1px solid ${monthlyNeed>0?'var(--blue)':'var(--green)'}">
-      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">今月必要</div>
-      <div style="font-weight:800;color:${monthlyNeed>0?'var(--blue)':'var(--green)'}">${monthlyNeed>0?monthlyNeed.toLocaleString()+esc(k.unit||''):'達成済✓'}</div>
-    </div>
-  </div>
-</div>`;
-    });
-    monthlyCtx=`<div style="margin-bottom:14px">
-  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">🗒 今月必要な目標数値（3ヶ月後KPIより）</div>
-  ${neededRows3m.length?neededRows3m.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">🗒</div>3ヶ月後タブにKPIを追加すると自動計算されます</div>`}
-  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='3m';render()">3ヶ月後のKPIを管理 →</button>
-</div>`;
-  }
-
   // ===目標カードセクション===
   let goalsSection='';
   if(tabDef.goals){
@@ -4234,181 +4190,24 @@ ${kpiRows}
   }
 
   // ===来月: 3ヶ月後のKPIから今月必要数値を算出===
+  // ===来月: 達成実績ボックスのみ===
   let nextMonthCtx='';
   if(tabDef.v==='next_month'){
     const now=new Date(td);
     const nm=new Date(now.getFullYear(),now.getMonth()+1,1);
     const nmEnd=new Date(now.getFullYear(),now.getMonth()+2,0);
     const nmStr=`${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}`;
-    // 3ヶ月後のKPIを取得
-    const kpi3m=div?(div.horizons?.['3m']?.kpis||[]):[];
-    // すでに達成した数値（ログ・完了案件から）
-    const {sales:salesNow,hires:hiresNow,profit:profitNow}=getAchievements(null,td);
-    // 3ヶ月後まで残り月数（来月から3ヶ月後 ≈ 2ヶ月）
-    const monthsTo3m=Math.max(1,3);
-    const neededRows=kpi3m.map(k=>{
-      const alreadyDone=k.current||0;
-      const remaining=Math.max(0,(k.target||0)-alreadyDone);
-      const monthlyNeed=Math.ceil(remaining/monthsTo3m);
-      const pct=k.target>0?Math.min(100,Math.round(alreadyDone/k.target*100)):0;
-      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
-      return`<div class="card card-sm" style="margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-    <div style="flex:1;font-weight:700;font-size:13px">${esc(k.title)}</div>
-    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}">${pct}%</span>
-  </div>
-  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
-    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px"></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
-    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
-      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">3ヶ月後目標</div>
-      <div style="font-weight:700">${(k.target||0).toLocaleString()}${esc(k.unit||'')}</div>
-    </div>
-    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
-      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">達成済</div>
-      <div style="font-weight:700;color:var(--${col})">${alreadyDone.toLocaleString()}${esc(k.unit||'')}</div>
-    </div>
-    <div style="background:linear-gradient(135deg,#3b82f618,#7c3aed12);padding:7px 4px;border-radius:6px;border:1px solid var(--blue)">
-      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">来月必要</div>
-      <div style="font-weight:800;color:var(--blue)">${monthlyNeed.toLocaleString()}${esc(k.unit||'')}</div>
-    </div>
-  </div>
-</div>`;
-    });
-    nextMonthCtx=`<div style="margin-bottom:14px">
-  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">🗒 来月必要な目標数値（3ヶ月後KPIより）</div>
-  ${neededRows.length?neededRows.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">🗒</div>3ヶ月後タブにKPIを追加すると自動計算されます</div>`}
-  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='3m';render()">3ヶ月後のKPIを管理 →</button>
-</div>
-${rAchievementBox(nmStr+'-01',nmEnd.toISOString().slice(0,10),'来月')}`;
+    const nmEndStr=`${nmEnd.getFullYear()}-${String(nmEnd.getMonth()+1).padStart(2,'0')}-${String(nmEnd.getDate()).padStart(2,'0')}`;
+    nextMonthCtx=rAchievementBox(nmStr+'-01',nmEndStr,'来月');
   }
 
-  // ===3ヶ月後: 半年後のKPIから月次必要数値を算出===
-  let q3Ctx='';
-  if(tabDef.v==='3m'){
-    const now=new Date(td);
-    const kpi6m=div?(div.horizons?.['6m']?.kpis||[]):[];
-    // 半年後まで残り月数（今月含む）≈ 6
-    const monthsTo6m=Math.max(1,6);
-    const neededRows6m=kpi6m.map(k=>{
-      const alreadyDone=k.current||0;
-      const remaining=Math.max(0,(k.target||0)-alreadyDone);
-      const monthlyNeed=Math.ceil(remaining/monthsTo6m);
-      const pct=k.target>0?Math.min(100,Math.round(alreadyDone/k.target*100)):0;
-      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
-      return`<div class="card card-sm" style="margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-    <div style="flex:1;font-weight:700;font-size:13px">${esc(k.title)}</div>
-    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}">${pct}%</span>
-  </div>
-  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
-    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px"></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
-    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
-      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">半年後目標</div>
-      <div style="font-weight:700">${(k.target||0).toLocaleString()}${esc(k.unit||'')}</div>
-    </div>
-    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
-      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">達成済</div>
-      <div style="font-weight:700;color:var(--${col})">${alreadyDone.toLocaleString()}${esc(k.unit||'')}</div>
-    </div>
-    <div style="background:${monthlyNeed>0?'linear-gradient(135deg,#3b82f618,#7c3aed12)':'var(--gdim)'};padding:7px 4px;border-radius:6px;border:1px solid ${monthlyNeed>0?'var(--blue)':'var(--green)'}">
-      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">月次必要</div>
-      <div style="font-weight:800;color:${monthlyNeed>0?'var(--blue)':'var(--green)'}">${monthlyNeed>0?monthlyNeed.toLocaleString()+esc(k.unit||''):'達成済✓'}</div>
-    </div>
-  </div>
-</div>`;
-    });
-    // 直近3ヶ月の達成実績
-    const dt3mAgo=new Date(now.getFullYear(),now.getMonth()-2,1);
-    const from3m=`${dt3mAgo.getFullYear()}-${String(dt3mAgo.getMonth()+1).padStart(2,'0')}-01`;
-    q3Ctx=`<div style="margin-bottom:14px">
-  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">📆 月次必要な目標数値（半年後KPIより）</div>
-  ${neededRows6m.length?neededRows6m.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">📆</div>半年後タブにKPIを追加すると自動計算されます</div>`}
-  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='6m';render()">半年後のKPIを管理 →</button>
-</div>
-${rAchievementBox(from3m,td,'直近3ヶ月')}`;
-  }
-
-  // ===半年後: 1年後の目標から月次必要数値を算出===
+  // ===半年後: 達成実績ボックスのみ===
   let halfYearCtx='';
   if(tabDef.v==='6m'){
-    const year1Goals6m=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='year1'&&(div?.id?g.divisionId===div.id:!g.divisionId));
     const now=new Date(td);
-    const endOfYear6m=g=>g.deadline?new Date(g.deadline):new Date(now.getFullYear(),11,31);
-    const monthsLeft6m=g=>{
-      const end=endOfYear6m(g);
-      return Math.max(1,Math.round((end-new Date(now.getFullYear(),now.getMonth(),1))/(1000*60*60*24*30.44)));
-    };
-    const neededRows1y=year1Goals6m.map(g=>{
-      const icon=GOAL_CATS.find(c=>c.v===g.category)?.l.split(' ')[0]||'🌱';
-      const ml=monthsLeft6m(g);
-      const isRev=(g.category==='revenue'||g.targetAmount>0)&&g.targetAmount>0;
-      const isSales=g.category==='sales'&&g.targetSalesCount>0;
-      const isHire=g.category==='hire'&&g.targetHireCount>0;
-      let target,current,unit,monthlyNeed,pct;
-      if(isRev){
-        const rs=revGoalStats(g);
-        target=g.targetAmount;current=rs.earned;unit='円';
-        pct=rs.pct;monthlyNeed=Math.ceil(rs.remaining/ml);
-      }else if(isSales){
-        const won=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.result==='成約').length;
-        target=g.targetSalesCount;current=won;unit='件';
-        pct=Math.min(100,Math.round(won/target*100));
-        monthlyNeed=Math.ceil(Math.max(0,target-won)/ml);
-      }else if(isHire){
-        const hired=S.logs.filter(l=>!l.deleted&&l.type==='hire'&&l.result==='内定').length;
-        target=g.targetHireCount;current=hired;unit='人';
-        pct=Math.min(100,Math.round(hired/target*100));
-        monthlyNeed=Math.ceil(Math.max(0,target-hired)/ml);
-      }else{
-        target=100;current=g.progress||0;unit='%';
-        pct=g.progress||0;
-        monthlyNeed=Math.ceil(Math.max(0,100-pct)/ml);
-      }
-      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
-      const bc=col==='green'?'bg':col==='blue'?'bb':col==='amber'?'ba':'br';
-      const fmtVal=v=>isRev?`¥${v.toLocaleString()}`:v.toLocaleString()+unit;
-      return`<div class="card card-sm" style="margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-    <span style="font-size:18px">${icon}</span>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:11px;color:var(--t2);margin-bottom:1px">🌱 1年後の目標</div>
-      <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.title)}</div>
-    </div>
-    <span class="badge ${bc}">${pct}%</span>
-  </div>
-  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
-    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px;transition:width .4s"></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
-    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
-      <div style="color:var(--t2);margin-bottom:2px;font-size:11px">年間目標</div>
-      <div style="font-weight:700;font-size:13px">${fmtVal(target)}</div>
-    </div>
-    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
-      <div style="color:var(--t2);margin-bottom:2px;font-size:11px">現状累計</div>
-      <div style="font-weight:700;font-size:13px;color:var(--${col})">${fmtVal(current)}</div>
-    </div>
-    <div style="background:${monthlyNeed>0?'linear-gradient(135deg,#3b82f618,#7c3aed12)':'var(--gdim)'};padding:7px 4px;border-radius:6px;border:1px solid ${monthlyNeed>0?'var(--blue)':'var(--green)'}">
-      <div style="color:var(--t2);margin-bottom:2px;font-size:11px">月次必要</div>
-      <div style="font-weight:800;font-size:13px;color:${monthlyNeed>0?'var(--blue)':'var(--green)'}">${monthlyNeed>0?fmtVal(monthlyNeed):'達成済✓'}</div>
-    </div>
-  </div>
-  <div style="font-size:11px;color:var(--t3);margin-top:6px;text-align:right">年末まで約${ml}ヶ月${g.deadline?` (期限: ${g.deadline})`:'（年末まで）'}</div>
-</div>`;
-    });
-    // 直近6ヶ月の達成実績
     const dt6mAgo=new Date(now.getFullYear(),now.getMonth()-5,1);
     const from6m=`${dt6mAgo.getFullYear()}-${String(dt6mAgo.getMonth()+1).padStart(2,'0')}-01`;
-    halfYearCtx=`<div style="margin-bottom:14px">
-  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">🌱 月次必要な目標数値（1年後の目標より）</div>
-  ${neededRows1y.length?neededRows1y.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">🌱</div>1年後タブで目標を追加すると自動計算されます</div>`}
-  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='year1';render()">1年後の目標を管理 →</button>
-</div>
-${rAchievementBox(from6m,td,'直近6ヶ月')}`;
+    halfYearCtx=rAchievementBox(from6m,td,'直近6ヶ月');
   }
 
   // ===達成実績ボックス（今週・今月・1年後タブ）===
@@ -4427,7 +4226,7 @@ ${rAchievementBox(from6m,td,'直近6ヶ月')}`;
     achieveBox=rAchievementBox(yStart,yEnd,'今年');
   }
 
-  return weeklyCtx+monthlyCtx+nextMonthCtx+q3Ctx+halfYearCtx+achieveBox+goalsSection+kpiSection;
+  return weeklyCtx+nextMonthCtx+halfYearCtx+achieveBox+goalsSection+kpiSection;
 }
 
 // ===達成実績ヘルパー===
