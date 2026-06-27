@@ -1239,10 +1239,24 @@ function startSheetsAutoSync(){
   },30*60*1000);
 }
 function gcalSilentReconnect(){
-  // ページロード時のauto-popup はブラウザにブロックされるため
-  // サイドバーに「再接続」ボタンを表示するだけにする
   if(!S.settings?.gcalConnected)return;
-  renderGcalUI(); // 「再接続が必要」ボタンを表示
+  // Google API がロード済みならサイレントトークン取得を試みる（prompt:'' = ポップアップ不要）
+  if(typeof google!=='undefined'&&google.accounts?.oauth2){
+    _gcalInitAndAuth(GCAL_CLIENT_ID,true);
+  } else {
+    // API未ロードならロード完了後に再試行（最大3秒待ち）
+    let waited=0;
+    const poll=setInterval(()=>{
+      waited+=500;
+      if(typeof google!=='undefined'&&google.accounts?.oauth2){
+        clearInterval(poll);
+        _gcalInitAndAuth(GCAL_CLIENT_ID,true);
+      } else if(waited>=3000){
+        clearInterval(poll);
+        renderGcalUI(); // タイムアウト時は手動再接続ボタンを表示
+      }
+    },500);
+  }
 }
 function gcalManualReconnect(){
   // ユーザーのクリックで呼ばれる（popup許可されている）
