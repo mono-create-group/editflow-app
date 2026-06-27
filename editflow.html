@@ -795,7 +795,10 @@ function fbSetupRealtimeSync(){
 }
 
 function signInWithGoogle(){
-  fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+  const provider=new firebase.auth.GoogleAuthProvider();
+  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if(isMobile){fbAuth.signInWithRedirect(provider);}
+  else{fbAuth.signInWithPopup(provider);}
 }
 function fbSignOut(){fbAuth.signOut();}
 
@@ -806,6 +809,11 @@ function renderAuthUI(){
   const el=document.getElementById('auth-ui');if(el)el.innerHTML=html;
   const mob=document.getElementById('mob-auth-ui');if(mob)mob.innerHTML=html;
 }
+
+// モバイルリダイレクト後の結果処理
+fbAuth.getRedirectResult().then(result=>{
+  if(result&&result.user)toast('☁️ Googleサインイン完了');
+}).catch(e=>console.error('redirect sign-in error:',e));
 
 fbAuth.onAuthStateChanged(user=>{
   FB_USER=user;
