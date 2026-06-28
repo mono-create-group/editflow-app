@@ -9,11 +9,16 @@
  *    - 次のユーザーとして実行: 自分
  *    - アクセスできるユーザー: 全員
  *    →「デプロイ」→（初回は承認を求められるので許可）
- * 5. 表示された「ウェブアプリのURL」をコピー
- * 6. EditFlowアプリの 案件管理 →「📊 シート同期」を押し、URLを貼り付ける
+ * 5. 表示された「ウェブアプリのURL」(https://script.google.com/macros/s/.../exec) をコピー
+ *    ※スプレッドシートのURL(docs.google.com...)ではない点に注意
+ * 6. EditFlowアプリの 案件管理 →「📊 シート同期」を押し、上記URLを貼り付ける
  *    （以降は保存のたびに自動で同期されます）
+ *
+ * 注意: ウェブアプリのPOST実行では SpreadsheetApp.getActiveSpreadsheet() は null になるため、
+ *       必ず openById(SHEET_ID) でシートを開くこと。
  */
 
+var SHEET_ID = "1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs";
 var HEADERS = ["案件名","ステータス","担当編集者","編集共有日","編集者初稿日","クライアント初稿日","納品日","報酬","素材リンク","参考動画","プロマネ","備考"];
 var ALL_STATUSES = ["案件掲載中","受注済み","未着手","進行中","編集者進行中","確認待ち","FB待ち","初稿完成","修正中","完了","キャンセル"];
 var STATUS_ORDER = ["案件掲載中","受注済み","編集者進行中","進行中","初稿完成","確認待ち","FB待ち","修正中","完了","キャンセル"];
@@ -22,14 +27,16 @@ function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     var data = { jobs: body.jobs || [], clients: body.clients || [], workers: body.workers || [] };
+    console.log("doPost received: clients=" + data.clients.length + " jobs=" + data.jobs.length + " workers=" + data.workers.length);
     var n = syncToSheet_(data);
+    console.log("synced sheets=" + n);
     return _json_({ ok: true, clients: n });
   } catch (err) {
+    console.error("doPost error: " + err);
     return _json_({ ok: false, error: String(err) });
   }
 }
 
-// 動作確認用（ブラウザでURLを開くと表示される）
 function doGet() {
   return _json_({ ok: true, message: "EditFlow sheet sync is live. Use POST to sync." });
 }
@@ -59,7 +66,7 @@ function subRow_(data, s) {
 }
 
 function syncToSheet_(data) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = SpreadsheetApp.openById(SHEET_ID);
   var jobs = data.jobs.filter(function (j) { return !j.deleted; });
   var count = 0;
 
