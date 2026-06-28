@@ -1444,6 +1444,7 @@ let SD=0; // schedule day offset (0=today,1=tomorrow,...)
 let RV='revenue'; // revenue sub-tab
 let GV='this_month'; // goals sub-tab (horizon)
 let PVMT='board'; // projects main tab (board/list/profit/payment/worker/priority)
+let PRIO_DRAFT='client'; // 優先度表の基準: 'client'=クライアント初稿 / 'editor'=編集者初稿
 let JT='morning'; // journal tab (morning/evening)
 let JCM=today().slice(0,7); // journal calendar month (YYYY-MM)
 let JOB_SORT='deadline'; // job sort order
@@ -3734,73 +3735,67 @@ function rProjWorker(){
 }
 // ===PRIORITY VIEW===
 function rProjPriority(){
+  const isEditor=PRIO_DRAFT==='editor';
+  const field=isEditor?'editorDraftDate':'clientDraftDate';
+  const fieldLbl=isEditor?'編集者初稿':'クライアント初稿';
+  const td=today();
+  const mk=n=>{const d=new Date();d.setDate(d.getDate()+n);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+  const tmr=mk(1),dat=mk(2);
+  // 完了・キャンセルは除外。案件＋未完了サブタスクを行に。
   const activeJobs=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
-  // 案件行
-  const jobRows=activeJobs.map(j=>({
-    type:'job',job:j,
-    sortDate:j.clientDraftDate||j.editorDraftDate||j.deliveryDate||'9999'
-  }));
-  // サブタスク行（未完了のもの）
-  const subRows=[];
-  activeJobs.forEach(j=>{
-    (j.subtasks||[]).filter(s=>!s.done).forEach(s=>{
-      subRows.push({
-        type:'sub',job:j,sub:s,
-        sortDate:s.clientDraftDate||s.editorDraftDate||s.deliveryDate||'9999'
-      });
-    });
-  });
-  const allRows=[...jobRows,...subRows].sort((a,b)=>a.sortDate>b.sortDate?1:a.sortDate<b.sortDate?-1:0);
-  if(!allRows.length)return`<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">案件なし</div></div>`;
-  return`<div class="card" style="padding:0;overflow:auto">
-<table style="width:100%;border-collapse:collapse;font-size:12px">
-<thead><tr style="background:var(--card2);font-weight:700;color:var(--t2)">
-  <th style="padding:8px 12px;text-align:left">案件名</th>
-  <th style="padding:8px 10px;text-align:left">ステータス</th>
-  <th style="padding:8px 10px;text-align:left">クライアント初稿</th>
-  <th style="padding:8px 10px;text-align:left">編集者初稿</th>
-  <th style="padding:8px 10px;text-align:left">納品日</th>
-  <th style="padding:8px 10px;text-align:left">担当</th>
-</tr></thead>
-<tbody>
-${allRows.map(row=>{
-  if(row.type==='job'){
-    const j=row.job;
-    const wName=getJobWorkerNames(j)||'-';
-    const uc=urgCls(j.deliveryDate);
-    return`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="openJobModal('${j.id}')">
-      <td style="padding:8px 12px;font-weight:600">${esc(j.title)}</td>
-      <td style="padding:8px 10px"><span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span></td>
-      <td style="padding:8px 10px;color:var(--t2)">${j.clientDraftDate||'-'}</td>
-      <td style="padding:8px 10px;color:var(--t2)">${j.editorDraftDate||'-'}</td>
-      <td style="padding:8px 10px;color:${uc==='urgent'?'var(--red)':uc==='soon'?'var(--amber)':'var(--t2)'}">${j.deliveryDate||'-'}</td>
-      <td style="padding:8px 10px;color:var(--t2)">${wName}</td>
-    </tr>`;
-  }else{
-    const {job:j,sub:s}=row;
-    const w=S.workers.find(wk=>wk.id===s.workerId);
-    const wName=s.workerId===SELF_WID?'自分':w?esc(w.name):'-';
-    const uc=urgCls(s.deliveryDate);
-    const subSt=s.status||'未着手';
-    return`<tr style="border-bottom:1px solid var(--border);background:var(--cdim);cursor:pointer" onclick="openJobModal('${j.id}')">
-      <td style="padding:6px 12px">
-        <div style="display:flex;align-items:center;gap:4px">
-          <span style="color:var(--cyan);font-size:11px;flex-shrink:0">└</span>
-          <span style="font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px">${esc(j.title)}</span>
-          <span style="color:var(--t3);font-size:10px">›</span>
-          <span style="font-weight:600;color:var(--text)">${esc(s.title)}</span>
-        </div>
-      </td>
-      <td style="padding:6px 10px"><span class="badge ${SCOLBG[subSt]||'bc'}" style="font-size:10px">${subSt}</span></td>
-      <td style="padding:6px 10px;color:var(--t2)">${s.clientDraftDate||'-'}</td>
-      <td style="padding:6px 10px;color:var(--t2)">${s.editorDraftDate||'-'}</td>
-      <td style="padding:6px 10px;color:${uc==='urgent'?'var(--red)':uc==='soon'?'var(--amber)':'var(--t2)'}">${s.deliveryDate||'-'}</td>
-      <td style="padding:6px 10px;color:var(--t2)">${wName||'-'}</td>
-    </tr>`;
-  }
-}).join('')}
-</tbody>
-</table></div>`;
+  const rows=[];
+  activeJobs.forEach(j=>rows.push({type:'job',job:j,date:j[field]||''}));
+  activeJobs.forEach(j=>(j.subtasks||[]).filter(s=>!s.done).forEach(s=>rows.push({type:'sub',job:j,sub:s,date:s[field]||''})));
+  const dayKeys=[td,tmr,dat];
+  const others=rows.filter(r=>!dayKeys.includes(r.date)).sort((a,b)=>((a.date||'9999')>(b.date||'9999')?1:-1));
+  const groups=[
+    {label:'🔴 今日',color:'var(--red)',items:rows.filter(r=>r.date===td)},
+    {label:'🟡 明日',color:'var(--amber)',items:rows.filter(r=>r.date===tmr)},
+    {label:'🟢 明後日',color:'var(--green)',items:rows.filter(r=>r.date===dat)},
+    {label:'📁 それ以降・未設定',color:'var(--t2)',items:others},
+  ];
+  const toggle=`<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--t2)">基準:</span>
+    <button class="btn btn-sm ${!isEditor?'btn-p':'btn-g'}" onclick="PRIO_DRAFT='client';render()">📋 クライアント初稿</button>
+    <button class="btn btn-sm ${isEditor?'btn-p':'btn-g'}" onclick="PRIO_DRAFT='editor';render()">✏️ 編集者初稿</button>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin-bottom:10px">${fieldLbl}の日付で「今日・明日・明後日」に振り分け（完了・キャンセルは除外）</div>`;
+  if(!rows.length)return`${toggle}<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">案件なし</div></div>`;
+  const rowHtml=r=>{
+    const dt=r.date||'-';
+    if(r.type==='job'){
+      const j=r.job;const wName=getJobWorkerNames(j)||'-';
+      return`<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="openJobModal('${j.id}')">
+        <td style="padding:8px 12px;font-weight:600">${esc(j.title)}</td>
+        <td style="padding:8px 10px"><span class="badge ${SCOLBG[j.status]||'bk'}">${j.status}</span></td>
+        <td style="padding:8px 10px;color:var(--t2)">${dt}</td>
+        <td style="padding:8px 10px;color:var(--t2)">${j.deliveryDate||'-'}</td>
+        <td style="padding:8px 10px;color:var(--t2)">${wName}</td>
+      </tr>`;
+    }else{
+      const {job:j,sub:s}=r;
+      const w=S.workers.find(wk=>wk.id===s.workerId);
+      const wName=s.workerId===SELF_WID?'自分':w?esc(w.name):'-';
+      const subSt=s.status||'未着手';
+      return`<tr style="border-bottom:1px solid var(--border);background:var(--cdim);cursor:pointer" onclick="openJobModal('${j.id}')">
+        <td style="padding:6px 12px"><div style="display:flex;align-items:center;gap:4px"><span style="color:var(--cyan);font-size:11px;flex-shrink:0">└</span><span style="font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px">${esc(j.title)}</span><span style="color:var(--t3);font-size:10px">›</span><span style="font-weight:600;color:var(--text)">${esc(s.title)}</span></div></td>
+        <td style="padding:6px 10px"><span class="badge ${SCOLBG[subSt]||'bc'}" style="font-size:10px">${subSt}</span></td>
+        <td style="padding:6px 10px;color:var(--t2)">${dt}</td>
+        <td style="padding:6px 10px;color:var(--t2)">${s.deliveryDate||'-'}</td>
+        <td style="padding:6px 10px;color:var(--t2)">${wName||'-'}</td>
+      </tr>`;
+    }
+  };
+  const section=g=>!g.items.length?'':`<div style="font-weight:800;font-size:14px;color:${g.color};margin:14px 0 6px">${g.label}（${g.items.length}件）</div>
+  <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+  <thead><tr style="background:var(--card2);font-weight:700;color:var(--t2)">
+    <th style="padding:8px 12px;text-align:left">案件名</th>
+    <th style="padding:8px 10px;text-align:left">ステータス</th>
+    <th style="padding:8px 10px;text-align:left">${fieldLbl}</th>
+    <th style="padding:8px 10px;text-align:left">納品日</th>
+    <th style="padding:8px 10px;text-align:left">担当</th>
+  </tr></thead><tbody>${g.items.map(rowHtml).join('')}</tbody></table></div>`;
+  return`${toggle}${groups.map(section).join('')}`;
 }
 // ===HABITS===
 function rHabits(){
@@ -8147,7 +8142,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-01';
+const APP_VERSION='20260628-02';
 
 render();
 function forceAppUpdate(){
