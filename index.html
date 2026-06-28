@@ -1450,7 +1450,7 @@ let JCM=today().slice(0,7); // journal calendar month (YYYY-MM)
 let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
-  tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[],
+  tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[],
   checkIns:[], workouts:[], workers:[], memos:[], meals:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
@@ -1619,7 +1619,7 @@ function getMonthDays(off){
   const first=new Date(y,m,1),last=new Date(y,m+1,0);
   const sd=(first.getDay()+6)%7;
   const days=Array(sd).fill(null);
-  for(let i=1;i<=last.getDate();i++)days.push(new Date(y,m,i).toISOString().slice(0,10));
+  for(let i=1;i<=last.getDate();i++){const _d=new Date(y,m,i);days.push(`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`);}
   while(days.length%7!==0)days.push(null);
   return{y:first.getFullYear(),m:first.getMonth(),days};
 }
@@ -3660,7 +3660,27 @@ function rProjPayment(){
   const unpaidEntries=entries.filter(e=>{const j=S.jobs.find(j=>j.id===e.jobId);return !j?.paymentDate;});
   const byWorker={};
   entries.forEach(e=>{if(!byWorker[e.workerId])byWorker[e.workerId]=[];byWorker[e.workerId].push(e);});
-  return`${secTitle('💳 月別ワーカー支払い')}
+  const rewardsAll=(S.rewards||[]).filter(r=>!r.deleted);
+  const rewardSection=(t,title,icon)=>{
+    const list=rewardsAll.filter(r=>r.type===t&&(r.date||'').startsWith(curM));
+    const tot=list.reduce((s,r)=>s+(r.amount||0),0);
+    const unpaid=list.filter(r=>!r.paidDate).reduce((s,r)=>s+(r.amount||0),0);
+    return`${secTitle(`${icon} ${title}の支払い`)}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="openRewardModal('${t}')">＋ ${title}を追加</button>
+    ${list.length?`<div class="card" style="margin-bottom:14px">
+      <div style="font-weight:700;margin-bottom:8px">合計 <span style="color:var(--amber)">¥${tot.toLocaleString()}</span>${unpaid?` <span style="font-size:12px;color:var(--t2)">（未払い ¥${unpaid.toLocaleString()}）</span>`:''}</div>
+      ${list.map(r=>`<div class="payment-row" style="flex-wrap:wrap;gap:4px">
+        <span class="pmt-worker">${esc(r.payee)}${r.note?` <span style="font-size:11px;color:var(--t2)">(${esc(r.note)})</span>`:''}</span>
+        <span class="pmt-amount">¥${(r.amount||0).toLocaleString()}</span>
+        <span style="font-size:11px;color:var(--t2)">${r.date||''}</span>
+        ${r.paidDate?`<span class="badge bg" style="font-size:10px">✅ 支払済 ${r.paidDate}</span>`:`<span class="badge ba" style="font-size:10px">⏳ 未払い</span>`}
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-g btn-xs" onclick="toggleRewardPaid('${r.id}')">${r.paidDate?'取消':'✅ 支払済みにする'}</button>
+          <button class="btn btn-g btn-xs btn-red" onclick="delReward('${r.id}')">🗑</button>
+        </div>
+      </div>`).join('')}
+    </div>`:`<div style="font-size:12px;color:var(--t3);margin-bottom:14px">${curM} の${title}なし</div>`}`;
+  };
+  return`${secTitle('💳 編集費用の支払い')}
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
   <select style="width:160px" onchange="window._payMonth=this.value;render()">
     ${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m}</option>`).join('')}
@@ -3694,7 +3714,40 @@ ${Object.entries(byWorker).length?Object.entries(byWorker).map(([wid,es])=>{
       </div>`;
     }).join('')}
   </div>`;}).join('')
-:`<div class="empty" style="padding:30px 0"><div class="empty-icon">💳</div><div>${curM} の支払い記録なし</div></div>`}`;
+:`<div class="empty" style="padding:30px 0"><div class="empty-icon">💳</div><div>${curM} の編集費用支払い記録なし</div></div>`}
+${rewardSection('sales','営業報酬','📞')}
+${rewardSection('hire','採用報酬','👤')}`;
+}
+function openRewardModal(type){
+  const title=type==='sales'?'営業報酬':'採用報酬';
+  openModal(`<div class="mhdr"><div class="mtitle">＋ ${title}の支払い</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  <div class="fg"><div class="fl">支払先（名前）*</div><input id="rw-payee" placeholder="例: 田中 太郎"></div>
+  <div class="fg"><div class="fl">金額（円）*</div><input id="rw-amount" type="number" inputmode="numeric" placeholder="例: 5000"></div>
+  <div class="fg"><div class="fl">対象日</div><input id="rw-date" type="date" value="${today()}"></div>
+  <div class="fg"><div class="fl">メモ</div><input id="rw-note" placeholder="例: 〇〇社 成約分 / △△さん紹介"></div>
+  <input type="hidden" id="rw-type" value="${type}">
+  <div class="mfooter"><button class="btn btn-p" onclick="saveReward()">保存</button></div>`);
+}
+function saveReward(){
+  const payee=document.getElementById('rw-payee').value.trim();
+  const amount=parseInt(document.getElementById('rw-amount').value)||0;
+  if(!payee||!amount){toast('支払先と金額を入力してください','warn');return;}
+  const type=document.getElementById('rw-type').value;
+  const date=document.getElementById('rw-date').value||today();
+  const note=document.getElementById('rw-note').value.trim();
+  if(!S.rewards)S.rewards=[];
+  S.rewards.push({id:uid(),type,payee,amount,date,paidDate:null,note,createdAt:new Date().toISOString()});
+  save();closeModal();render();toast('報酬を追加しました');
+}
+function toggleRewardPaid(id){
+  const r=(S.rewards||[]).find(r=>r.id===id);if(!r)return;
+  r.paidDate=r.paidDate?null:today();
+  save();render();
+}
+function delReward(id){
+  if(!confirm('この報酬を削除しますか？'))return;
+  S.rewards=(S.rewards||[]).filter(r=>r.id!==id);
+  save();render();
 }
 // ===WORKER VIEW===
 function rProjWorker(){
@@ -4634,7 +4687,7 @@ function rJournal(){
   const morningEntry=S.journals.find(j=>j.date===JD&&j.type==='morning')||S.journals.find(j=>j.date===JD&&!j.type)||{};
   const eveningEntry=S.journals.find(j=>j.date===JD&&j.type==='evening')||{};
   const dayGrid=Array(sd).fill(null);
-  for(let i=1;i<=last.getDate();i++)dayGrid.push(new Date(y,m,i).toISOString().slice(0,10));
+  for(let i=1;i<=last.getDate();i++){const _d=new Date(y,m,i);dayGrid.push(`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`);}
 
   const morningForm=`
   <div style="font-size:12px;color:var(--t3);margin-bottom:14px;padding:8px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--purple)">今日という一日を<strong style="color:var(--pl)">経営者として設計</strong>する時間です。5分で書ける・判断が研ぎ澄まされる内容にフォーカスしてください。</div>
@@ -8173,7 +8226,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-03';
+const APP_VERSION='20260628-04';
 
 render();
 function forceAppUpdate(){
