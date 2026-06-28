@@ -1562,12 +1562,42 @@ let _lsPending=false;
 function save(){
   S._savedAt=Date.now();
   fbSave();
+  scheduleSheetSync();
   if(!_lsPending){
     _lsPending=true;
     requestAnimationFrame(()=>{
       _lsPending=false;
       try{localStorage.setItem(DB,JSON.stringify(S));}catch(e){console.warn('save error',e);}
     });
+  }
+}
+// ===スプレッドシート同期（Apps Script Web App 経由・Firebase不要）===
+let _sheetSyncTimer=null;
+function scheduleSheetSync(){
+  if(!S.settings||!S.settings.sheetsSyncUrl)return;
+  clearTimeout(_sheetSyncTimer);
+  _sheetSyncTimer=setTimeout(()=>syncToSheet(false),5000);
+}
+function syncToSheet(manual){
+  if(!S.settings)S.settings={};
+  let url=S.settings.sheetsSyncUrl;
+  if(!url){
+    if(!manual)return;
+    url=(prompt('スプレッドシート同期用URL（Apps ScriptのウェブアプリURL）を貼り付けてください。\n※一度設定すれば、次回以降は保存のたびに自動同期します。')||'').trim();
+    if(!url)return;
+    S.settings.sheetsSyncUrl=url;
+    save();
+  }
+  const payload={
+    jobs:(S.jobs||[]).filter(j=>!j.deleted),
+    clients:(S.clients||[]).filter(c=>!c.deleted),
+    workers:S.workers||[]
+  };
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)});
+    if(manual)toast('📊 スプレッドシートへ同期しました（反映まで数秒）');
+  }catch(e){
+    if(manual)toast('同期に失敗しました: '+e,'warn');
   }
 }
 // ページを閉じる直前に必ずフラッシュ
@@ -3068,6 +3098,7 @@ function rProjects(){
     ${tabs.map(([k,l])=>`<button class="btn btn-g btn-sm ${PVMT===k?'btn-p':''}" onclick="PVMT='${k}';render()">${l}</button>`).join('')}
     <button class="btn btn-p btn-sm" onclick="openClientModal()">＋ クライアント追加</button>
     <button class="btn btn-g btn-sm" onclick="openJobModal()">＋ 案件追加</button>
+    <button class="btn btn-g btn-sm" onclick="syncToSheet(true)" title="案件をスプレッドシートに送信">📊 シート同期</button>
     <select style="font-size:12px;padding:4px 8px;border-radius:6px" onchange="JOB_SORT=this.value;render()">
       <option value="deadline" ${JOB_SORT==='deadline'?'selected':''}>納期順（優先度）</option>
       <option value="default" ${JOB_SORT==='default'?'selected':''}>デフォルト</option>
@@ -7988,7 +8019,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-02';
+const APP_VERSION='20260628-03';
 
 render();
 function forceAppUpdate(){
