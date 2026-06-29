@@ -1476,7 +1476,7 @@ function defState(){return{
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
   goalReviews:{},
-  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false,timeScheduleLockEnabled:true,goalLockEnabled:true,draftLockEnabled:true},
+  settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false,timeScheduleLockEnabled:false,goalLockEnabled:true,draftLockEnabled:true},
   frogId:null,
   customEx:[],
   navConfig:null,
@@ -1823,6 +1823,7 @@ document.addEventListener('input',e=>{
   if(document.getElementById('modal-overlay')?.contains(e.target))_modalDirty=true;
 });
 function checkTimeScheduleLock(){
+  return false; // 今日のタイムスケジュール入力ロックは廃止（常に開く）
   if(S.settings?.timeScheduleLockEnabled===false)return false;
   const td=today();
   if(sessionStorage.getItem('ef_skip_ts_'+td))return false;
@@ -8076,7 +8077,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-05';
+const APP_VERSION='20260628-06';
 
 render();
 function forceAppUpdate(){
