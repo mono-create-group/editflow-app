@@ -3096,7 +3096,7 @@ function sortJobs(jobs){
 }
 function rProjects(){
   const clients=S.clients.filter(c=>!c.deleted);
-  const tabs=[['board','📋 ボード'],['deadline','📅 今日明日期限'],['listing','📢 掲載中'],['list','📄 リスト'],['clients','👥 クライアント一覧'],['profit','💰 利益'],['payment','💳 支払い'],['completed','✅ 完了済み'],['worker','👤 編集者別'],['priority','📊 優先度表']];
+  const tabs=[['board','📋 ボード'],['deadline','📅 今日明日期限'],['listing','📢 掲載中'],['list','📄 リスト'],['clients','👥 クライアント一覧'],['profit','💰 利益'],['payment','💳 支払い'],['invoice','🧾 請求書'],['completed','✅ 完了済み'],['worker','👤 編集者別'],['priority','📊 優先度表']];
   return`<div class="ph">
   <div class="ph-title">案件管理</div>
   <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
@@ -3201,7 +3201,7 @@ ${(()=>{
   if(!rows.length)return'';
   return`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:8px">${rows.join('')}</div>`;
 })()}
-${{board:rProjBoard,deadline:rProjDeadline,listing:rProjListing,list:()=>rProjList(clients),clients:rProjClients,profit:rProjProfit,payment:rProjPayment,completed:rProjCompleted,worker:rProjWorker,priority:rProjPriority}[PVMT]?.()??rProjBoard()}`;
+${{board:rProjBoard,deadline:rProjDeadline,listing:rProjListing,list:()=>rProjList(clients),clients:rProjClients,profit:rProjProfit,payment:rProjPayment,invoice:rProjInvoice,completed:rProjCompleted,worker:rProjWorker,priority:rProjPriority}[PVMT]?.()??rProjBoard()}`;
 }
 
 function rProjListing(){
@@ -3512,6 +3512,87 @@ function rProjCard(j){
 </div>`;
 }
 
+// ===請求書ページ===
+function _invAmt(j){return j.unitPrice||j.profit||0;}
+function _invoiceJobs(cid,m){
+  return S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&(j.deliveryDate||'').startsWith(m)&&_invAmt(j)>0&&((j.clientId||'')===(cid||'')));
+}
+function rProjInvoice(){
+  const now=new Date();
+  const selM=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const months=[...new Set(S.jobs.filter(j=>!j.deleted&&j.deliveryDate&&_invAmt(j)>0).map(j=>j.deliveryDate.slice(0,7)))].sort().reverse();
+  if(!months.includes(selM))months.unshift(selM);
+  const curM=window._invMonth||selM;
+  const tax=!!window._invTax;
+  const jobs=S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&(j.deliveryDate||'').startsWith(curM)&&_invAmt(j)>0);
+  const byClient={};
+  jobs.forEach(j=>{const k=j.clientId||'';(byClient[k]=byClient[k]||[]).push(j);});
+  const clientName=cid=>cid?(S.clients.find(c=>c.id===cid)?.name||'不明'):'クライアント未設定';
+  const grand=jobs.reduce((s,j)=>s+_invAmt(j),0);
+  return`${secTitle('🧾 請求書作成')}
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+  <select style="width:150px" onchange="window._invMonth=this.value;render()">${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m}</option>`).join('')}</select>
+  <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" ${tax?'checked':''} onchange="window._invTax=this.checked;render()">消費税10%を加算</label>
+  <button class="btn btn-g btn-sm" onclick="openInvoiceInfo()">✏️ 請求元情報</button>
+  <span style="font-size:13px;color:var(--t2)">対象 ¥${grand.toLocaleString()}・${Object.keys(byClient).length}社</span>
+</div>
+<div style="font-size:11px;color:var(--t3);margin-bottom:12px">「${curM}」に納品した案件をクライアント別に集計します。「請求書テキストをコピー」で送付用の文面を取得できます。</div>
+${!jobs.length?`<div class="empty"><div class="empty-icon">🧾</div><div class="empty-title">${curM} に納品した請求対象の案件はありません</div></div>`:Object.entries(byClient).map(([cid,js])=>{
+  const sub=js.reduce((s,j)=>s+_invAmt(j),0);
+  const taxAmt=tax?Math.floor(sub*0.1):0;
+  const total=sub+taxAmt;
+  const allInvoiced=js.every(j=>j.invoiceDate);
+  return`<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:15px">${esc(clientName(cid))} <span style="font-size:11px;font-weight:500;color:var(--t2)">様</span></div>
+      ${allInvoiced?`<span class="badge bg" style="font-size:10px">🧾 請求済</span>`:`<span class="badge ba" style="font-size:10px">⏳ 未請求</span>`}
+    </div>
+    ${js.map(j=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span>${esc(j.title)}${j.invoiceDate?` <span style="font-size:10px;color:var(--green)">🧾${j.invoiceDate}</span>`:''}</span>
+      <span style="font-weight:600">¥${_invAmt(j).toLocaleString()}</span>
+    </div>`).join('')}
+    <div style="text-align:right;margin-top:8px;font-size:13px">小計 ¥${sub.toLocaleString()}${tax?` ＋税 ¥${taxAmt.toLocaleString()}`:''} → <span style="font-weight:800;font-size:16px;color:var(--green)">合計 ¥${total.toLocaleString()}</span></div>
+    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-p btn-sm" onclick="copyInvoiceText('${cid}','${curM}')">📋 請求書テキストをコピー</button>
+      ${allInvoiced?`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',false)">請求済を取消</button>`:`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',true)">🧾 請求済みにする</button>`}
+    </div>
+  </div>`;}).join('')}`;
+}
+function genInvoiceText(cid,m){
+  const js=_invoiceJobs(cid,m);
+  const name=cid?(S.clients.find(c=>c.id===cid)?.name||'クライアント'):'クライアント';
+  const sub=js.reduce((s,j)=>s+_invAmt(j),0);
+  const tax=!!window._invTax;const taxAmt=tax?Math.floor(sub*0.1):0;const total=sub+taxAmt;
+  let t=`請求書\n\n${name} 御中\n\nご請求日：${today()}\n下記の通りご請求申し上げます。\n\n────────────────\n`;
+  js.forEach(j=>{t+=`${j.title}　¥${_invAmt(j).toLocaleString()}\n`;});
+  t+=`────────────────\n小計　¥${sub.toLocaleString()}\n`;
+  if(tax)t+=`消費税(10%)　¥${taxAmt.toLocaleString()}\n`;
+  t+=`合計　¥${total.toLocaleString()}\n\n`;
+  t+=(S.settings&&S.settings.invoiceInfo)?S.settings.invoiceInfo:'【「✏️ 請求元情報」から屋号・振込先・支払期限などを設定してください】';
+  return t;
+}
+function copyInvoiceText(cid,m){
+  const t=genInvoiceText(cid,m);
+  const ok=()=>toast('📋 請求書テキストをコピーしました');
+  const fb=()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ok();}catch(e){toast('コピーに失敗しました','warn');}ta.remove();};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok).catch(fb);}else{fb();}
+}
+function markClientInvoiced(cid,m,on){
+  _invoiceJobs(cid,m).forEach(j=>{j.invoiceDate=on?today():'';});
+  save();render();toast(on?'🧾 請求済みにしました':'請求済を取り消しました');
+}
+function openInvoiceInfo(){
+  if(!S.settings)S.settings={};
+  openModal(`<div class="mhdr"><div class="mtitle">✏️ 請求元情報</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div style="font-size:12px;color:var(--t2);margin-bottom:8px">請求書テキストの末尾に毎回自動挿入されます（屋号・振込先・支払期限・登録番号など）。</div>
+<div class="fg"><textarea id="inv-info" rows="6" placeholder="例: mono.create（中村航汰）／振込先：〇〇銀行〇〇支店 普通1234567／お支払期限：翌月末">${esc(S.settings.invoiceInfo||'')}</textarea></div>
+<div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="saveInvoiceInfo()">保存</button></div>`);
+}
+function saveInvoiceInfo(){
+  if(!S.settings)S.settings={};
+  S.settings.invoiceInfo=document.getElementById('inv-info').value;
+  save();closeModal();render();toast('請求元情報を保存しました');
+}
 function rProjCompleted(){
   const done=S.jobs.filter(j=>!j.deleted&&(j.status==='完了'||j.status==='キャンセル')).sort((a,b)=>(b.deliveryDate||b.createdAt||'')>(a.deliveryDate||a.createdAt||'')?1:-1);
   if(!done.length)return`<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">完了済み案件なし</div><div style="color:var(--t2)">完了・キャンセルした案件がここに表示されます</div></div>`;
@@ -8077,7 +8158,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-06';
+const APP_VERSION='20260628-07';
 
 render();
 function forceAppUpdate(){
