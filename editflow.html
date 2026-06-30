@@ -3514,61 +3514,211 @@ function rProjCard(j){
 
 // ===請求書ページ===
 function _invAmt(j){return j.unitPrice||j.profit||0;}
+function _invFmt(n){return '¥'+Math.round(n||0).toLocaleString();}
+function _calcWithholding(base){base=Math.round(base||0);if(base<=1000000)return Math.floor(base*0.1021);return Math.floor((base-1000000)*0.2042)+102100;}
+function _issuer(){
+  const d=(S.settings&&S.settings.issuer)||{};
+  return Object.assign({name:'',person:'',zip:'',address:'',tel:'',email:'',regNo:'',bankName:'',branchName:'',accountType:'普通',accountNo:'',accountHolder:'',paymentTerms:'発行日の翌月末',defaultTax:true,defaultWithholding:false,notesDefault:'お振込手数料は御社にてご負担いただけますようお願い申し上げます。'},d);
+}
+function _endNextMonth(iso){const d=iso?new Date(iso):new Date();const last=new Date(d.getFullYear(),d.getMonth()+2,0);return `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`;}
 function _invoiceJobs(cid,m){
-  return S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&(j.deliveryDate||'').startsWith(m)&&_invAmt(j)>0&&((j.clientId||'')===(cid||'')));
+  return S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&(j.status==='完了'||j.deliveryDate||j.invoiceDate)&&(!m||(j.deliveryDate||'').startsWith(m))&&((j.clientId||'')===(cid||'')));
 }
 function rProjInvoice(){
-  const now=new Date();
-  const selM=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const months=[...new Set(S.jobs.filter(j=>!j.deleted&&j.deliveryDate&&_invAmt(j)>0).map(j=>j.deliveryDate.slice(0,7)))].sort().reverse();
-  if(!months.includes(selM))months.unshift(selM);
-  const curM=window._invMonth||selM;
-  const tax=!!window._invTax;
-  const jobs=S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&(j.deliveryDate||'').startsWith(curM)&&_invAmt(j)>0);
+  const curM=(window._invMonth!==undefined)?window._invMonth:'';
+  const mLabel=curM||'すべての期間';
+  const jobs=S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&(j.status==='完了'||j.deliveryDate||j.invoiceDate)&&(!curM||(j.deliveryDate||'').startsWith(curM)));
   const byClient={};
   jobs.forEach(j=>{const k=j.clientId||'';(byClient[k]=byClient[k]||[]).push(j);});
   const clientName=cid=>cid?(S.clients.find(c=>c.id===cid)?.name||'不明'):'クライアント未設定';
+  const iss=_issuer();
   const grand=jobs.reduce((s,j)=>s+_invAmt(j),0);
-  return`${secTitle('🧾 請求書作成')}
+  return`${secTitle('🧾 請求書')}
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
-  <select style="width:150px" onchange="window._invMonth=this.value;render()">${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m}</option>`).join('')}</select>
-  <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" ${tax?'checked':''} onchange="window._invTax=this.checked;render()">消費税10%を加算</label>
+  <select style="width:160px" onchange="window._invMonth=this.value;render()"><option value="" ${curM===''?'selected':''}>すべての期間</option>${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m}</option>`).join('')}</select>
   <button class="btn btn-g btn-sm" onclick="openInvoiceInfo()">✏️ 請求元情報</button>
-  <span style="font-size:13px;color:var(--t2)">対象 ¥${grand.toLocaleString()}・${Object.keys(byClient).length}社</span>
+  <span style="font-size:13px;color:var(--t2)">請求対象 ¥${grand.toLocaleString()}・${Object.keys(byClient).length}社</span>
 </div>
-<div style="font-size:11px;color:var(--t3);margin-bottom:12px">「${curM}」に納品した案件をクライアント別に集計します。「請求書テキストをコピー」で送付用の文面を取得できます。</div>
-${!jobs.length?`<div class="empty"><div class="empty-icon">🧾</div><div class="empty-title">${curM} に納品した請求対象の案件はありません</div></div>`:Object.entries(byClient).map(([cid,js])=>{
+${!iss.name?`<div class="card" style="background:#3a2a00;border:1px solid var(--amber);margin-bottom:10px;font-size:12px">⚠️ まず「✏️ 請求元情報」に屋号・振込先などを設定してください（請求書に自動で差し込まれます）。</div>`:''}
+<div style="font-size:11px;color:var(--t3);margin-bottom:12px">${mLabel}の <b>完了 または 納品済み</b> の案件をクライアント別にまとめます。「🧾 請求書を作成」で宛先や明細を編集 → PDF保存できます。</div>
+${!Object.keys(byClient).length?`<div class="empty"><div class="empty-icon">🧾</div><div class="empty-title">${mLabel}の請求対象案件はありません</div><div style="color:var(--t2);font-size:12px;margin-top:4px">案件に「単価/報酬」を入力し、ステータスを「完了」にするか納品日を設定すると表示されます</div></div>`:Object.entries(byClient).map(([cid,js])=>{
   const sub=js.reduce((s,j)=>s+_invAmt(j),0);
-  const taxAmt=tax?Math.floor(sub*0.1):0;
-  const total=sub+taxAmt;
   const allInvoiced=js.every(j=>j.invoiceDate);
   return`<div class="card" style="margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-      <div style="font-weight:700;font-size:15px">${esc(clientName(cid))} <span style="font-size:11px;font-weight:500;color:var(--t2)">様</span></div>
+      <div style="font-weight:700;font-size:15px">${esc(clientName(cid))} <span style="font-size:11px;font-weight:500;color:var(--t2)">御中</span></div>
       ${allInvoiced?`<span class="badge bg" style="font-size:10px">🧾 請求済</span>`:`<span class="badge ba" style="font-size:10px">⏳ 未請求</span>`}
     </div>
     ${js.map(j=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border)">
       <span>${esc(j.title)}${j.invoiceDate?` <span style="font-size:10px;color:var(--green)">🧾${j.invoiceDate}</span>`:''}</span>
       <span style="font-weight:600">¥${_invAmt(j).toLocaleString()}</span>
     </div>`).join('')}
-    <div style="text-align:right;margin-top:8px;font-size:13px">小計 ¥${sub.toLocaleString()}${tax?` ＋税 ¥${taxAmt.toLocaleString()}`:''} → <span style="font-weight:800;font-size:16px;color:var(--green)">合計 ¥${total.toLocaleString()}</span></div>
+    <div style="text-align:right;margin-top:8px;font-size:13px">小計 <span style="font-weight:800;font-size:16px;color:var(--green)">¥${sub.toLocaleString()}</span><span style="color:var(--t3);font-size:11px">（税・源泉は請求書で調整）</span></div>
     <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-      <button class="btn btn-p btn-sm" onclick="copyInvoiceText('${cid}','${curM}')">📋 請求書テキストをコピー</button>
-      ${allInvoiced?`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',false)">請求済を取消</button>`:`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',true)">🧾 請求済みにする</button>`}
+      <button class="btn btn-p btn-sm" onclick="openInvoiceEditor('${cid}','${curM}')">🧾 請求書を作成（PDF）</button>
+      <button class="btn btn-g btn-sm" onclick="copyInvoiceText('${cid}','${curM}')">📋 テキストでコピー</button>
+      ${allInvoiced?`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',false)">請求済を取消</button>`:`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',true)">✅ 請求済みにする</button>`}
     </div>
   </div>`;}).join('')}`;
 }
+function openInvoiceEditor(cid,m){
+  const js=_invoiceJobs(cid,m);
+  if(!js.length){toast('対象の案件がありません','warn');return;}
+  const i=_issuer();
+  const cname=cid?(S.clients.find(c=>c.id===cid)?.name||'クライアント'):'クライアント';
+  const issue=today();
+  const due=js.map(j=>j.dueDate).filter(Boolean).sort().reverse()[0]||_endNextMonth(issue);
+  const items=js.map(j=>({name:j.title,qty:1,unit:_invAmt(j),amount:_invAmt(j)}));
+  window._invDraft={cid,m,recipient:cname,issue,no:'INV-'+issue.replace(/-/g,''),due,subject:js.length===1?js[0].title:'動画制作費 ほか',items,taxOn:i.defaultTax,whOn:i.defaultWithholding,notes:i.notesDefault};
+  _renderInvoiceEditor();
+}
+function _invItemRow(it){
+  return `<tr data-item style="border-bottom:1px solid #ddd">
+    <td style="padding:4px 8px"><input class="inv-inp ii-name" value="${esc(it.name||'')}" style="width:100%"></td>
+    <td style="padding:4px 8px;text-align:center"><input class="inv-inp ii-qty" type="number" value="${it.qty||1}" oninput="_invRecalc()" style="width:54px;text-align:right"></td>
+    <td style="padding:4px 8px;text-align:right"><input class="inv-inp ii-unit" type="number" value="${it.unit||0}" oninput="_invRecalc()" style="width:96px;text-align:right"></td>
+    <td class="ii-amt" style="padding:4px 8px;text-align:right;font-weight:600">¥0</td>
+    <td class="inv-noprint" style="text-align:center"><button onclick="this.closest('tr').remove();_invRecalc()" style="border:none;background:none;color:#c00;cursor:pointer;font-size:15px">✕</button></td>
+  </tr>`;
+}
+function _invAddItem(){const tb=document.querySelector('#inv-items tbody');if(!tb)return;tb.insertAdjacentHTML('beforeend',_invItemRow({name:'',qty:1,unit:0}));_invRecalc();}
+function _invRecalc(){
+  const d=window._invDraft;if(!d)return;
+  let sub=0;const items=[];
+  document.querySelectorAll('#inv-items tr[data-item]').forEach(tr=>{
+    const name=tr.querySelector('.ii-name').value;
+    const qty=parseFloat(tr.querySelector('.ii-qty').value)||0;
+    const unit=parseFloat(tr.querySelector('.ii-unit').value)||0;
+    const amt=Math.round(qty*unit);
+    tr.querySelector('.ii-amt').textContent=_invFmt(amt);
+    sub+=amt;items.push({name,qty,unit,amount:amt});
+  });
+  d.items=items;
+  const taxEl=document.getElementById('inv-tax-on'),whEl=document.getElementById('inv-wh-on');
+  d.taxOn=taxEl?taxEl.checked:d.taxOn;d.whOn=whEl?whEl.checked:d.whOn;
+  const tax=d.taxOn?Math.floor(sub*0.1):0;
+  const wh=d.whOn?_calcWithholding(sub):0;
+  const total=sub+tax-wh;
+  d.subtotal=sub;d.tax=tax;d.withholding=wh;d.total=total;
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('inv-subtotal',_invFmt(sub));set('inv-tax',_invFmt(tax));set('inv-wh','-'+_invFmt(wh));
+  set('inv-total',_invFmt(total));set('inv-bigamt',_invFmt(total));
+  const tr1=document.getElementById('inv-tax-row');if(tr1)tr1.style.display=d.taxOn?'':'none';
+  const tr2=document.getElementById('inv-wh-row');if(tr2)tr2.style.display=d.whOn?'':'none';
+}
+function _renderInvoiceEditor(){
+  const d=window._invDraft,i=_issuer();
+  let root=document.getElementById('inv-editor-root');
+  if(!root){root=document.createElement('div');root.id='inv-editor-root';document.body.appendChild(root);}
+  root.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);overflow:auto;padding:24px 16px';
+  const acct=[i.bankName,i.branchName,(i.accountNo?i.accountType+' '+i.accountNo:''),i.accountHolder].filter(Boolean).join('　');
+  root.innerHTML=`<style>
+   @media print{
+     body *{visibility:hidden!important;}
+     #inv-editor-root,#inv-editor-root *{visibility:visible!important;}
+     #inv-editor-root{position:absolute!important;inset:0!important;background:#fff!important;padding:0!important;overflow:visible!important;}
+     #inv-toolbar{display:none!important;}
+     #inv-paper{box-shadow:none!important;margin:0!important;max-width:100%!important;border-radius:0!important;}
+     .inv-inp{border:none!important;background:transparent!important;padding:0!important;}
+     .inv-noprint{display:none!important;}
+     @page{size:A4;margin:14mm;}
+   }
+   #inv-editor-root .inv-inp{border:1px solid #ddd;background:#fafafa;border-radius:4px;padding:3px 6px;font-family:inherit;font-size:inherit;color:#111;}
+  </style>
+  <div id="inv-toolbar" style="position:sticky;top:0;display:flex;gap:8px;justify-content:flex-end;align-items:center;max-width:800px;margin:0 auto 12px;flex-wrap:wrap;z-index:2">
+    <span style="margin-right:auto;color:#fff;font-weight:700">🧾 請求書プレビュー（その場で編集できます）</span>
+    <button class="btn btn-g btn-sm" onclick="closeInvoiceEditor()">✕ 閉じる</button>
+    <button class="btn btn-g btn-sm" onclick="markClientInvoiced('${d.cid}','${d.m}',true);closeInvoiceEditor()">✅ 請求済みにする</button>
+    <button class="btn btn-p btn-sm" onclick="_invPrint()">📄 PDFで保存 / 印刷</button>
+  </div>
+  <div id="inv-paper" style="max-width:800px;margin:0 auto;background:#fff;color:#111;padding:38px 42px;border-radius:8px;box-shadow:0 12px 48px rgba(0,0,0,.45);font-size:13px;line-height:1.6">
+    <div style="text-align:center;font-size:25px;font-weight:800;letter-spacing:10px;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:22px">請 求 書</div>
+    <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:18px">
+      <div style="flex:1">
+        <div style="font-size:18px;font-weight:700;border-bottom:1px solid #111;padding-bottom:5px;margin-bottom:10px;display:flex;align-items:baseline;gap:6px"><input class="inv-inp" id="inv-recipient" value="${esc(d.recipient)}" style="font-size:18px;font-weight:700;flex:1"><span>御中</span></div>
+        <div style="color:#444">下記の通りご請求申し上げます。</div>
+      </div>
+      <div style="width:238px;font-size:12px;color:#333">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><span>請求番号</span><input class="inv-inp" id="inv-no" value="${esc(d.no)}" style="width:140px;text-align:right"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span>発行日</span><input type="date" class="inv-inp" id="inv-issue" value="${d.issue}" style="width:140px"></div>
+        <div style="font-size:14px;font-weight:700;border-top:1px solid #ccc;padding-top:6px">${esc(i.name||'（請求元名 未設定）')}</div>
+        ${i.person?`<div>${esc(i.person)}</div>`:''}
+        ${(i.zip||i.address)?`<div>${esc(i.zip)} ${esc(i.address)}</div>`:''}
+        ${i.tel?`<div>TEL: ${esc(i.tel)}</div>`:''}
+        ${i.email?`<div>${esc(i.email)}</div>`:''}
+        ${i.regNo?`<div>登録番号: ${esc(i.regNo)}</div>`:''}
+      </div>
+    </div>
+    <div style="background:#f4f7ff;border:1px solid #c9d8ff;border-radius:6px;padding:12px 18px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700;font-size:15px">ご請求金額（税込）</span>
+      <span id="inv-bigamt" style="font-weight:800;font-size:24px">¥0</span>
+    </div>
+    <div style="display:flex;gap:24px;margin-bottom:14px;font-size:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px"><span>お支払期限</span><input type="date" class="inv-inp" id="inv-due" value="${d.due}"></div>
+      <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:200px"><span>件名</span><input class="inv-inp" id="inv-subject" value="${esc(d.subject)}" style="flex:1"></div>
+    </div>
+    <table id="inv-items" style="width:100%;border-collapse:collapse;margin-bottom:6px">
+      <thead><tr style="background:#333;color:#fff">
+        <th style="text-align:left;padding:6px 8px">品目・内容</th>
+        <th style="width:64px;padding:6px 8px">数量</th>
+        <th style="width:104px;padding:6px 8px">単価</th>
+        <th style="width:116px;padding:6px 8px">金額</th>
+        <th class="inv-noprint" style="width:32px"></th>
+      </tr></thead>
+      <tbody>${d.items.map(it=>_invItemRow(it)).join('')}</tbody>
+    </table>
+    <button class="btn btn-g btn-xs inv-noprint" onclick="_invAddItem()" style="margin-bottom:14px">＋ 行を追加</button>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+      <table style="font-size:13px;min-width:270px">
+        <tr><td style="padding:3px 12px;text-align:right;color:#444">小計</td><td id="inv-subtotal" style="padding:3px 0;text-align:right;font-weight:600;width:120px">¥0</td></tr>
+        <tr id="inv-tax-row"><td style="padding:3px 12px;text-align:right;color:#444">消費税（10%）</td><td id="inv-tax" style="padding:3px 0;text-align:right">¥0</td></tr>
+        <tr id="inv-wh-row"><td style="padding:3px 12px;text-align:right;color:#444">源泉徴収税（10.21%）</td><td id="inv-wh" style="padding:3px 0;text-align:right;color:#c00">¥0</td></tr>
+        <tr style="border-top:2px solid #111"><td style="padding:6px 12px;text-align:right;font-weight:800">合計</td><td id="inv-total" style="padding:6px 0;text-align:right;font-weight:800;font-size:16px">¥0</td></tr>
+      </table>
+    </div>
+    <div class="inv-noprint" style="display:flex;gap:18px;margin-bottom:16px;font-size:12px;background:#f5f5f5;padding:9px 14px;border-radius:6px;flex-wrap:wrap">
+      <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="inv-tax-on" ${d.taxOn?'checked':''} onchange="_invRecalc()">消費税10%を加算</label>
+      <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="inv-wh-on" ${d.whOn?'checked':''} onchange="_invRecalc()">源泉徴収を差し引く（個人・10.21%）</label>
+    </div>
+    <div style="display:flex;gap:22px;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px">
+        <div style="font-weight:700;margin-bottom:4px">備考</div>
+        <textarea class="inv-inp" id="inv-notes" rows="3" style="width:100%">${esc(d.notes||'')}</textarea>
+      </div>
+      <div style="width:310px">
+        <div style="font-weight:700;margin-bottom:4px">お振込先</div>
+        <div style="border:1px solid #ddd;border-radius:6px;padding:9px 11px;font-size:12px;min-height:56px">${acct?esc(acct):'<span style="color:#999">「請求元情報」で振込先を設定してください</span>'}</div>
+      </div>
+    </div>
+  </div>`;
+  _invRecalc();
+}
+function _invPrint(){
+  const d=window._invDraft;const oldT=document.title;
+  document.title=`請求書_${(d&&d.recipient)||''}_${(d&&d.issue)||''}`;
+  window.print();
+  setTimeout(()=>{document.title=oldT;},800);
+}
+function closeInvoiceEditor(){const r=document.getElementById('inv-editor-root');if(r)r.remove();}
 function genInvoiceText(cid,m){
   const js=_invoiceJobs(cid,m);
   const name=cid?(S.clients.find(c=>c.id===cid)?.name||'クライアント'):'クライアント';
+  const i=_issuer();
   const sub=js.reduce((s,j)=>s+_invAmt(j),0);
-  const tax=!!window._invTax;const taxAmt=tax?Math.floor(sub*0.1):0;const total=sub+taxAmt;
+  const tax=i.defaultTax?Math.floor(sub*0.1):0;
+  const wh=i.defaultWithholding?_calcWithholding(sub):0;
+  const total=sub+tax-wh;
   let t=`請求書\n\n${name} 御中\n\nご請求日：${today()}\n下記の通りご請求申し上げます。\n\n────────────────\n`;
   js.forEach(j=>{t+=`${j.title}　¥${_invAmt(j).toLocaleString()}\n`;});
   t+=`────────────────\n小計　¥${sub.toLocaleString()}\n`;
-  if(tax)t+=`消費税(10%)　¥${taxAmt.toLocaleString()}\n`;
+  if(tax)t+=`消費税(10%)　¥${tax.toLocaleString()}\n`;
+  if(wh)t+=`源泉徴収税　-¥${wh.toLocaleString()}\n`;
   t+=`合計　¥${total.toLocaleString()}\n\n`;
-  t+=(S.settings&&S.settings.invoiceInfo)?S.settings.invoiceInfo:'【「✏️ 請求元情報」から屋号・振込先・支払期限などを設定してください】';
+  if(i.name)t+=`${i.name}${i.person?'（'+i.person+'）':''}\n`;
+  if(i.regNo)t+=`登録番号：${i.regNo}\n`;
+  if(i.bankName)t+=`お振込先：${i.bankName} ${i.branchName} ${i.accountType}${i.accountNo} ${i.accountHolder}\n`;
+  t+=`お支払期限：${i.paymentTerms||'発行日の翌月末'}\n`;
   return t;
 }
 function copyInvoiceText(cid,m){
@@ -3583,14 +3733,46 @@ function markClientInvoiced(cid,m,on){
 }
 function openInvoiceInfo(){
   if(!S.settings)S.settings={};
-  openModal(`<div class="mhdr"><div class="mtitle">✏️ 請求元情報</div><button class="mclose" onclick="closeModal()">✕</button></div>
-<div style="font-size:12px;color:var(--t2);margin-bottom:8px">請求書テキストの末尾に毎回自動挿入されます（屋号・振込先・支払期限・登録番号など）。</div>
-<div class="fg"><textarea id="inv-info" rows="6" placeholder="例: mono.create（中村航汰）／振込先：〇〇銀行〇〇支店 普通1234567／お支払期限：翌月末">${esc(S.settings.invoiceInfo||'')}</textarea></div>
+  const i=_issuer();
+  openModalLg(`<div class="mhdr"><div class="mtitle">✏️ 請求元情報</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div style="font-size:12px;color:var(--t2);margin-bottom:10px">一度設定すれば、請求書に自動で差し込まれます。</div>
+<div style="font-size:12px;font-weight:700;color:var(--t2);margin:6px 0 4px">🏢 請求元（あなた）</div>
+<div class="fg"><div class="fl">名前 / 屋号 *</div><input id="ii-name" value="${esc(i.name)}" placeholder="mono.create"></div>
+<div class="fg"><div class="fl">担当者名</div><input id="ii-person" value="${esc(i.person)}" placeholder="中村 航汰"></div>
+<div class="frow"><div class="fg"><div class="fl">郵便番号</div><input id="ii-zip" value="${esc(i.zip)}" placeholder="070-0000"></div>
+  <div class="fg"><div class="fl">電話番号</div><input id="ii-tel" value="${esc(i.tel)}" placeholder="090-1234-5678"></div></div>
+<div class="fg"><div class="fl">住所</div><input id="ii-address" value="${esc(i.address)}" placeholder="北海道旭川市〇〇1-2-3"></div>
+<div class="fg"><div class="fl">メール</div><input id="ii-email" value="${esc(i.email)}" placeholder="mono.create.group@gmail.com"></div>
+<div class="fg"><div class="fl">インボイス登録番号</div><input id="ii-regno" value="${esc(i.regNo)}" placeholder="T1234567890123"></div>
+<div style="font-size:12px;font-weight:700;color:var(--t2);margin:12px 0 4px">🏦 お振込先</div>
+<div class="frow"><div class="fg"><div class="fl">銀行名</div><input id="ii-bank" value="${esc(i.bankName)}" placeholder="〇〇銀行"></div>
+  <div class="fg"><div class="fl">支店名</div><input id="ii-branch" value="${esc(i.branchName)}" placeholder="〇〇支店"></div></div>
+<div class="frow"><div class="fg"><div class="fl">口座種別</div><select id="ii-acctype"><option ${i.accountType==='普通'?'selected':''}>普通</option><option ${i.accountType==='当座'?'selected':''}>当座</option></select></div>
+  <div class="fg"><div class="fl">口座番号</div><input id="ii-accno" value="${esc(i.accountNo)}" placeholder="1234567"></div></div>
+<div class="fg"><div class="fl">口座名義</div><input id="ii-accholder" value="${esc(i.accountHolder)}" placeholder="ナカムラ コウタ"></div>
+<div style="font-size:12px;font-weight:700;color:var(--t2);margin:12px 0 4px">⚙️ 既定値</div>
+<div class="fg"><div class="fl">お支払期限（文言）</div><input id="ii-terms" value="${esc(i.paymentTerms)}" placeholder="発行日の翌月末"></div>
+<div style="display:flex;gap:16px;margin:6px 0;flex-wrap:wrap">
+  <label style="font-size:13px;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="ii-deftax" ${i.defaultTax?'checked':''}>消費税10%を初期ON</label>
+  <label style="font-size:13px;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="ii-defwh" ${i.defaultWithholding?'checked':''}>源泉徴収を初期ON</label>
+</div>
+<div class="fg"><div class="fl">備考の既定文</div><textarea id="ii-notes" rows="2">${esc(i.notesDefault)}</textarea></div>
 <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="saveInvoiceInfo()">保存</button></div>`);
 }
 function saveInvoiceInfo(){
   if(!S.settings)S.settings={};
-  S.settings.invoiceInfo=document.getElementById('inv-info').value;
+  const g=id=>document.getElementById(id);
+  S.settings.issuer={
+    name:g('ii-name').value.trim(),person:g('ii-person').value.trim(),
+    zip:g('ii-zip').value.trim(),tel:g('ii-tel').value.trim(),
+    address:g('ii-address').value.trim(),email:g('ii-email').value.trim(),
+    regNo:g('ii-regno').value.trim(),
+    bankName:g('ii-bank').value.trim(),branchName:g('ii-branch').value.trim(),
+    accountType:g('ii-acctype').value,accountNo:g('ii-accno').value.trim(),accountHolder:g('ii-accholder').value.trim(),
+    paymentTerms:g('ii-terms').value.trim()||'発行日の翌月末',
+    defaultTax:g('ii-deftax').checked,defaultWithholding:g('ii-defwh').checked,
+    notesDefault:g('ii-notes').value
+  };
   save();closeModal();render();toast('請求元情報を保存しました');
 }
 function rProjCompleted(){
@@ -6735,6 +6917,7 @@ function openJobModal(id,preStatus,preClientId){
 </div>
 <div class="frow">
   <div class="fg"><div class="fl">請求書提出日</div><input type="date" id="j-invoice" value="${j?.invoiceDate||''}"></div>
+  <div class="fg"><div class="fl">支払期日</div><input type="date" id="j-due" value="${j?.dueDate||''}"></div>
 </div>
 <div class="frow">
   <div class="fg"><div class="fl">入金日</div><input type="date" id="j-payin" value="${j?.paymentDate||''}"></div>
@@ -6935,7 +7118,7 @@ function saveJob(){
   const onlySelf=selWorkerIds.length===0||selWorkerIds.every(id=>id===SELF_WID);
   const workerPay=hasPricedSubs?subtasks.filter(s=>s.workerId!==SELF_WID).reduce((s,sub)=>s+(sub.workerPay||0),0):(onlySelf?0:parseInt(document.getElementById('j-wpay')?.value)||0);
   const isTrial=document.getElementById('j-trial-val')?.value==='1';
-  const data={title,jobType:document.getElementById('j-type')?.value||'edit',clientId:document.getElementById('j-cl').value||null,workerIds:selWorkerIds,workerId:selWorkerIds[0]||null,scope:document.getElementById('j-scope').value||null,status:document.getElementById('j-stat').value,isTrial,unitPrice,profit:unitPrice,workerPay,sharedDate:document.getElementById('j-shared').value||null,editorDraftDate:document.getElementById('j-editor-draft').value||null,clientDraftDate:document.getElementById('j-client-draft').value||null,thumbnailDate:document.getElementById('j-thumbnail')?.value||null,deliveryDate:document.getElementById('j-deliver').value||null,invoiceDate:document.getElementById('j-invoice').value||null,paymentDate:document.getElementById('j-payin').value||null,payoutDate:document.getElementById('j-payout').value||null,notes:document.getElementById('j-notes').value.trim(),subtasks};
+  const data={title,jobType:document.getElementById('j-type')?.value||'edit',clientId:document.getElementById('j-cl').value||null,workerIds:selWorkerIds,workerId:selWorkerIds[0]||null,scope:document.getElementById('j-scope').value||null,status:document.getElementById('j-stat').value,isTrial,unitPrice,profit:unitPrice,workerPay,sharedDate:document.getElementById('j-shared').value||null,editorDraftDate:document.getElementById('j-editor-draft').value||null,clientDraftDate:document.getElementById('j-client-draft').value||null,thumbnailDate:document.getElementById('j-thumbnail')?.value||null,deliveryDate:document.getElementById('j-deliver').value||null,invoiceDate:document.getElementById('j-invoice').value||null,dueDate:document.getElementById('j-due')?.value||null,paymentDate:document.getElementById('j-payin').value||null,payoutDate:document.getElementById('j-payout').value||null,notes:document.getElementById('j-notes').value.trim(),subtasks};
   if(EID){
     const j=S.jobs.find(j=>j.id===EID);
     const prevStatus=j?.status;
@@ -8182,7 +8365,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-08';
+const APP_VERSION='20260628-09';
 
 render();
 function forceAppUpdate(){
