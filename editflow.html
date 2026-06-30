@@ -710,6 +710,7 @@ const BUILTIN_VIEWS=[
   {id:'dashboard',label:'ダッシュボード',icon:'🏠'},
   {id:'tasks',label:'タスク管理',icon:'✅'},
   {id:'projects',label:'案件管理',icon:'🎬'},
+  {id:'pipeline',label:'商談管理',icon:'🤝'},
   {id:'workers',label:'ワーカー管理',icon:'👥'},
   {id:'habits',label:'習慣トラッカー',icon:'🔥'},
   {id:'goals',label:'目標・KPI管理',icon:'🎯'},
@@ -759,7 +760,7 @@ function _applyCloudData(json){
   const cloud=JSON.parse(json);
   const def=defState();
   S=migrate(Object.assign(def,cloud));
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   localStorage.setItem(DB,JSON.stringify(S));
 }
 
@@ -801,7 +802,7 @@ function fbSetupRealtimeSync(){
 // チームデータのみ shared/team に相乗りさせ、全員で同じ案件を見られるようにする。
 // Firestoreルールが共有アクセスを許可していれば自動で有効化。許可されない場合は
 // permission-denied を検知して自動で個人モードへフォールバック（現状維持・無害）。
-const TEAM_KEYS=['jobs','clients','workers'];
+const TEAM_KEYS=['jobs','clients','workers','pipeline'];
 let TEAM_SHARE_OK=null;      // null=未判定 / true=共有有効 / false=個人モード
 let _teamUnsub=null;
 window._teamSnap=window._teamSnap||{};
@@ -1528,7 +1529,7 @@ let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[],
-  checkIns:[], workouts:[], workers:[], memos:[], meals:[],
+  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
   goalReviews:{},
@@ -2218,7 +2219,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -4470,6 +4471,103 @@ function rGoalTree(){
   <span style="color:var(--purple)">▸ ルート目標 ${roots.length}件</span> ${unlinkedCount?`<span style="color:var(--amber)">・未連動 ${unlinkedCount}件あり</span>`:'<span style="color:var(--green)">・すべて連動済み ✓</span>'}
 </div>
 ${roots.map(g=>renderNode(g,0)).join('')}`;
+}
+// ===商談管理（パイプライン）チーム共有===
+const PIPE_STAGES=['リード','商談中','提案中','受注','失注'];
+const PIPE_BG={'リード':'bk','商談中':'bb','提案中':'ba','受注':'bg','失注':'br'};
+function _pipeDeals(){return (S.pipeline||[]).filter(d=>!d.deleted);}
+function rPipeline(){
+  const deals=_pipeDeals();
+  const open=deals.filter(d=>d.stage!=='受注'&&d.stage!=='失注');
+  const pipelineSum=open.reduce((s,d)=>s+(d.amount||0),0);
+  const wonSum=deals.filter(d=>d.stage==='受注').reduce((s,d)=>s+(d.amount||0),0);
+  const cname=d=>d.clientId?(S.clients.find(c=>c.id===d.clientId)?.name||d.clientName||''):(d.clientName||'');
+  return`${secTitle('🤝 商談管理')}
+<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+  <button class="btn btn-p btn-sm" onclick="openDealModal()">＋ 商談を追加</button>
+  <span style="font-size:13px;color:var(--t2);align-self:center">見込み ¥${pipelineSum.toLocaleString()}・受注 ¥${wonSum.toLocaleString()}・進行中 ${open.length}件</span>
+</div>
+${!deals.length?`<div class="empty"><div class="empty-icon">🤝</div><div class="empty-title">まだ商談がありません</div><div style="color:var(--t2);font-size:12px;margin-top:4px">「＋ 商談を追加」から見込み案件を登録すると、ステージ別に進捗管理できます（チーム全員で共有）</div></div>`:
+PIPE_STAGES.map(st=>{
+  const ds=deals.filter(d=>d.stage===st);
+  if(!ds.length)return '';
+  const sum=ds.reduce((s,d)=>s+(d.amount||0),0);
+  return`<div style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span class="badge ${PIPE_BG[st]||'bk'}">${st}</span>
+      <span style="font-size:12px;color:var(--t2)">${ds.length}件・¥${sum.toLocaleString()}</span>
+    </div>
+    ${ds.map(d=>`<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="openDealModal('${d.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="min-width:0">
+          <div style="font-weight:700;font-size:14px">${esc(d.name||'(無題)')}</div>
+          ${cname(d)?`<div style="font-size:12px;color:var(--t2)">🏢 ${esc(cname(d))}</div>`:''}
+          ${d.expectedDate?`<div style="font-size:11px;color:var(--t3)">📅 見込み ${d.expectedDate}</div>`:''}
+          ${d.owner?`<div style="font-size:11px;color:var(--t3)">👤 ${esc(d.owner)}</div>`:''}
+          ${d.notes?`<div style="font-size:11px;color:var(--t3);margin-top:2px">📝 ${esc(d.notes.slice(0,60))}${d.notes.length>60?'…':''}</div>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0"><div style="font-weight:800;font-size:15px;color:var(--green)">¥${(d.amount||0).toLocaleString()}</div></div>
+      </div>
+      <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap" onclick="event.stopPropagation()">
+        ${PIPE_STAGES.filter(s=>s!==d.stage).map(s=>`<button class="btn btn-g btn-xs" onclick="moveDealStage('${d.id}','${s}')">→${s}</button>`).join('')}
+      </div>
+    </div>`).join('')}
+  </div>`;
+}).join('')}`;
+}
+function moveDealStage(id,stage){
+  const d=(S.pipeline||[]).find(x=>x.id===id);if(!d)return;
+  d.stage=stage;d.updatedAt=Date.now();
+  save();render();toast('商談を「'+stage+'」に移動しました');
+}
+function openDealModal(id){
+  const d=id?(S.pipeline||[]).find(x=>x.id===id):null;
+  const clients=(S.clients||[]).filter(c=>!c.deleted);
+  const workers=(S.workers||[]).filter(w=>!w.deleted);
+  openModalLg(`<div class="mhdr"><div class="mtitle">${d?'商談を編集':'商談を追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<input type="hidden" id="d-id" value="${d?d.id:''}">
+<div class="fg"><div class="fl">商談名 *</div><input id="d-name" value="${esc(d?.name||'')}" placeholder="例: 〇〇株式会社 動画制作の提案"></div>
+<div class="frow">
+  <div class="fg"><div class="fl">クライアント</div>
+    <select id="d-client"><option value="">未設定 / 新規</option>${clients.map(c=>`<option value="${c.id}" ${d?.clientId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+  </div>
+  <div class="fg"><div class="fl">相手先名（自由入力）</div><input id="d-clientname" value="${esc(d?.clientName||'')}" placeholder="未登録の見込み客の場合"></div>
+</div>
+<div class="frow">
+  <div class="fg"><div class="fl">ステージ</div><select id="d-stage">${PIPE_STAGES.map(s=>`<option ${(d?.stage||'リード')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+  <div class="fg"><div class="fl">想定金額（円）</div><input type="number" id="d-amount" value="${d?.amount||''}" placeholder="0"></div>
+</div>
+<div class="frow">
+  <div class="fg"><div class="fl">受注見込み日</div><input type="date" id="d-expected" value="${d?.expectedDate||''}"></div>
+  <div class="fg"><div class="fl">担当</div>
+    <select id="d-owner"><option value="">未設定</option><option ${d?.owner==='自分'?'selected':''}>自分</option>${workers.map(w=>`<option ${d?.owner===w.name?'selected':''}>${esc(w.name)}</option>`).join('')}</select>
+  </div>
+</div>
+<div class="fg"><div class="fl">メモ・次のアクション</div><textarea id="d-notes" rows="3">${esc(d?.notes||'')}</textarea></div>
+<div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button>${d?`<button class="btn btn-red" onclick="delDeal('${d.id}')">削除</button>`:''}<button class="btn btn-p" onclick="saveDeal()">保存</button></div>`);
+  setTimeout(()=>document.getElementById('d-name')?.focus(),50);
+}
+function saveDeal(){
+  const name=document.getElementById('d-name').value.trim();
+  if(!name){toast('商談名を入力してください','warn');return;}
+  const id=document.getElementById('d-id').value;
+  const data={name,
+    clientId:document.getElementById('d-client').value||null,
+    clientName:document.getElementById('d-clientname').value.trim()||null,
+    stage:document.getElementById('d-stage').value,
+    amount:parseInt(document.getElementById('d-amount').value)||0,
+    expectedDate:document.getElementById('d-expected').value||null,
+    owner:document.getElementById('d-owner').value||null,
+    notes:document.getElementById('d-notes').value.trim()};
+  if(!S.pipeline)S.pipeline=[];
+  if(id){const d=S.pipeline.find(x=>x.id===id);if(d)Object.assign(d,data,{updatedAt:Date.now()});}
+  else{S.pipeline.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
+  save();closeModal();render();toast('商談を保存しました 🤝');
+}
+function delDeal(id){
+  const d=(S.pipeline||[]).find(x=>x.id===id);if(!d)return;
+  d.deleted=true;d.updatedAt=Date.now();
+  save();closeModal();render();toast('商談を削除しました');
 }
 function rGoals(){
   // 統合ページ: 目標管理 + KPI管理を1ページに
@@ -8421,7 +8519,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-10';
+const APP_VERSION='20260628-11';
 
 render();
 function forceAppUpdate(){
