@@ -3443,7 +3443,7 @@ function rProjCard(j){
   const uc=urgCls(j.deliveryDate);
   const pr=jobProfit(j),ti=jobTotalIn(j),to=jobTotalOut(j);
   return`<div class="proj-card" onclick="openJobModal('${j.id}')">
-  <div class="proj-card-title">${esc(j.title)}</div>
+  <div class="proj-card-title">${j.jobType==='consul'?'💼 ':''}${esc(j.title)}</div>
   ${cl?`<div class="proj-card-client">👤 ${esc(cl.name)}</div>`:''}
   ${wNames?`<div style="font-size:11px;color:var(--t2);margin-top:2px">🛠 ${esc(wNames)}</div>`:''}
   ${j.scope?`<div style="font-size:11px;color:var(--t2);margin-top:2px">📌 ${esc(j.scope)}</div>`:''}
@@ -6816,6 +6816,13 @@ function openJobModal(id,preStatus,preClientId){
   const up=j?.unitPrice||j?.profit||0, wp=j?.workerPay||0;
   const pr=up-wp;
   openModalLg(`<div class="mhdr"><div class="mtitle">${j?'案件編集':'案件追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div class="fg"><div class="fl">案件タイプ</div>
+  <div style="display:flex;gap:6px">
+    <button type="button" id="jt-edit" class="btn btn-sm" onclick="setJobType('edit')">📹 編集案件</button>
+    <button type="button" id="jt-consul" class="btn btn-sm" onclick="setJobType('consul')">💼 コンサル案件</button>
+  </div>
+</div>
+<input type="hidden" id="j-type" value="${j?.jobType||'edit'}">
 <div class="fg"><div class="fl">案件タイトル *</div><input id="j-ttl" value="${esc(j?.title||'')}" placeholder="例: 歌舞伎町のご飯やさん（1本目）"></div>
 <div class="frow">
   <div class="fg"><div class="fl">クライアント名</div>
@@ -6848,9 +6855,9 @@ function openJobModal(id,preStatus,preClientId){
 <input type="hidden" id="j-trial-val" value="${j?.isTrial?'1':'0'}">
 <div class="frow">
   <div class="fg"><div class="fl">ステータス</div>
-    <select id="j-stat">${PSTATUS.map(s=>`<option ${(j?.status||preStatus||'未着手')===s?'selected':''}>${s}</option>`).join('')}</select>
+    <select id="j-stat">${[...PSTATUS,'商談中','契約中','継続中'].map(s=>`<option ${(j?.status||preStatus||'未着手')===s?'selected':''}>${s}</option>`).join('')}</select>
   </div>
-  <div class="fg"><div class="fl">担当範囲</div>
+  <div class="fg" id="jf-scope"><div class="fl">担当範囲</div>
     <select id="j-scope">
       <option value="">選択</option>
       ${['動画編集','サムネイル制作','動画編集＋サムネイル','ショート動画','VSL','スクール動画','その他'].map(s=>`<option ${j?.scope===s?'selected':''}>${s}</option>`).join('')}
@@ -6859,23 +6866,25 @@ function openJobModal(id,preStatus,preClientId){
 </div>
 <div style="font-size:12px;font-weight:700;color:var(--t2);margin:10px 0 6px">📅 日程</div>
 <div class="frow">
-  <div class="fg"><div class="fl">共有日</div><input type="date" id="j-shared" value="${j?.sharedDate||''}"></div>
-  <div class="fg"><div class="fl">編集者 初稿</div><input type="date" id="j-editor-draft" value="${j?.editorDraftDate||''}"></div>
+  <div class="fg"><div class="fl" id="jl-shared">共有日</div><input type="date" id="j-shared" value="${j?.sharedDate||''}"></div>
+  <div class="fg"><div class="fl" id="jl-deliver">納品日</div><input type="date" id="j-deliver" value="${j?.deliveryDate||''}"></div>
 </div>
+<div id="jf-editdates">
 <div class="frow">
+  <div class="fg"><div class="fl">編集者 初稿</div><input type="date" id="j-editor-draft" value="${j?.editorDraftDate||''}"></div>
   <div class="fg"><div class="fl">クライアント提出 初稿</div><input type="date" id="j-client-draft" value="${j?.clientDraftDate||''}"></div>
-  <div class="fg"><div class="fl">納品日</div><input type="date" id="j-deliver" value="${j?.deliveryDate||''}"></div>
 </div>
 <div class="frow">
   <div class="fg"><div class="fl">🖼 サムネイル納品日</div><input type="date" id="j-thumbnail" value="${j?.thumbnailDate||''}"></div>
   <div class="fg"></div>
 </div>
+</div>
 <div style="font-size:12px;font-weight:700;color:var(--t2);margin:10px 0 6px">💰 報酬</div>
 <div class="frow">
-  <div class="fg"><div class="fl">単価（円）<span id="j-unit-hint" style="font-size:10px;color:var(--t3);font-weight:400">${subs.some(s=>s.unitPrice>0)?' (サブタスクから自動計算)':''}</span></div><input type="number" id="j-unit" value="${j?jobTotalIn(j)||'':''}" placeholder="0" oninput="updJobProfit()" ${subs.some(s=>s.unitPrice>0)?'readonly style="opacity:.6"':''}></div>
-  <div class="fg"><div class="fl">ワーカー支払額（円）<span id="j-wpay-hint" style="font-size:10px;color:var(--t3);font-weight:400">${subs.some(s=>s.workerPay>0)?' (自動計算)':''}</span></div><input type="number" id="j-wpay" value="${j?jobTotalOut(j)||'':''}" placeholder="0" oninput="updJobProfit()" ${subs.some(s=>s.workerPay>0)?'readonly style="opacity:.6"':''}></div>
+  <div class="fg"><div class="fl" id="jl-unit">単価（円）<span id="j-unit-hint" style="font-size:10px;color:var(--t3);font-weight:400">${subs.some(s=>s.unitPrice>0)?' (サブタスクから自動計算)':''}</span></div><input type="number" id="j-unit" value="${j?jobTotalIn(j)||'':''}" placeholder="0" oninput="updJobProfit()" ${subs.some(s=>s.unitPrice>0)?'readonly style="opacity:.6"':''}></div>
+  <div class="fg" id="jf-wpay"><div class="fl">ワーカー支払額（円）<span id="j-wpay-hint" style="font-size:10px;color:var(--t3);font-weight:400">${subs.some(s=>s.workerPay>0)?' (自動計算)':''}</span></div><input type="number" id="j-wpay" value="${j?jobTotalOut(j)||'':''}" placeholder="0" oninput="updJobProfit()" ${subs.some(s=>s.workerPay>0)?'readonly style="opacity:.6"':''}></div>
 </div>
-<div class="fg"><div class="fl">利益（自動計算）</div>
+<div class="fg" id="jf-profit"><div class="fl">利益（自動計算）</div>
   <div id="j-profit-disp" style="padding:8px 12px;background:var(--card2);border-radius:var(--rs);font-weight:700;color:${pr>=0?'var(--green)':'var(--red)'}">¥${pr.toLocaleString()}</div>
 </div>
 <div class="frow">
@@ -6885,11 +6894,13 @@ function openJobModal(id,preStatus,preClientId){
   <div class="fg"><div class="fl">入金日</div><input type="date" id="j-payin" value="${j?.paymentDate||''}"></div>
   <div class="fg"><div class="fl">支払日</div><input type="date" id="j-payout" value="${j?.payoutDate||''}"></div>
 </div>
+<div id="jf-subs">
 <div style="font-size:12px;font-weight:700;color:var(--t2);margin:10px 0 4px">✅ サブタスク <span style="font-weight:400;color:var(--t3)">（単価・支払はサブタスクごとに入力すると案件全体の金額が自動計算されます）</span></div>
 <div id="j-sub-cont">${subs.map((s,i)=>mkSubRow(s,`サブタスク ${i+1}`)).join('')}</div>
 <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px">
   <button class="btn btn-g btn-xs" onclick="addJobSubField()">＋ サブタスク追加</button>
   <span style="font-size:11px;color:var(--t3)">単価・支払を入力すると案件全体が自動計算</span>
+</div>
 </div>
 <div class="fg"><div class="fl">メモ</div><textarea id="j-notes" rows="2">${esc(j?.notes||'')}</textarea></div>
 <div class="mfooter">
@@ -6898,6 +6909,19 @@ function openJobModal(id,preStatus,preClientId){
   <button class="btn btn-p" onclick="saveJob()">保存</button>
 </div>`);
   document.getElementById('j-ttl')?.focus();
+  setJobType(document.getElementById('j-type')?.value||'edit');
+}
+function setJobType(t){
+  const el=document.getElementById('j-type');if(el)el.value=t;
+  const isConsul=t==='consul';
+  ['jf-scope','jf-editdates','jf-wpay','jf-profit','jf-subs'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=isConsul?'none':'';});
+  const lu=document.getElementById('jl-unit');if(lu&&lu.childNodes[0])lu.childNodes[0].nodeValue=isConsul?'報酬（円）':'単価（円）';
+  const ls=document.getElementById('jl-shared');if(ls)ls.textContent=isConsul?'開始日':'共有日';
+  const ld=document.getElementById('jl-deliver');if(ld)ld.textContent=isConsul?'完了予定日':'納品日';
+  const be=document.getElementById('jt-edit'),bc=document.getElementById('jt-consul');
+  if(be)be.className='btn btn-sm '+(isConsul?'btn-g':'btn-p');
+  if(bc)bc.className='btn btn-sm '+(isConsul?'btn-p':'btn-g');
+  if(typeof updJobProfit==='function')updJobProfit();
 }
 function toggleJobTrial(){
   const v=document.getElementById('j-trial-val');
@@ -7065,7 +7089,7 @@ function saveJob(){
   const onlySelf=selWorkerIds.length===0||selWorkerIds.every(id=>id===SELF_WID);
   const workerPay=hasPricedSubs?subtasks.filter(s=>s.workerId!==SELF_WID).reduce((s,sub)=>s+(sub.workerPay||0),0):(onlySelf?0:parseInt(document.getElementById('j-wpay')?.value)||0);
   const isTrial=document.getElementById('j-trial-val')?.value==='1';
-  const data={title,clientId:document.getElementById('j-cl').value||null,workerIds:selWorkerIds,workerId:selWorkerIds[0]||null,scope:document.getElementById('j-scope').value||null,status:document.getElementById('j-stat').value,isTrial,unitPrice,profit:unitPrice,workerPay,sharedDate:document.getElementById('j-shared').value||null,editorDraftDate:document.getElementById('j-editor-draft').value||null,clientDraftDate:document.getElementById('j-client-draft').value||null,thumbnailDate:document.getElementById('j-thumbnail')?.value||null,deliveryDate:document.getElementById('j-deliver').value||null,invoiceDate:document.getElementById('j-invoice').value||null,paymentDate:document.getElementById('j-payin').value||null,payoutDate:document.getElementById('j-payout').value||null,notes:document.getElementById('j-notes').value.trim(),subtasks};
+  const data={title,jobType:document.getElementById('j-type')?.value||'edit',clientId:document.getElementById('j-cl').value||null,workerIds:selWorkerIds,workerId:selWorkerIds[0]||null,scope:document.getElementById('j-scope').value||null,status:document.getElementById('j-stat').value,isTrial,unitPrice,profit:unitPrice,workerPay,sharedDate:document.getElementById('j-shared').value||null,editorDraftDate:document.getElementById('j-editor-draft').value||null,clientDraftDate:document.getElementById('j-client-draft').value||null,thumbnailDate:document.getElementById('j-thumbnail')?.value||null,deliveryDate:document.getElementById('j-deliver').value||null,invoiceDate:document.getElementById('j-invoice').value||null,paymentDate:document.getElementById('j-payin').value||null,payoutDate:document.getElementById('j-payout').value||null,notes:document.getElementById('j-notes').value.trim(),subtasks};
   if(EID){
     const j=S.jobs.find(j=>j.id===EID);
     const prevStatus=j?.status;
@@ -8312,7 +8336,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-07';
+const APP_VERSION='20260628-08';
 
 render();
 function forceAppUpdate(){
