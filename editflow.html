@@ -3570,7 +3570,14 @@ function rProjCard(j){
 }
 
 // ===請求書ページ===
-function _invAmt(j){return j.unitPrice||j.profit||0;}
+function _invAmt(j){return (typeof jobTotalIn==='function'?jobTotalIn(j):0)||j.unitPrice||j.profit||0;}
+function _jobInvDate(j){
+  if(j.invoiceDate)return j.invoiceDate;
+  if(j.deliveryDate)return j.deliveryDate;
+  const sd=(j.subtasks||[]).map(s=>s.deliveryDate).filter(Boolean).sort();
+  return sd.length?sd[sd.length-1]:'';
+}
+function _invMonthMatch(j,m){if(!m)return true;const d=_jobInvDate(j);return !!d&&d.startsWith(m);}
 function _invFmt(n){return '¥'+Math.round(n||0).toLocaleString();}
 function _calcWithholding(base){base=Math.round(base||0);if(base<=1000000)return Math.floor(base*0.1021);return Math.floor((base-1000000)*0.2042)+102100;}
 function _issuer(){
@@ -3579,16 +3586,16 @@ function _issuer(){
 }
 function _endNextMonth(iso){const d=iso?new Date(iso):new Date();const last=new Date(d.getFullYear(),d.getMonth()+2,0);return `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`;}
 function _invoiceJobs(cid,m){
-  return S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&(!m||(j.invoiceDate||'').startsWith(m))&&((j.clientId||'')===(cid||'')));
+  return S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&_invMonthMatch(j,m)&&((j.clientId||'')===(cid||'')));
 }
 function rProjInvoice(){
   const now=new Date();
   const nowM=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const months=[...new Set(S.jobs.filter(j=>!j.deleted&&j.invoiceDate&&_invAmt(j)>0).map(j=>j.invoiceDate.slice(0,7)))].sort().reverse();
+  const months=[...new Set(S.jobs.filter(j=>!j.deleted&&_invAmt(j)>0).map(j=>_jobInvDate(j)).filter(Boolean).map(d=>d.slice(0,7)))].sort().reverse();
   if(!months.includes(nowM))months.unshift(nowM);
   const curM=(window._invMonth!==undefined)?window._invMonth:nowM;
   const mLabel=curM||'すべての期間';
-  const jobs=S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&(!curM||(j.invoiceDate||'').startsWith(curM)));
+  const jobs=S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&_invMonthMatch(j,curM));
   const byClient={};
   jobs.forEach(j=>{const k=j.clientId||'';(byClient[k]=byClient[k]||[]).push(j);});
   const clientName=cid=>cid?(S.clients.find(c=>c.id===cid)?.name||'不明'):'クライアント未設定';
@@ -3611,7 +3618,7 @@ ${!Object.keys(byClient).length?`<div class="empty"><div class="empty-icon">🧾
       ${allInvoiced?`<span class="badge bg" style="font-size:10px">🧾 請求済</span>`:`<span class="badge ba" style="font-size:10px">⏳ 未請求</span>`}
     </div>
     ${js.map(j=>`<label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer">
-      <span style="display:flex;align-items:center;gap:8px;min-width:0"><input type="checkbox" class="inv-sel" data-cid="${cid}" data-jid="${j.id}" checked><span>${esc(j.title)} <span style="font-size:10px;color:var(--t3)">🧾${j.invoiceDate||'-'}</span>${j.invoicedAt?` <span style="font-size:10px;color:var(--green)">✅請求済 ${j.invoicedAt}</span>`:''}</span></span>
+      <span style="display:flex;align-items:center;gap:8px;min-width:0"><input type="checkbox" class="inv-sel" data-cid="${cid}" data-jid="${j.id}" checked><span>${esc(j.title)}${(j.subtasks||[]).filter(s=>s.unitPrice>0).length?` <span style="font-size:10px;color:var(--t3)">＋サブ${(j.subtasks||[]).filter(s=>s.unitPrice>0).length}件</span>`:''} <span style="font-size:10px;color:var(--t3)">🧾${j.invoiceDate||_jobInvDate(j)||'-'}</span>${j.invoicedAt?` <span style="font-size:10px;color:var(--green)">✅請求済 ${j.invoicedAt}</span>`:''}</span></span>
       <span style="font-weight:600;flex-shrink:0">¥${_invAmt(j).toLocaleString()}</span>
     </label>`).join('')}
     <div style="text-align:right;margin-top:8px;font-size:13px">合計（全件） <span style="font-weight:800;font-size:16px;color:var(--green)">¥${sub.toLocaleString()}</span></div>
@@ -3630,7 +3637,12 @@ function openInvoiceEditor(cid,m,ids){
   const cname=cid?(S.clients.find(c=>c.id===cid)?.name||'クライアント'):'クライアント';
   const issue=today();
   const due=js.map(j=>j.dueDate).filter(Boolean).sort().reverse()[0]||_endNextMonth(issue);
-  const items=js.map(j=>({name:j.title,qty:1,unit:_invAmt(j),amount:_invAmt(j)}));
+  const items=[];
+  js.forEach(j=>{
+    const subs=(j.subtasks||[]).filter(s=>s.unitPrice>0);
+    if(subs.length){subs.forEach(s=>items.push({name:j.title+'（'+(s.title||'サブタスク')+'）',qty:1,unit:s.unitPrice,amount:s.unitPrice}));}
+    else{items.push({name:j.title,qty:1,unit:_invAmt(j),amount:_invAmt(j)});}
+  });
   window._invDraft={cid,m,jobIds:js.map(j=>j.id),recipient:cname,issue,no:'INV-'+issue.replace(/-/g,''),due,subject:js.length===1?js[0].title:'動画制作費 ほか',items,taxMode:i.defaultTax?'ex':'none',whOn:i.defaultWithholding,notes:i.notesDefault};
   _renderInvoiceEditor();
 }
@@ -8545,7 +8557,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-12';
+const APP_VERSION='20260628-13';
 
 render();
 function forceAppUpdate(){
