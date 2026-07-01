@@ -3567,13 +3567,16 @@ function _issuer(){
 }
 function _endNextMonth(iso){const d=iso?new Date(iso):new Date();const last=new Date(d.getFullYear(),d.getMonth()+2,0);return `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`;}
 function _invoiceJobs(cid,m){
-  return S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&(j.status==='完了'||j.deliveryDate||j.invoiceDate)&&(!m||(j.deliveryDate||'').startsWith(m))&&((j.clientId||'')===(cid||'')));
+  return S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&(!m||(j.invoiceDate||'').startsWith(m))&&((j.clientId||'')===(cid||'')));
 }
 function rProjInvoice(){
-  const months=[...new Set(S.jobs.filter(j=>!j.deleted&&j.deliveryDate&&_invAmt(j)>0).map(j=>j.deliveryDate.slice(0,7)))].sort().reverse();
-  const curM=(window._invMonth!==undefined)?window._invMonth:'';
+  const now=new Date();
+  const nowM=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const months=[...new Set(S.jobs.filter(j=>!j.deleted&&j.invoiceDate&&_invAmt(j)>0).map(j=>j.invoiceDate.slice(0,7)))].sort().reverse();
+  if(!months.includes(nowM))months.unshift(nowM);
+  const curM=(window._invMonth!==undefined)?window._invMonth:nowM;
   const mLabel=curM||'すべての期間';
-  const jobs=S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&(j.status==='完了'||j.deliveryDate||j.invoiceDate)&&(!curM||(j.deliveryDate||'').startsWith(curM)));
+  const jobs=S.jobs.filter(j=>!j.deleted&&j.status!=='キャンセル'&&_invAmt(j)>0&&(!curM||(j.invoiceDate||'').startsWith(curM)));
   const byClient={};
   jobs.forEach(j=>{const k=j.clientId||'';(byClient[k]=byClient[k]||[]).push(j);});
   const clientName=cid=>cid?(S.clients.find(c=>c.id===cid)?.name||'不明'):'クライアント未設定';
@@ -3581,42 +3584,53 @@ function rProjInvoice(){
   const grand=jobs.reduce((s,j)=>s+_invAmt(j),0);
   return`${secTitle('🧾 請求書')}
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
-  <select style="width:160px" onchange="window._invMonth=this.value;render()"><option value="" ${curM===''?'selected':''}>すべての期間</option>${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m}</option>`).join('')}</select>
+  <select style="width:190px" onchange="window._invMonth=this.value;render()"><option value="" ${curM===''?'selected':''}>すべての期間</option>${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m} 提出予定</option>`).join('')}</select>
   <button class="btn btn-g btn-sm" onclick="openInvoiceInfo()">✏️ 請求元情報</button>
-  <span style="font-size:13px;color:var(--t2)">請求対象 ¥${grand.toLocaleString()}・${Object.keys(byClient).length}社</span>
+  <span style="font-size:13px;color:var(--t2)">対象 ¥${grand.toLocaleString()}・${Object.keys(byClient).length}社</span>
 </div>
 ${!iss.name?`<div class="card" style="background:#3a2a00;border:1px solid var(--amber);margin-bottom:10px;font-size:12px">⚠️ まず「✏️ 請求元情報」に屋号・振込先などを設定してください（請求書に自動で差し込まれます）。</div>`:''}
-<div style="font-size:11px;color:var(--t3);margin-bottom:12px">${mLabel}の <b>完了 または 納品済み</b> の案件をクライアント別にまとめます。「🧾 請求書を作成」で宛先や明細を編集 → PDF保存できます。</div>
-${!Object.keys(byClient).length?`<div class="empty"><div class="empty-icon">🧾</div><div class="empty-title">${mLabel}の請求対象案件はありません</div><div style="color:var(--t2);font-size:12px;margin-top:4px">案件に「単価/報酬」を入力し、ステータスを「完了」にするか納品日を設定すると表示されます</div></div>`:Object.entries(byClient).map(([cid,js])=>{
+<div style="font-size:11px;color:var(--t3);margin-bottom:12px">請求書提出日が <b>${mLabel}</b> の案件を表示中。請求する案件を ☑ で選び「請求書を作成」→ 編集 → PDF保存。</div>
+${!Object.keys(byClient).length?`<div class="empty"><div class="empty-icon">🧾</div><div class="empty-title">${mLabel} に請求書提出予定の案件はありません</div><div style="color:var(--t2);font-size:12px;margin-top:4px">案件に「請求書提出日」を設定するとここに表示されます</div></div>`:Object.entries(byClient).map(([cid,js])=>{
   const sub=js.reduce((s,j)=>s+_invAmt(j),0);
-  const allInvoiced=js.every(j=>j.invoiceDate);
+  const allInvoiced=js.length&&js.every(j=>j.invoicedAt);
   return`<div class="card" style="margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
       <div style="font-weight:700;font-size:15px">${esc(clientName(cid))} <span style="font-size:11px;font-weight:500;color:var(--t2)">御中</span></div>
       ${allInvoiced?`<span class="badge bg" style="font-size:10px">🧾 請求済</span>`:`<span class="badge ba" style="font-size:10px">⏳ 未請求</span>`}
     </div>
-    ${js.map(j=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border)">
-      <span>${esc(j.title)}${j.invoiceDate?` <span style="font-size:10px;color:var(--green)">🧾${j.invoiceDate}</span>`:''}</span>
-      <span style="font-weight:600">¥${_invAmt(j).toLocaleString()}</span>
-    </div>`).join('')}
-    <div style="text-align:right;margin-top:8px;font-size:13px">小計 <span style="font-weight:800;font-size:16px;color:var(--green)">¥${sub.toLocaleString()}</span><span style="color:var(--t3);font-size:11px">（税・源泉は請求書で調整）</span></div>
+    ${js.map(j=>`<label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <span style="display:flex;align-items:center;gap:8px;min-width:0"><input type="checkbox" class="inv-sel" data-cid="${cid}" data-jid="${j.id}" checked><span>${esc(j.title)} <span style="font-size:10px;color:var(--t3)">🧾${j.invoiceDate||'-'}</span>${j.invoicedAt?` <span style="font-size:10px;color:var(--green)">✅請求済 ${j.invoicedAt}</span>`:''}</span></span>
+      <span style="font-weight:600;flex-shrink:0">¥${_invAmt(j).toLocaleString()}</span>
+    </label>`).join('')}
+    <div style="text-align:right;margin-top:8px;font-size:13px">合計（全件） <span style="font-weight:800;font-size:16px;color:var(--green)">¥${sub.toLocaleString()}</span></div>
     <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-      <button class="btn btn-p btn-sm" onclick="openInvoiceEditor('${cid}','${curM}')">🧾 請求書を作成（PDF）</button>
+      <button class="btn btn-p btn-sm" onclick="openInvoiceEditorFromSelection('${cid}','${curM}')">🧾 選択した案件で請求書を作成</button>
       <button class="btn btn-g btn-sm" onclick="copyInvoiceText('${cid}','${curM}')">📋 テキストでコピー</button>
-      ${allInvoiced?`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',false)">請求済を取消</button>`:`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',true)">✅ 請求済みにする</button>`}
+      ${allInvoiced?`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',false)">請求済を取消</button>`:`<button class="btn btn-g btn-sm" onclick="markClientInvoiced('${cid}','${curM}',true)">✅ 全件を請求済みに</button>`}
     </div>
   </div>`;}).join('')}`;
 }
-function openInvoiceEditor(cid,m){
-  const js=_invoiceJobs(cid,m);
+function openInvoiceEditor(cid,m,ids){
+  let js=_invoiceJobs(cid,m);
+  if(ids&&ids.length)js=js.filter(j=>ids.includes(j.id));
   if(!js.length){toast('対象の案件がありません','warn');return;}
   const i=_issuer();
   const cname=cid?(S.clients.find(c=>c.id===cid)?.name||'クライアント'):'クライアント';
   const issue=today();
   const due=js.map(j=>j.dueDate).filter(Boolean).sort().reverse()[0]||_endNextMonth(issue);
   const items=js.map(j=>({name:j.title,qty:1,unit:_invAmt(j),amount:_invAmt(j)}));
-  window._invDraft={cid,m,recipient:cname,issue,no:'INV-'+issue.replace(/-/g,''),due,subject:js.length===1?js[0].title:'動画制作費 ほか',items,taxOn:i.defaultTax,whOn:i.defaultWithholding,notes:i.notesDefault};
+  window._invDraft={cid,m,jobIds:js.map(j=>j.id),recipient:cname,issue,no:'INV-'+issue.replace(/-/g,''),due,subject:js.length===1?js[0].title:'動画制作費 ほか',items,taxMode:i.defaultTax?'ex':'none',whOn:i.defaultWithholding,notes:i.notesDefault};
   _renderInvoiceEditor();
+}
+function openInvoiceEditorFromSelection(cid,m){
+  const ids=[...document.querySelectorAll('.inv-sel[data-cid="'+cid+'"]:checked')].map(cb=>cb.dataset.jid);
+  if(!ids.length){toast('請求する案件を1件以上選んでください','warn');return;}
+  openInvoiceEditor(cid,m,ids);
+}
+function markDraftInvoiced(){
+  const d=window._invDraft;if(!d)return;
+  (d.jobIds||[]).forEach(id=>{const j=S.jobs.find(x=>x.id===id);if(j){j.invoicedAt=today();j.updatedAt=Date.now();}});
+  save();closeInvoiceEditor();render();toast('🧾 請求済みにしました');
 }
 function _invItemRow(it){
   return `<tr data-item style="border-bottom:1px solid #ddd">
@@ -3640,16 +3654,21 @@ function _invRecalc(){
     sub+=amt;items.push({name,qty,unit,amount:amt});
   });
   d.items=items;
-  const taxEl=document.getElementById('inv-tax-on'),whEl=document.getElementById('inv-wh-on');
-  d.taxOn=taxEl?taxEl.checked:d.taxOn;d.whOn=whEl?whEl.checked:d.whOn;
-  const tax=d.taxOn?Math.floor(sub*0.1):0;
-  const wh=d.whOn?_calcWithholding(sub):0;
-  const total=sub+tax-wh;
-  d.subtotal=sub;d.tax=tax;d.withholding=wh;d.total=total;
+  const modeEl=document.getElementById('inv-taxmode'),whEl=document.getElementById('inv-wh-on');
+  d.taxMode=modeEl?modeEl.value:(d.taxMode||'ex');d.whOn=whEl?whEl.checked:d.whOn;
+  let tax=0,preTax=sub,goodsTotal=sub;
+  if(d.taxMode==='ex'){tax=Math.floor(sub*0.1);preTax=sub;goodsTotal=sub+tax;}
+  else if(d.taxMode==='in'){preTax=Math.round(sub/1.1);tax=sub-preTax;goodsTotal=sub;}
+  else{tax=0;preTax=sub;goodsTotal=sub;}
+  const wh=d.whOn?_calcWithholding(preTax):0;
+  const total=goodsTotal-wh;
+  d.subtotal=sub;d.tax=tax;d.preTax=preTax;d.withholding=wh;d.total=total;
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
   set('inv-subtotal',_invFmt(sub));set('inv-tax',_invFmt(tax));set('inv-wh','-'+_invFmt(wh));
   set('inv-total',_invFmt(total));set('inv-bigamt',_invFmt(total));
-  const tr1=document.getElementById('inv-tax-row');if(tr1)tr1.style.display=d.taxOn?'':'none';
+  const subLbl=document.getElementById('inv-subtotal-lbl');if(subLbl)subLbl.textContent=d.taxMode==='in'?'小計（税込）':(d.taxMode==='ex'?'小計（税抜）':'小計');
+  const taxLbl=document.getElementById('inv-tax-lbl');if(taxLbl)taxLbl.textContent=d.taxMode==='in'?'うち消費税（10%）':'消費税（10%）';
+  const tr1=document.getElementById('inv-tax-row');if(tr1)tr1.style.display=d.taxMode==='none'?'none':'';
   const tr2=document.getElementById('inv-wh-row');if(tr2)tr2.style.display=d.whOn?'':'none';
 }
 function _renderInvoiceEditor(){
@@ -3674,7 +3693,7 @@ function _renderInvoiceEditor(){
   <div id="inv-toolbar" style="position:sticky;top:0;display:flex;gap:8px;justify-content:flex-end;align-items:center;max-width:800px;margin:0 auto 12px;flex-wrap:wrap;z-index:2">
     <span style="margin-right:auto;color:#fff;font-weight:700">🧾 請求書プレビュー（その場で編集できます）</span>
     <button class="btn btn-g btn-sm" onclick="closeInvoiceEditor()">✕ 閉じる</button>
-    <button class="btn btn-g btn-sm" onclick="markClientInvoiced('${d.cid}','${d.m}',true);closeInvoiceEditor()">✅ 請求済みにする</button>
+    <button class="btn btn-g btn-sm" onclick="markDraftInvoiced()">✅ 請求済みにする</button>
     <button class="btn btn-p btn-sm" onclick="_invPrint()">📄 PDFで保存 / 印刷</button>
   </div>
   <div id="inv-paper" style="max-width:800px;margin:0 auto;background:#fff;color:#111;padding:38px 42px;border-radius:8px;box-shadow:0 12px 48px rgba(0,0,0,.45);font-size:13px;line-height:1.6">
@@ -3716,14 +3735,20 @@ function _renderInvoiceEditor(){
     <button class="btn btn-g btn-xs inv-noprint" onclick="_invAddItem()" style="margin-bottom:14px">＋ 行を追加</button>
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
       <table style="font-size:13px;min-width:270px">
-        <tr><td style="padding:3px 12px;text-align:right;color:#444">小計</td><td id="inv-subtotal" style="padding:3px 0;text-align:right;font-weight:600;width:120px">¥0</td></tr>
-        <tr id="inv-tax-row"><td style="padding:3px 12px;text-align:right;color:#444">消費税（10%）</td><td id="inv-tax" style="padding:3px 0;text-align:right">¥0</td></tr>
+        <tr><td id="inv-subtotal-lbl" style="padding:3px 12px;text-align:right;color:#444">小計</td><td id="inv-subtotal" style="padding:3px 0;text-align:right;font-weight:600;width:120px">¥0</td></tr>
+        <tr id="inv-tax-row"><td id="inv-tax-lbl" style="padding:3px 12px;text-align:right;color:#444">消費税（10%）</td><td id="inv-tax" style="padding:3px 0;text-align:right">¥0</td></tr>
         <tr id="inv-wh-row"><td style="padding:3px 12px;text-align:right;color:#444">源泉徴収税（10.21%）</td><td id="inv-wh" style="padding:3px 0;text-align:right;color:#c00">¥0</td></tr>
         <tr style="border-top:2px solid #111"><td style="padding:6px 12px;text-align:right;font-weight:800">合計</td><td id="inv-total" style="padding:6px 0;text-align:right;font-weight:800;font-size:16px">¥0</td></tr>
       </table>
     </div>
     <div class="inv-noprint" style="display:flex;gap:18px;margin-bottom:16px;font-size:12px;background:#f5f5f5;padding:9px 14px;border-radius:6px;flex-wrap:wrap">
-      <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="inv-tax-on" ${d.taxOn?'checked':''} onchange="_invRecalc()">消費税10%を加算</label>
+      <label style="display:flex;gap:6px;align-items:center">消費税
+        <select id="inv-taxmode" onchange="_invRecalc()" style="padding:2px 4px">
+          <option value="ex" ${d.taxMode==='ex'?'selected':''}>外税（税抜＋10%）</option>
+          <option value="in" ${d.taxMode==='in'?'selected':''}>内税（税込・10%内包）</option>
+          <option value="none" ${d.taxMode==='none'?'selected':''}>なし</option>
+        </select>
+      </label>
       <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="inv-wh-on" ${d.whOn?'checked':''} onchange="_invRecalc()">源泉徴収を差し引く（個人・10.21%）</label>
     </div>
     <div style="display:flex;gap:22px;flex-wrap:wrap">
@@ -3773,7 +3798,7 @@ function copyInvoiceText(cid,m){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok).catch(fb);}else{fb();}
 }
 function markClientInvoiced(cid,m,on){
-  _invoiceJobs(cid,m).forEach(j=>{j.invoiceDate=on?today():'';});
+  _invoiceJobs(cid,m).forEach(j=>{j.invoicedAt=on?today():null;j.updatedAt=Date.now();});
   save();render();toast(on?'🧾 請求済みにしました':'請求済を取り消しました');
 }
 function openInvoiceInfo(){
@@ -7224,7 +7249,7 @@ function openJobModal(id,preStatus,preClientId){
   <div id="j-profit-disp" style="padding:8px 12px;background:var(--card2);border-radius:var(--rs);font-weight:700;color:${pr>=0?'var(--green)':'var(--red)'}">¥${pr.toLocaleString()}</div>
 </div>
 <div class="frow">
-  <div class="fg"><div class="fl">請求書提出日</div><input type="date" id="j-invoice" value="${j?.invoiceDate||''}"></div>
+  <div class="fg"><div class="fl">請求書提出日 <span style="color:var(--red)">*</span></div><input type="date" id="j-invoice" value="${j?.invoiceDate||''}"></div>
   <div class="fg"><div class="fl">支払期日</div><input type="date" id="j-due" value="${j?.dueDate||''}"></div>
 </div>
 <div class="frow">
@@ -7402,6 +7427,7 @@ function _appendWorkerOpt(w){
 function saveJob(){
   const title=document.getElementById('j-ttl')?.value.trim();
   if(!title){toast('タイトルを入力してください','err');return;}
+  if(!document.getElementById('j-invoice')?.value){toast('請求書提出日を入力してください（請求書ページで使います）','warn');return;}
   const oldSubs=EID?S.jobs.find(j=>j.id===EID)?.subtasks||[]:[];
   const subEls=[...document.querySelectorAll('#j-sub-cont .j-sub-row')];
   const subtasks=subEls.map((el,i)=>{
@@ -8673,7 +8699,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-11';
+const APP_VERSION='20260628-12';
 
 render();
 function forceAppUpdate(){
