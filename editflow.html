@@ -748,6 +748,7 @@ let _fbUnsubscribe=null;
 
 function fbSave(){
   if(!FB_USER)return;
+  S._uid=FB_USER.uid;
   _stampTeamChanges();
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer=setTimeout(()=>{
@@ -764,12 +765,22 @@ function _applyCloudData(json){
   const def=defState();
   S=migrate(Object.assign(def,cloud));
   ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
 
 function fbSetupRealtimeSync(){
   if(!FB_USER)return;
   if(_fbUnsubscribe){_fbUnsubscribe();_fbUnsubscribe=null;}
+  // 同じ端末で別アカウントがサインインした場合、前アカウントの個人データが
+  // 新アカウントへ漏れる/上書きするのを防ぐため、ローカルを初期化してクラウド優先にする。
+  if(S._uid&&S._uid!==FB_USER.uid){
+    S=migrate(defState());
+    S._uid=FB_USER.uid;S._savedAt=0;
+    window._teamSnap={};
+    localStorage.setItem(DB,JSON.stringify(S));
+    if(typeof render==='function')render();
+  }
   let _firstLoad=true;
   _fbUnsubscribe=fbDb.collection('users').doc(FB_USER.uid).onSnapshot(doc=>{
     if(!doc.exists||!doc.data()?.json){
@@ -8801,7 +8812,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-17';
+const APP_VERSION='20260628-18';
 
 render();
 function forceAppUpdate(){
