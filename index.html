@@ -2221,6 +2221,36 @@ function render(){
 function subTabs(tabs,cur,fn){return`<div class="sub-tabs">${tabs.map(([k,l])=>`<div class="stab${cur===k?' act':''}" onclick="${fn}('${k}')">${l}</div>`).join('')}</div>`;}
 function secTitle(t){return`<div class="section-ttl">${t}</div>`;}
 // ===DASHBOARD===
+function rDashTeamSummary(){
+  const deals=(S.pipeline||[]).filter(d=>!d.deleted);
+  const openDeals=deals.filter(d=>d.stage!=='受注'&&d.stage!=='失注');
+  const pipeSum=openDeals.reduce((s,d)=>s+(d.amount||0),0);
+  const wonSum=deals.filter(d=>d.stage==='受注').reduce((s,d)=>s+(d.amount||0),0);
+  const kgis=(S.teamKgis||[]).filter(k=>!k.deleted).slice(0,3);
+  const td_=today();
+  const posts=(S.teamPosts||[]).filter(p=>!p.deleted&&p.status!=='投稿済'&&(p.scheduledDate||'')>=td_).sort((a,b)=>((a.scheduledDate||'')+(a.scheduledTime||''))>((b.scheduledDate||'')+(b.scheduledTime||''))?1:-1).slice(0,3);
+  if(!(deals.length||kgis.length||posts.length))return'';
+  let h=`${secTitle('📊 チームサマリー')}`;
+  if(deals.length){
+    h+=`<div class="card card-sm" style="margin-bottom:8px;cursor:pointer" onclick="V='pipeline';render()">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;font-size:13px">🤝 商談</span><span style="font-size:11px;color:var(--t2)">進行中 ${openDeals.length}件</span></div>
+      <div style="font-size:12px;color:var(--t2);margin-top:3px">見込み ¥${pipeSum.toLocaleString()} ・ 受注 <span style="color:var(--green);font-weight:700">¥${wonSum.toLocaleString()}</span></div>
+    </div>`;
+  }
+  if(kgis.length){
+    h+=`<div class="card card-sm" style="margin-bottom:8px;cursor:pointer" onclick="V='teamgoals';render()">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">📈 チームKGI</div>
+      ${kgis.map(k=>{const pct=_pct(k.current,k.target);return`<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:12px"><span>${esc(k.title)}</span><span style="color:var(--t2)">${pct}%</span></div><div style="background:var(--card2);border-radius:5px;height:6px;margin-top:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--green)"></div></div></div>`;}).join('')}
+    </div>`;
+  }
+  if(posts.length){
+    h+=`<div class="card card-sm" style="margin-bottom:8px;cursor:pointer" onclick="V='posts';render()">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">📅 投稿予定</div>
+      ${posts.map(p=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${POST_ICON[p.platform]||'📱'} ${esc((p.content||'').slice(0,28))}</span><span style="color:var(--t3);flex-shrink:0">${p.scheduledDate||''}</span></div>`).join('')}
+    </div>`;
+  }
+  return h;
+}
 function rDash(){
   const td=today(),ci=S.checkIns.find(c=>c.date===td);
   const allTasks=S.tasks.filter(t=>!t.deleted);
@@ -2325,6 +2355,8 @@ ${dueJobs.map(item=>{
     <div style="font-size:11px;color:var(--t2);margin-top:2px">🎬 案件 — ${date}</div>
   </div>`;}).join('')}`;
 })()}
+
+${rDashTeamSummary()}
 
 <!-- ======== 🔒 個人情報（あなただけが見られます） ======== -->
 <div style="margin:24px 0 12px;padding:9px 14px;background:var(--pdim);border-left:4px solid var(--purple);border-radius:8px;font-weight:800;font-size:15px;color:var(--purple)">🔒 個人情報 <span style="font-size:11px;font-weight:500;color:var(--t2)">— サインインしているあなただけが見られます</span></div>
@@ -8923,7 +8955,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-16';
+const APP_VERSION='20260628-17';
 
 render();
 function forceAppUpdate(){
