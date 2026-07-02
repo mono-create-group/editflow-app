@@ -6472,8 +6472,37 @@ function changeIssueStatus(divId,id,newStatus){
   if(i){i.status=newStatus;save();render();}
 }
 
+// アカウント混在データの掃除: 個人データを端末+このアカウントのクラウド両方で初期化する
+// (チーム共有データ TEAM_KEYS と設定は残す。v-18以前にクラウドへ混在した個人データの復旧用)
+function efResetPersonalData(){
+  if(!confirm('個人データ(タスク/習慣/目標/ジャーナル/記録など)を、この端末と現在サインイン中アカウントのクラウドの両方で空にします。\n\nチーム共有データ(案件/クライアント/ワーカー/商談/チームKGI等)と設定は残ります。\n\n実行しますか?'))return;
+  if(!confirm('本当に実行しますか? この操作は元に戻せません。'))return;
+  const def=defState();
+  const keep={};
+  TEAM_KEYS.forEach(k=>keep[k]=S[k]);
+  keep.settings=S.settings;keep.navConfig=S.navConfig;keep.customPages=S.customPages;
+  keep._uid=S._uid;keep.bizBoard=S.bizBoard;
+  S=Object.assign(def,keep);
+  save();
+  toast('👤 個人データを初期化しました(クラウドにも反映されます)','ok');
+  render();
+}
 function rSettings(){
   return`<div class="ph"><div class="ph-title">設定</div></div>
+
+${secTitle('👤 アカウントとデータ管理')}
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:10px">
+    <b>データの分かれ方</b>: 案件・クライアント・ワーカー・商談・チームKGI/KPI・投稿・ドキュメントの8種は<b>チーム共有</b>(どのアカウントでも同じ表示が仕様)。
+    タスク・習慣・目標・ジャーナル等の個人データはアカウント(UID)ごとに分離されます。<br>
+    サインイン中: <b>${typeof FB_USER!=='undefined'&&FB_USER?esc(FB_USER.email||FB_USER.uid):'未サインイン'}</b>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin-bottom:10px">
+    「別アカウントなのに同じ個人データが見える」場合は、修正(v-18)以前にクラウドへ混在保存されたデータが残っています。
+    混在してしまったアカウントでサインインした状態で、下のボタンで初期化してください。
+  </div>
+  <button class="btn btn-g btn-sm" onclick="efResetPersonalData()" ${typeof FB_USER!=='undefined'&&FB_USER?'':'disabled'}>👤 このアカウントの個人データを初期化(端末+クラウド)</button>
+</div>
 
 ${secTitle('🍅 ポモドーロタイマー')}
 <div class="card" style="margin-bottom:16px">
@@ -8958,7 +8987,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-2';
+const APP_VERSION='20260703-3';
 
 render();
 function forceAppUpdate(){
