@@ -3607,7 +3607,7 @@ ${!Object.keys(byClient).length?`<div class="empty"><div class="empty-icon">🧾
     </div>
     ${js.map(j=>`<label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <span style="display:flex;align-items:center;gap:8px;min-width:0"><input type="checkbox" class="inv-sel" data-cid="${cid}" data-jid="${j.id}" checked><span>${esc(j.title)}${(j.subtasks||[]).filter(s=>s.unitPrice>0).length?` <span style="font-size:10px;color:var(--t3)">＋サブ${(j.subtasks||[]).filter(s=>s.unitPrice>0).length}件</span>`:''} <span style="font-size:10px;color:var(--t3)">🧾${j.invoiceDate||_jobInvDate(j)||'-'}</span>${j.invoicedAt?` <span style="font-size:10px;color:var(--green)">✅請求済 ${j.invoicedAt}</span>`:''}</span></span>
-      <span style="font-weight:600;flex-shrink:0">¥${_invAmt(j).toLocaleString()}</span>
+      <span style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="font-weight:600">¥${_invAmt(j).toLocaleString()}</span><button class="btn btn-g btn-xs" onclick="event.preventDefault();event.stopPropagation();openJobModal('${j.id}')">詳細</button></span>
     </label>`).join('')}
     <div style="text-align:right;margin-top:8px;font-size:13px">合計（全件） <span style="font-weight:800;font-size:16px;color:var(--green)">¥${sub.toLocaleString()}</span></div>
     <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
@@ -8711,7 +8711,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-13';
+const APP_VERSION='20260628-14';
 
 render();
 function forceAppUpdate(){
