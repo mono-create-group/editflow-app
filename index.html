@@ -711,6 +711,7 @@ const BUILTIN_VIEWS=[
   {id:'tasks',label:'タスク管理',icon:'✅'},
   {id:'projects',label:'案件管理',icon:'🎬'},
   {id:'pipeline',label:'商談管理',icon:'🤝'},
+  {id:'teamgoals',label:'チームKGI/KPI',icon:'📈'},
   {id:'workers',label:'ワーカー管理',icon:'👥'},
   {id:'habits',label:'習慣トラッカー',icon:'🔥'},
   {id:'goals',label:'目標・KPI管理',icon:'🎯'},
@@ -760,7 +761,7 @@ function _applyCloudData(json){
   const cloud=JSON.parse(json);
   const def=defState();
   S=migrate(Object.assign(def,cloud));
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   localStorage.setItem(DB,JSON.stringify(S));
 }
 
@@ -802,7 +803,7 @@ function fbSetupRealtimeSync(){
 // チームデータのみ shared/team に相乗りさせ、全員で同じ案件を見られるようにする。
 // Firestoreルールが共有アクセスを許可していれば自動で有効化。許可されない場合は
 // permission-denied を検知して自動で個人モードへフォールバック（現状維持・無害）。
-const TEAM_KEYS=['jobs','clients','workers','pipeline'];
+const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis'];
 let TEAM_SHARE_OK=null;      // null=未判定 / true=共有有効 / false=個人モード
 let _teamUnsub=null;
 window._teamSnap=window._teamSnap||{};
@@ -1508,7 +1509,7 @@ let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[],
-  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[],
+  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
   goalReviews:{},
@@ -2198,7 +2199,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -4462,6 +4463,110 @@ function rGoalTree(){
   <span style="color:var(--purple)">▸ ルート目標 ${roots.length}件</span> ${unlinkedCount?`<span style="color:var(--amber)">・未連動 ${unlinkedCount}件あり</span>`:'<span style="color:var(--green)">・すべて連動済み ✓</span>'}
 </div>
 ${roots.map(g=>renderNode(g,0)).join('')}`;
+}
+// ===チームKGI/KPI（全アカウント共有・個人目標とは別）===
+function _pct(cur,tgt){tgt=+tgt||0;if(!tgt)return 0;return Math.max(0,Math.min(100,Math.round((+cur||0)/tgt*100)));}
+function rTeamGoals(){
+  const kgis=(S.teamKgis||[]).filter(k=>!k.deleted);
+  const kpis=(S.teamKpis||[]).filter(k=>!k.deleted);
+  const kgiName=id=>kgis.find(k=>k.id===id)?.title||'';
+  return`${secTitle('📈 チーム KGI / KPI')}
+<div style="font-size:11px;color:var(--t3);margin-bottom:12px">チーム全体の重要目標（KGI）と、それを動かす指標（KPI）。全アカウントで共有されます。<b>個人の目標とは別</b>です。</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 8px">
+  <div style="font-weight:800;font-size:15px;color:var(--purple)">🎯 KGI（重要目標）</div>
+  <button class="btn btn-p btn-sm" onclick="tgOpenKgi()">＋ KGIを追加</button>
+</div>
+${!kgis.length?`<div style="color:var(--t3);font-size:12px;margin-bottom:16px">まだKGIがありません</div>`:kgis.map(k=>{
+  const pct=_pct(k.current,k.target);
+  return`<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="tgOpenKgi('${k.id}')">
+    <div style="display:flex;justify-content:space-between;gap:8px">
+      <div style="font-weight:700">${esc(k.title)}</div>
+      <div style="font-weight:800;color:var(--green);white-space:nowrap">${(+k.current||0).toLocaleString()} / ${(+k.target||0).toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:var(--card2);border-radius:6px;height:8px;margin-top:8px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--green)"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-top:4px"><span>${pct}%</span>${k.deadline?`<span>📅 ${k.deadline}</span>`:'<span></span>'}</div>
+  </div>`;
+}).join('')}
+<div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px">
+  <div style="font-weight:800;font-size:15px;color:var(--purple)">📊 KPI（業績指標）</div>
+  <button class="btn btn-p btn-sm" onclick="tgOpenKpi()">＋ KPIを追加</button>
+</div>
+${!kpis.length?`<div style="color:var(--t3);font-size:12px">まだKPIがありません</div>`:kpis.map(k=>{
+  const pct=_pct(k.current,k.target);
+  return`<div class="card" style="margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;gap:8px;cursor:pointer" onclick="tgOpenKpi('${k.id}')">
+      <div style="min-width:0"><div style="font-weight:700">${esc(k.title)}</div>
+      <div style="font-size:11px;color:var(--t3)">${esc(k.period||'月次')}${k.kgiId&&kgiName(k.kgiId)?` ・🎯 ${esc(kgiName(k.kgiId))}`:''}</div></div>
+      <div style="font-weight:800;color:var(--green);white-space:nowrap">${(+k.current||0).toLocaleString()} / ${(+k.target||0).toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:var(--card2);border-radius:6px;height:7px;margin-top:8px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--purple)"></div></div>
+    <div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-g btn-xs" onclick="bumpKpi('${k.id}')">＋ 実績を更新</button></div>
+  </div>`;
+}).join('')}`;
+}
+function tgOpenKgi(id){
+  const k=id?(S.teamKgis||[]).find(x=>x.id===id):null;
+  openModalLg(`<div class="mhdr"><div class="mtitle">${k?'KGIを編集':'KGIを追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<input type="hidden" id="kg-id" value="${k?k.id:''}">
+<div class="fg"><div class="fl">目標名 *</div><input id="kg-title" value="${esc(k?.title||'')}" placeholder="例: 月商100万円 / クライアント30社"></div>
+<div class="frow">
+  <div class="fg"><div class="fl">目標値</div><input type="number" id="kg-target" value="${k?.target??''}" placeholder="1000000"></div>
+  <div class="fg"><div class="fl">現在値</div><input type="number" id="kg-current" value="${k?.current??''}" placeholder="0"></div>
+</div>
+<div class="frow">
+  <div class="fg"><div class="fl">単位</div><input id="kg-unit" value="${esc(k?.unit||'')}" placeholder="円 / 社 / 件"></div>
+  <div class="fg"><div class="fl">期限</div><input type="date" id="kg-deadline" value="${k?.deadline||''}"></div>
+</div>
+<div class="fg"><div class="fl">メモ</div><textarea id="kg-note" rows="2">${esc(k?.note||'')}</textarea></div>
+<div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button>${k?`<button class="btn btn-red" onclick="tgDelKgi('${k.id}')">削除</button>`:''}<button class="btn btn-p" onclick="tgSaveKgi()">保存</button></div>`);
+}
+function tgSaveKgi(){
+  const title=document.getElementById('kg-title').value.trim();
+  if(!title){toast('目標名を入力してください','warn');return;}
+  const id=document.getElementById('kg-id').value;
+  const data={title,target:parseFloat(document.getElementById('kg-target').value)||0,current:parseFloat(document.getElementById('kg-current').value)||0,unit:document.getElementById('kg-unit').value.trim(),deadline:document.getElementById('kg-deadline').value||null,note:document.getElementById('kg-note').value.trim()};
+  if(!S.teamKgis)S.teamKgis=[];
+  if(id){const k=S.teamKgis.find(x=>x.id===id);if(k)Object.assign(k,data,{updatedAt:Date.now()});}
+  else{S.teamKgis.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
+  save();closeModal();render();toast('KGIを保存しました 🎯');
+}
+function tgDelKgi(id){const k=(S.teamKgis||[]).find(x=>x.id===id);if(!k)return;k.deleted=true;k.updatedAt=Date.now();save();closeModal();render();toast('KGIを削除しました');}
+function tgOpenKpi(id){
+  const k=id?(S.teamKpis||[]).find(x=>x.id===id):null;
+  const kgis=(S.teamKgis||[]).filter(x=>!x.deleted);
+  const periods=['日次','週次','月次','四半期','通期'];
+  openModalLg(`<div class="mhdr"><div class="mtitle">${k?'KPIを編集':'KPIを追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<input type="hidden" id="kp-id" value="${k?k.id:''}">
+<div class="fg"><div class="fl">指標名 *</div><input id="kp-title" value="${esc(k?.title||'')}" placeholder="例: 新規商談数 / 投稿数 / 受注率"></div>
+<div class="frow">
+  <div class="fg"><div class="fl">目標値</div><input type="number" id="kp-target" value="${k?.target??''}" placeholder="10"></div>
+  <div class="fg"><div class="fl">現在値</div><input type="number" id="kp-current" value="${k?.current??''}" placeholder="0"></div>
+</div>
+<div class="frow">
+  <div class="fg"><div class="fl">単位</div><input id="kp-unit" value="${esc(k?.unit||'')}" placeholder="件 / % / 本"></div>
+  <div class="fg"><div class="fl">集計期間</div><select id="kp-period">${periods.map(p=>`<option ${(k?.period||'月次')===p?'selected':''}>${p}</option>`).join('')}</select></div>
+</div>
+<div class="fg"><div class="fl">紐づくKGI</div><select id="kp-kgi"><option value="">なし</option>${kgis.map(g=>`<option value="${g.id}" ${k?.kgiId===g.id?'selected':''}>${esc(g.title)}</option>`).join('')}</select></div>
+<div class="fg"><div class="fl">メモ</div><textarea id="kp-note" rows="2">${esc(k?.note||'')}</textarea></div>
+<div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button>${k?`<button class="btn btn-red" onclick="tgDelKpi('${k.id}')">削除</button>`:''}<button class="btn btn-p" onclick="tgSaveKpi()">保存</button></div>`);
+}
+function tgSaveKpi(){
+  const title=document.getElementById('kp-title').value.trim();
+  if(!title){toast('指標名を入力してください','warn');return;}
+  const id=document.getElementById('kp-id').value;
+  const data={title,target:parseFloat(document.getElementById('kp-target').value)||0,current:parseFloat(document.getElementById('kp-current').value)||0,unit:document.getElementById('kp-unit').value.trim(),period:document.getElementById('kp-period').value,kgiId:document.getElementById('kp-kgi').value||null,note:document.getElementById('kp-note').value.trim()};
+  if(!S.teamKpis)S.teamKpis=[];
+  if(id){const k=S.teamKpis.find(x=>x.id===id);if(k)Object.assign(k,data,{updatedAt:Date.now()});}
+  else{S.teamKpis.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
+  save();closeModal();render();toast('KPIを保存しました 📊');
+}
+function tgDelKpi(id){const k=(S.teamKpis||[]).find(x=>x.id===id);if(!k)return;k.deleted=true;k.updatedAt=Date.now();save();closeModal();render();toast('KPIを削除しました');}
+function bumpKpi(id){
+  const k=(S.teamKpis||[]).find(x=>x.id===id);if(!k)return;
+  const v=prompt('現在の実績値を入力',(k.current||0));
+  if(v===null)return;
+  k.current=parseFloat(v)||0;k.updatedAt=Date.now();
+  save();render();toast('実績を更新しました 📊');
 }
 // ===商談管理（パイプライン）チーム共有===
 const PIPE_STAGES=['リード','商談中','提案中','受注','失注'];
@@ -8711,7 +8816,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-14';
+const APP_VERSION='20260628-15';
 
 render();
 function forceAppUpdate(){
