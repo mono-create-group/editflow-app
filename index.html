@@ -712,6 +712,8 @@ const BUILTIN_VIEWS=[
   {id:'projects',label:'案件管理',icon:'🎬'},
   {id:'pipeline',label:'商談管理',icon:'🤝'},
   {id:'teamgoals',label:'チームKGI/KPI',icon:'📈'},
+  {id:'posts',label:'投稿管理',icon:'📅'},
+  {id:'docs',label:'ドキュメント',icon:'📁'},
   {id:'workers',label:'ワーカー管理',icon:'👥'},
   {id:'habits',label:'習慣トラッカー',icon:'🔥'},
   {id:'goals',label:'目標・KPI管理',icon:'🎯'},
@@ -761,7 +763,7 @@ function _applyCloudData(json){
   const cloud=JSON.parse(json);
   const def=defState();
   S=migrate(Object.assign(def,cloud));
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   localStorage.setItem(DB,JSON.stringify(S));
 }
 
@@ -803,7 +805,7 @@ function fbSetupRealtimeSync(){
 // チームデータのみ shared/team に相乗りさせ、全員で同じ案件を見られるようにする。
 // Firestoreルールが共有アクセスを許可していれば自動で有効化。許可されない場合は
 // permission-denied を検知して自動で個人モードへフォールバック（現状維持・無害）。
-const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis'];
+const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs'];
 let TEAM_SHARE_OK=null;      // null=未判定 / true=共有有効 / false=個人モード
 let _teamUnsub=null;
 window._teamSnap=window._teamSnap||{};
@@ -1509,7 +1511,7 @@ let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[],
-  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[],
+  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
   goalReviews:{},
@@ -2199,7 +2201,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -4464,6 +4466,111 @@ function rGoalTree(){
 </div>
 ${roots.map(g=>renderNode(g,0)).join('')}`;
 }
+// ===投稿管理（チーム共有）===
+const POST_PLATFORMS=['X','Threads','Instagram','YouTube','TikTok','その他'];
+const POST_STATUS=['下書き','予約済','投稿済'];
+const POST_BG={'下書き':'bk','予約済':'bb','投稿済':'bg'};
+const POST_ICON={'X':'𝕏','Threads':'@','Instagram':'📷','YouTube':'▶️','TikTok':'🎵','その他':'📱'};
+function _teamPosts(){return (S.teamPosts||[]).filter(p=>!p.deleted);}
+function rPosts(){
+  const posts=_teamPosts().slice().sort((a,b)=>((a.scheduledDate||'')+(a.scheduledTime||''))>((b.scheduledDate||'')+(b.scheduledTime||''))?1:-1);
+  const upcoming=posts.filter(p=>p.status!=='投稿済');
+  const done=posts.filter(p=>p.status==='投稿済');
+  const card=p=>`<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="tpOpenPost('${p.id}')">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+      <div style="min-width:0">
+        <div style="font-size:12px;color:var(--t2)">${POST_ICON[p.platform]||'📱'} ${esc(p.platform||'')} ・ <span class="badge ${POST_BG[p.status]||'bk'}" style="font-size:10px">${esc(p.status||'下書き')}</span></div>
+        <div style="font-weight:600;font-size:13px;margin-top:3px;white-space:pre-wrap">${esc((p.content||'').slice(0,90))}${(p.content||'').length>90?'…':''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;font-size:11px;color:var(--t3)">${p.scheduledDate||''}<br>${p.scheduledTime||''}</div>
+    </div>
+    <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap" onclick="event.stopPropagation()">
+      ${p.status!=='投稿済'?`<button class="btn btn-g btn-xs" onclick="tpMarkPosted('${p.id}')">✅ 投稿済みに</button>`:''}
+      ${p.url?`<a class="btn btn-g btn-xs" href="${esc(p.url)}" target="_blank" rel="noopener">🔗 開く</a>`:''}
+    </div>
+  </div>`;
+  return`${secTitle('📅 投稿管理')}
+<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+  <button class="btn btn-p btn-sm" onclick="tpOpenPost()">＋ 投稿を追加</button>
+  <span style="font-size:13px;color:var(--t2);align-self:center">予定 ${upcoming.length}件・投稿済 ${done.length}件</span>
+</div>
+<div style="font-size:11px;color:var(--t3);margin-bottom:12px">チームの投稿予定を管理します（全アカウントで共有）。</div>
+${!posts.length?`<div class="empty"><div class="empty-icon">📅</div><div class="empty-title">まだ投稿がありません</div></div>`:`
+${upcoming.length?`<div style="font-weight:800;font-size:14px;color:var(--purple);margin-bottom:6px">🗓 予定・下書き</div>${upcoming.map(card).join('')}`:''}
+${done.length?`<div style="font-weight:800;font-size:14px;color:var(--t2);margin:14px 0 6px">✅ 投稿済み</div>${done.map(card).join('')}`:''}`}`;
+}
+function tpMarkPosted(id){const p=(S.teamPosts||[]).find(x=>x.id===id);if(!p)return;p.status='投稿済';p.updatedAt=Date.now();save();render();toast('投稿済みにしました ✅');}
+function tpOpenPost(id){
+  const p=id?(S.teamPosts||[]).find(x=>x.id===id):null;
+  openModalLg(`<div class="mhdr"><div class="mtitle">${p?'投稿を編集':'投稿を追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<input type="hidden" id="pt-id" value="${p?p.id:''}">
+<div class="frow">
+  <div class="fg"><div class="fl">プラットフォーム</div><select id="pt-platform">${POST_PLATFORMS.map(pl=>`<option ${(p?.platform||'X')===pl?'selected':''}>${pl}</option>`).join('')}</select></div>
+  <div class="fg"><div class="fl">ステータス</div><select id="pt-status">${POST_STATUS.map(s=>`<option ${(p?.status||'下書き')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+</div>
+<div class="frow">
+  <div class="fg"><div class="fl">投稿予定日</div><input type="date" id="pt-date" value="${p?.scheduledDate||''}"></div>
+  <div class="fg"><div class="fl">時刻</div><input type="time" id="pt-time" value="${p?.scheduledTime||''}"></div>
+</div>
+<div class="fg"><div class="fl">投稿内容</div><textarea id="pt-content" rows="5">${esc(p?.content||'')}</textarea></div>
+<div class="fg"><div class="fl">URL（投稿後）</div><input id="pt-url" value="${esc(p?.url||'')}" placeholder="https://..."></div>
+<div class="fg"><div class="fl">メモ</div><textarea id="pt-notes" rows="2">${esc(p?.notes||'')}</textarea></div>
+<div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button>${p?`<button class="btn btn-red" onclick="tpDelPost('${p.id}')">削除</button>`:''}<button class="btn btn-p" onclick="tpSavePost()">保存</button></div>`);
+}
+function tpSavePost(){
+  const content=document.getElementById('pt-content').value.trim();
+  if(!content){toast('投稿内容を入力してください','warn');return;}
+  const id=document.getElementById('pt-id').value;
+  const data={platform:document.getElementById('pt-platform').value,status:document.getElementById('pt-status').value,scheduledDate:document.getElementById('pt-date').value||null,scheduledTime:document.getElementById('pt-time').value||null,content,url:document.getElementById('pt-url').value.trim()||null,notes:document.getElementById('pt-notes').value.trim()};
+  if(!S.teamPosts)S.teamPosts=[];
+  if(id){const p=S.teamPosts.find(x=>x.id===id);if(p)Object.assign(p,data,{updatedAt:Date.now()});}
+  else{S.teamPosts.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
+  save();closeModal();render();toast('投稿を保存しました 📅');
+}
+function tpDelPost(id){const p=(S.teamPosts||[]).find(x=>x.id===id);if(!p)return;p.deleted=true;p.updatedAt=Date.now();save();closeModal();render();toast('投稿を削除しました');}
+// ===ドキュメント管理（チーム共有）===
+function _teamDocs(){return (S.teamDocs||[]).filter(d=>!d.deleted);}
+function rDocs(){
+  const docs=_teamDocs();
+  const cats={};docs.forEach(d=>{const c=d.category||'未分類';(cats[c]=cats[c]||[]).push(d);});
+  return`${secTitle('📁 ドキュメント')}
+<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+  <button class="btn btn-p btn-sm" onclick="tdOpenDoc()">＋ ドキュメントを追加</button>
+  <span style="font-size:13px;color:var(--t2);align-self:center">${docs.length}件</span>
+</div>
+<div style="font-size:11px;color:var(--t3);margin-bottom:12px">マニュアル・議事録・スプレッドシート等のリンクをチームで共有します。</div>
+${!docs.length?`<div class="empty"><div class="empty-icon">📁</div><div class="empty-title">まだドキュメントがありません</div></div>`:Object.entries(cats).map(([c,ds])=>`
+<div style="font-weight:800;font-size:14px;color:var(--purple);margin:8px 0 6px">📂 ${esc(c)}</div>
+${ds.map(d=>`<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+  <div style="min-width:0">
+    <div style="font-weight:700;font-size:14px">${d.url?`<a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--pl)">${esc(d.title)} 🔗</a>`:esc(d.title)}</div>
+    ${d.notes?`<div style="font-size:11px;color:var(--t3);margin-top:2px">${esc(d.notes.slice(0,80))}</div>`:''}
+  </div>
+  <button class="btn btn-g btn-xs" style="flex-shrink:0" onclick="tdOpenDoc('${d.id}')">✏️</button>
+</div>`).join('')}`).join('')}`;
+}
+function tdOpenDoc(id){
+  const d=id?(S.teamDocs||[]).find(x=>x.id===id):null;
+  const cats=[...new Set(_teamDocs().map(x=>x.category).filter(Boolean))];
+  openModalLg(`<div class="mhdr"><div class="mtitle">${d?'ドキュメントを編集':'ドキュメントを追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<input type="hidden" id="dc-id" value="${d?d.id:''}">
+<div class="fg"><div class="fl">タイトル *</div><input id="dc-title" value="${esc(d?.title||'')}" placeholder="例: 編集マニュアル / 議事録 6月"></div>
+<div class="fg"><div class="fl">URL</div><input id="dc-url" value="${esc(d?.url||'')}" placeholder="https://docs.google.com/..."></div>
+<div class="fg"><div class="fl">カテゴリ</div><input id="dc-cat" value="${esc(d?.category||'')}" placeholder="マニュアル / 議事録 / 契約書" list="dc-cats"><datalist id="dc-cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+<div class="fg"><div class="fl">メモ</div><textarea id="dc-notes" rows="2">${esc(d?.notes||'')}</textarea></div>
+<div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button>${d?`<button class="btn btn-red" onclick="tdDelDoc('${d.id}')">削除</button>`:''}<button class="btn btn-p" onclick="tdSaveDoc()">保存</button></div>`);
+}
+function tdSaveDoc(){
+  const title=document.getElementById('dc-title').value.trim();
+  if(!title){toast('タイトルを入力してください','warn');return;}
+  const id=document.getElementById('dc-id').value;
+  const data={title,url:document.getElementById('dc-url').value.trim()||null,category:document.getElementById('dc-cat').value.trim()||null,notes:document.getElementById('dc-notes').value.trim()};
+  if(!S.teamDocs)S.teamDocs=[];
+  if(id){const d=S.teamDocs.find(x=>x.id===id);if(d)Object.assign(d,data,{updatedAt:Date.now()});}
+  else{S.teamDocs.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
+  save();closeModal();render();toast('ドキュメントを保存しました 📁');
+}
+function tdDelDoc(id){const d=(S.teamDocs||[]).find(x=>x.id===id);if(!d)return;d.deleted=true;d.updatedAt=Date.now();save();closeModal();render();toast('ドキュメントを削除しました');}
 // ===チームKGI/KPI（全アカウント共有・個人目標とは別）===
 function _pct(cur,tgt){tgt=+tgt||0;if(!tgt)return 0;return Math.max(0,Math.min(100,Math.round((+cur||0)/tgt*100)));}
 function rTeamGoals(){
@@ -8816,7 +8923,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260628-15';
+const APP_VERSION='20260628-16';
 
 render();
 function forceAppUpdate(){
