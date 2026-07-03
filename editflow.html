@@ -778,6 +778,14 @@ function fbSetupRealtimeSync(){
   // 同じ端末で別アカウントがサインインした場合、前アカウントの個人データが
   // 新アカウントへ漏れる/上書きするのを防ぐため、ローカルを初期化してクラウド優先にする。
   if(S._uid&&S._uid!==FB_USER.uid){
+    // 【安全策 v-10】ローカルを消す前に必ずバックアップを残す
+    // (クラウド同期が権限等で機能していない環境でのデータ消失を防ぐ)
+    try{
+      localStorage.setItem('ef_v5_backup_'+S._uid+'_'+Date.now(), JSON.stringify(S));
+      // バックアップは直近3件まで保持
+      const bk=Object.keys(localStorage).filter(k=>k.startsWith('ef_v5_backup_')).sort();
+      while(bk.length>3){localStorage.removeItem(bk.shift());}
+    }catch(e){console.warn('backup before switch failed',e);}
     S=migrate(defState());
     S._uid=FB_USER.uid;S._savedAt=0;
     window._teamSnap={};
@@ -9551,7 +9559,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-9';
+const APP_VERSION='20260703-10';
 
 render();
 function forceAppUpdate(){
