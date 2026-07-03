@@ -2305,7 +2305,58 @@ const BIZ_BOARD={
     '四半期: ソラ(戦略AI)による戦略レビュー',
   ],
 };
-function bizState(){if(!S.bizBoard)S.bizBoard={done:{},extra:[]};if(!S.bizBoard.done)S.bizBoard.done={};if(!S.bizBoard.extra)S.bizBoard.extra=[];if(!S.bizBoard.userRoadmap)S.bizBoard.userRoadmap=[];if(!S.bizBoard.userIssues)S.bizBoard.userIssues=[];return S.bizBoard;}
+function bizState(){if(!S.bizBoard)S.bizBoard={done:{},extra:[]};if(!S.bizBoard.done)S.bizBoard.done={};if(!S.bizBoard.extra)S.bizBoard.extra=[];if(!S.bizBoard.userRoadmap)S.bizBoard.userRoadmap=[];if(!S.bizBoard.userIssues)S.bizBoard.userIssues=[];if(!S.bizBoard.goalOv)S.bizBoard.goalOv={};if(!S.bizBoard.roadOv)S.bizBoard.roadOv={};if(!S.bizBoard.userGoals)S.bizBoard.userGoals=[];return S.bizBoard;}
+// --- 目標の編集(固定カードは上書き保存 / 追加カードは自由編集) ---
+function bbEditGoalFixed(gi){
+  const b=bizState();const base=BIZ_BOARD.goals[gi];const ov=b.goalOv[gi]||{};
+  const label=prompt('項目名',ov.label||base.label);if(label===null)return;
+  const target=prompt('目標値',ov.target||base.target);if(target===null)return;
+  const detail=prompt('詳細(省略可)',ov.detail||base.detail);if(detail===null)return;
+  b.goalOv[gi]={label:label.trim()||base.label,target:target.trim()||base.target,detail:(detail||'').trim()};
+  save();render();
+}
+function bbAddGoal(){
+  const label=(prompt('項目名(例: 8月 売上目標)')||'').trim();if(!label)return;
+  const target=(prompt('目標値(例: ¥50万)')||'').trim();
+  const detail=(prompt('詳細(省略可)')||'').trim();
+  bizState().userGoals.push({id:'ug'+Date.now(),label,target,detail});
+  save();render();
+}
+function bbEditGoalUser(id){
+  const g=bizState().userGoals.find(x=>x.id===id);if(!g)return;
+  const label=prompt('項目名',g.label);if(label===null)return;
+  const target=prompt('目標値',g.target);if(target===null)return;
+  const detail=prompt('詳細(省略可)',g.detail);if(detail===null)return;
+  g.label=label.trim()||g.label;g.target=target.trim();g.detail=(detail||'').trim();
+  save();render();
+}
+function bbDelGoalUser(id){
+  if(!confirm('この目標を削除しますか?'))return;
+  const b=bizState();b.userGoals=b.userGoals.filter(x=>x.id!==id);
+  save();render();
+}
+// --- ロードマップ固定7項目の編集(上書き保存) ---
+function bbEditRoadmapFixed(no){
+  const b=bizState();const base=BIZ_BOARD.roadmap.find(r=>r.no===no);if(!base)return;
+  const ov=b.roadOv[no]||{};
+  const title=prompt('項目名',ov.title||base.title);if(title===null)return;
+  const note=prompt('メモ(省略可)',ov.note!==undefined?ov.note:base.note);if(note===null)return;
+  b.roadOv[no]=Object.assign({},b.roadOv[no]||{},{title:title.trim()||base.title,note:(note||'').trim()});
+  save();render();
+}
+function bbCycleRoadmapFixed(no){
+  const b=bizState();const base=BIZ_BOARD.roadmap.find(r=>r.no===no);if(!base)return;
+  const o=['doing','ready','wait','done'];
+  const cur=(b.roadOv[no]&&b.roadOv[no].st)||base.st;
+  b.roadOv[no]=Object.assign({},b.roadOv[no]||{},{st:o[(o.indexOf(cur)+1)%o.length]});
+  save();render();
+}
+function bbEditRoadmapUser(id){
+  const r=bizState().userRoadmap.find(x=>x.id===id);if(!r)return;
+  const title=prompt('項目名',r.title);if(title===null)return;
+  r.title=title.trim()||r.title;
+  save();render();
+}
 function bbAddRoadmap(){
   const t=(prompt('ロードマップに追加する項目')||'').trim();if(!t)return;
   bizState().userRoadmap.push({id:'ur'+Date.now(),title:t,st:'todo',note:''});
@@ -2384,30 +2435,39 @@ function rBizBoard(){
   <div style="background:var(--card2);border-radius:6px;height:8px;margin-top:12px;overflow:hidden"><div style="height:100%;width:${totalPct}%;background:var(--purple)"></div></div>
   <div style="font-size:11px;color:var(--t3);margin-top:4px">全タスク進捗: ${doneCount}/${allTasks.length}(${totalPct}%)</div>
 </div>
-<div style="font-weight:800;font-size:15px;color:var(--purple);margin:14px 0 8px">🎯 目標(2026下期)</div>
+<div style="font-weight:800;font-size:15px;color:var(--purple);margin:14px 0 8px">🎯 目標(2026下期) <button class="btn btn-g btn-xs" onclick="bbAddGoal()">＋ 目標を追加</button></div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px">
-  ${BIZ_BOARD.goals.map(g=>`<div class="card" style="margin-bottom:0">
-    <div style="font-size:11px;color:var(--t3);font-weight:700">${esc(g.label)}</div>
+  ${BIZ_BOARD.goals.map((g,gi)=>{const ov=b.goalOv[gi]||{};const label=ov.label||g.label,target=ov.target||g.target,detail=ov.detail!==undefined?ov.detail:g.detail;return`<div class="card" style="margin-bottom:0;position:relative">
+    <button class="btn btn-g btn-xs" style="position:absolute;top:6px;right:6px" onclick="bbEditGoalFixed(${gi})">✎</button>
+    <div style="font-size:11px;color:var(--t3);font-weight:700;padding-right:26px">${esc(label)}</div>
+    <div style="font-weight:800;font-size:15px;color:var(--green);margin:2px 0">${esc(target)}</div>
+    <div style="font-size:11px;color:var(--t2);line-height:1.5">${esc(detail)}</div>
+  </div>`;}).join('')}
+  ${b.userGoals.map(g=>`<div class="card" style="margin-bottom:0;position:relative;border-left:3px solid var(--amber)">
+    <div style="position:absolute;top:6px;right:6px;display:flex;gap:4px"><button class="btn btn-g btn-xs" onclick="bbEditGoalUser('${g.id}')">✎</button><button class="btn btn-g btn-xs" onclick="bbDelGoalUser('${g.id}')">✕</button></div>
+    <div style="font-size:11px;color:var(--t3);font-weight:700;padding-right:52px">${esc(g.label)}</div>
     <div style="font-weight:800;font-size:15px;color:var(--green);margin:2px 0">${esc(g.target)}</div>
     <div style="font-size:11px;color:var(--t2);line-height:1.5">${esc(g.detail)}</div>
   </div>`).join('')}
 </div>
 <div style="font-weight:800;font-size:15px;color:var(--purple);margin:18px 0 8px">🗺 ロードマップ(会長指示 7項目)</div>
 <div class="card">
-  ${BIZ_BOARD.roadmap.map(r=>{const[label,color]=RSTYLE[r.st]||RSTYLE.doing;return`
+  ${BIZ_BOARD.roadmap.map(r=>{const ov=b.roadOv[r.no]||{};const title=ov.title||r.title,note=ov.note!==undefined?ov.note:r.note,st=ov.st||r.st;const[label,color]=RSTYLE[st]||RSTYLE.doing;return`
   <div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--card2)">
     <div style="font-weight:800;color:var(--t3);width:18px;flex-shrink:0">${r.no}</div>
     <div style="min-width:0;flex:1">
-      <div style="font-size:13px;font-weight:600;line-height:1.5">${esc(r.title)}</div>
-      <div style="font-size:10.5px;color:var(--t3)">${esc(r.note)}</div>
+      <div style="font-size:13px;font-weight:600;line-height:1.5">${esc(title)}</div>
+      <div style="font-size:10.5px;color:var(--t3)">${esc(note)}</div>
     </div>
-    <div style="font-size:11px;font-weight:700;color:${color};white-space:nowrap">${label}</div>
+    <button class="btn btn-g btn-xs" style="font-size:11px;font-weight:700;color:${color};white-space:nowrap" onclick="bbCycleRoadmapFixed(${r.no})" title="タップで状態切替">${label}</button>
+    <button class="btn btn-g btn-xs" onclick="bbEditRoadmapFixed(${r.no})">✎</button>
   </div>`;}).join('')}
   ${bizState().userRoadmap.map(r=>{const M={todo:['予定','var(--t3)'],doing:['進行中','var(--amber)'],done:['完了','var(--green)']};const m=M[r.st]||M.todo;return`
   <div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--card2)">
     <div style="font-weight:800;color:var(--t3);width:18px;flex-shrink:0">＋</div>
     <div style="min-width:0;flex:1;font-size:13px;${r.st==='done'?'color:var(--t3);text-decoration:line-through':''}">${esc(r.title)}</div>
     <button class="btn btn-g btn-xs" style="color:${m[1]};font-weight:800" onclick="bbCycleRoadmap('${r.id}')">${m[0]}</button>
+    <button class="btn btn-g btn-xs" onclick="bbEditRoadmapUser('${r.id}')">✎</button>
     <button class="btn btn-g btn-xs" onclick="bbDelRoadmap('${r.id}')">✕</button>
   </div>`;}).join('')}
   <div style="margin-top:8px"><button class="btn btn-g btn-xs" onclick="bbAddRoadmap()">＋ 項目を追加</button></div>
@@ -2453,7 +2513,7 @@ ${bizState().userIssues.map(i=>{
 <div style="font-weight:800;font-size:15px;color:var(--purple);margin:18px 0 8px">🔁 定例サイクル</div>
 <div class="card">
   ${BIZ_BOARD.cadence.map(c=>`<div style="font-size:12.5px;padding:5px 0;color:var(--t2)">・${esc(c)}</div>`).join('')}
-  <div style="font-size:10.5px;color:var(--t3);margin-top:8px">※ボードの項目定義の更新はClaude Code(CEO)が行います。チェック状態と追加タスクはこの端末+同期先に保存されます。</div>
+  <div style="font-size:10.5px;color:var(--t3);margin-top:8px">※目標・ロードマップは ✎ でその場編集、状態ラベルはタップで切替できます。編集内容はGoogleサインインでクラウドにも保存されます。</div>
 </div>`;
 }
 // ===事業部ボード(佐々木さんと共有: 事業部ごとの目標・営業/採用記録)===
@@ -9712,7 +9772,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-11';
+const APP_VERSION='20260703-12';
 
 render();
 function forceAppUpdate(){
