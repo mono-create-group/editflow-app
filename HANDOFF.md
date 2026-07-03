@@ -1,6 +1,16 @@
 # EditFlow 引き継ぎドキュメント
 
-最終更新: 2026-07-03(深夜) / APP_VERSION `20260703-2`
+最終更新: 2026-07-03(夜) / APP_VERSION `20260703-11`
+
+> 【v20260703-11の変更・最重要】**自社Firebaseへ移行完了・チーム共有が実働開始**
+> - Firebaseプロジェクトを `task-management-app-bd1b1`(他者所有・ルール変更不可)→ **`editflow-mono-create`(mono.create.group@gmail.com所有)** に差し替え
+> - Firestore: 東京リージョン・本番モード。ルールは users/{uid}=本人のみ、shared/**=メール許可制
+>   (現在の許可: mono.create.group@gmail.com / nakamurakouta512@gmail.com。
+>   **佐々木さんを追加するには Firebaseコンソール→Firestore→ルール のメール配列に1行追加するだけ**)
+> - 実測済み: ①個人データ分離 ②shared/team 読み書き成功(チーム共有ON) ③アカウント切替→クラウド自動復元(タスク490全量)
+> - 移行時の注意: 旧プロジェクトのuidが S._uid に残っていると切替保護が発動してローカル初期化される。
+>   v-10の自動バックアップ(ef_v5_backup_*)から復元できる(今回実際に発動し、バックアップから完全復旧した)
+> - Googleサインインのポップアップは login_hint を setCustomParameters した signInWithGoogle 差し替え+実ボタンclickで自動化可能
 
 > 【v20260703-2の変更】
 > - 新ビュー **🏢経営ボード**(`rBizBoard` / データ定義はコード内 `BIZ_BOARD` 定数 / チェック状態は `S.bizBoard`)。
