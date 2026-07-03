@@ -2318,7 +2318,46 @@ const BIZ_BOARD={
     '四半期: ソラ(戦略AI)による戦略レビュー',
   ],
 };
-function bizState(){if(!S.bizBoard)S.bizBoard={done:{},extra:[]};if(!S.bizBoard.done)S.bizBoard.done={};if(!S.bizBoard.extra)S.bizBoard.extra=[];return S.bizBoard;}
+function bizState(){if(!S.bizBoard)S.bizBoard={done:{},extra:[]};if(!S.bizBoard.done)S.bizBoard.done={};if(!S.bizBoard.extra)S.bizBoard.extra=[];if(!S.bizBoard.userRoadmap)S.bizBoard.userRoadmap=[];if(!S.bizBoard.userIssues)S.bizBoard.userIssues=[];return S.bizBoard;}
+function bbAddRoadmap(){
+  const t=(prompt('ロードマップに追加する項目')||'').trim();if(!t)return;
+  bizState().userRoadmap.push({id:'ur'+Date.now(),title:t,st:'todo',note:''});
+  save();render();
+}
+function bbCycleRoadmap(id){
+  const r=bizState().userRoadmap.find(x=>x.id===id);if(!r)return;
+  const o=['todo','doing','done'];r.st=o[(o.indexOf(r.st)+1)%3];
+  save();render();
+}
+function bbDelRoadmap(id){
+  if(!confirm('削除しますか?'))return;
+  const b=bizState();b.userRoadmap=b.userRoadmap.filter(x=>x.id!==id);
+  save();render();
+}
+function bbAddIssue(){
+  const t=(prompt('イシュー(課題)のタイトル')||'').trim();if(!t)return;
+  const why=(prompt('なぜ重要か(省略可)')||'').trim();
+  bizState().userIssues.push({id:'ui'+Date.now(),title:t,why,tasks:[]});
+  save();render();
+}
+function bbDelIssue(id){
+  if(!confirm('このイシューを削除しますか?'))return;
+  const b=bizState();b.userIssues=b.userIssues.filter(x=>x.id!==id);
+  save();render();
+}
+function bbAddIssueTask(iid){
+  const i=bizState().userIssues.find(x=>x.id===iid);if(!i)return;
+  const t=(prompt('タスク内容')||'').trim();if(!t)return;
+  const o=(prompt('担当(省略可)')||'').trim();
+  i.tasks.push({id:'ut'+Date.now(),text:t,owner:o||'未定',due:''});
+  save();render();
+}
+function bbDelIssueTask(iid,tid){
+  const i=bizState().userIssues.find(x=>x.id===iid);if(!i)return;
+  i.tasks=i.tasks.filter(x=>x.id!==tid);
+  const b=bizState();delete b.done[tid];
+  save();render();
+}
 function bizToggle(id){const b=bizState();b.done[id]=!b.done[id];save();render();}
 function bizAddTask(issueId){
   const text=(prompt('追加するタスク内容')||'').trim();if(!text)return;
@@ -2377,8 +2416,16 @@ function rBizBoard(){
     </div>
     <div style="font-size:11px;font-weight:700;color:${color};white-space:nowrap">${label}</div>
   </div>`;}).join('')}
+  ${bizState().userRoadmap.map(r=>{const M={todo:['予定','var(--t3)'],doing:['進行中','var(--amber)'],done:['完了','var(--green)']};const m=M[r.st]||M.todo;return`
+  <div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--card2)">
+    <div style="font-weight:800;color:var(--t3);width:18px;flex-shrink:0">＋</div>
+    <div style="min-width:0;flex:1;font-size:13px;${r.st==='done'?'color:var(--t3);text-decoration:line-through':''}">${esc(r.title)}</div>
+    <button class="btn btn-g btn-xs" style="color:${m[1]};font-weight:800" onclick="bbCycleRoadmap('${r.id}')">${m[0]}</button>
+    <button class="btn btn-g btn-xs" onclick="bbDelRoadmap('${r.id}')">✕</button>
+  </div>`;}).join('')}
+  <div style="margin-top:8px"><button class="btn btn-g btn-xs" onclick="bbAddRoadmap()">＋ 項目を追加</button></div>
 </div>
-<div style="font-weight:800;font-size:15px;color:var(--purple);margin:18px 0 8px">🔥 イシュー × タスク</div>
+<div style="font-weight:800;font-size:15px;color:var(--purple);margin:18px 0 8px">🔥 イシュー × タスク <button class="btn btn-g btn-xs" onclick="bbAddIssue()">＋ イシューを追加</button></div>
 ${BIZ_BOARD.issues.map(i=>{
   const extras=b.extra.filter(x=>x.issueId===i.id);
   const ids=[...i.tasks.map(t=>t.id),...extras.map(x=>x.id)];
@@ -2396,6 +2443,26 @@ ${BIZ_BOARD.issues.map(i=>{
     <div style="margin-top:8px"><button class="btn btn-g btn-xs" onclick="bizAddTask('${i.id}')">＋ タスク追加</button></div>
   </div>`;
 }).join('')}
+${bizState().userIssues.map(i=>{
+  const ids=i.tasks.map(t=>t.id);
+  const dn=ids.filter(id=>b.done[id]).length;
+  const pct=_pct(dn,ids.length||1);
+  return`<div class="card" style="margin-bottom:10px;border-left:3px solid var(--amber)">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+      <div style="min-width:0"><div style="font-weight:800">${esc(i.title)} <span style="font-size:10px;color:var(--t3)">(追加分)</span></div>
+      ${i.why?`<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:2px">${esc(i.why)}</div>`:''}</div>
+      <div style="white-space:nowrap"><span style="font-weight:800;color:${dn===ids.length&&ids.length>0?'var(--green)':'var(--amber)'}">${dn}/${ids.length}</span>
+      <button class="btn btn-g btn-xs" onclick="bbDelIssue('${i.id}')">✕</button></div>
+    </div>
+    ${i.tasks.map(t=>{const done=!!b.done[t.id];return`
+    <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--card2);cursor:pointer" onclick="bizToggle('${t.id}')">
+      <div style="width:18px;height:18px;border-radius:5px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:12px;${done?'background:var(--green);color:#fff':'border:1.5px solid var(--t3)'}">${done?'✓':''}</div>
+      <div style="min-width:0;flex:1"><div style="font-size:13px;line-height:1.5;${done?'text-decoration:line-through;color:var(--t3)':''}">${esc(t.text)}</div>
+      <div style="font-size:10.5px;color:var(--t3)">👤 ${esc(t.owner||'未定')}</div></div>
+      <button class="btn btn-g btn-xs" onclick="event.stopPropagation();bbDelIssueTask('${i.id}','${t.id}')">✕</button>
+    </div>`;}).join('')}
+    <div style="margin-top:8px"><button class="btn btn-g btn-xs" onclick="bbAddIssueTask('${i.id}')">＋ タスク追加</button></div>
+  </div>`;}).join('')}
 <div style="font-weight:800;font-size:15px;color:var(--purple);margin:18px 0 8px">🔁 定例サイクル</div>
 <div class="card">
   ${BIZ_BOARD.cadence.map(c=>`<div style="font-size:12.5px;padding:5px 0;color:var(--t2)">・${esc(c)}</div>`).join('')}
@@ -2433,6 +2500,12 @@ function buSeed(){
 }
 function buGet(id){return (S.bizUnits||[]).find(u=>u.id===id);}
 // 事業ごとの初期ロードマップ・イシュー(2026-07-03時点。以後はアプリ上で編集)
+const BU_PRODUCT_SEEDS={
+  bu_hp:['HP制作(¥49,800)','LINE構築(¥29,800)','HP+LINEセット(¥79,600)','月額管理(¥3,000)'],
+  bu_dispatch:['ショート編集','長尺編集','サムネイル','トライアル(半額)'],
+  bu_shift:['月額プラン(¥2,980)','年払いプラン(¥29,800)'],
+};
+const BU_ROLE_OPTIONS=['編集者','営業スタッフ','その他'];
 const BU_PLAN_SEEDS={
   bu_hp:{
     roadmap:[
@@ -2499,6 +2572,7 @@ function buEnsurePlan(u){
   const seed=BU_PLAN_SEEDS[u.id]||{roadmap:[],issues:[]};
   if(!Array.isArray(u.roadmap)){u.roadmap=seed.roadmap.map(r=>({id:uid(),title:r.t,st:r.st,note:''}));changed=true;}
   if(!Array.isArray(u.issues)){u.issues=seed.issues.map(i=>({id:uid(),title:i.t,why:i.why,tasks:i.tasks.map(t=>({id:uid(),text:t.x,owner:t.o,done:false}))}));changed=true;}
+  if(!Array.isArray(u.products)){u.products=(BU_PRODUCT_SEEDS[u.id]||[]).slice();changed=true;}
   if(changed){u.updatedAt=Date.now();save();}
 }
 const BU_RM_STATES=[['todo','予定','var(--t3)'],['doing','進行中','var(--amber)'],['done','完了','var(--green)']];
@@ -2638,6 +2712,36 @@ function buSetNotes(unitId,val){
   const u=buGet(unitId);if(!u)return;
   u.notes=val;u.updatedAt=Date.now();save();
 }
+function buEditProducts(unitId){
+  const u=buGet(unitId);if(!u)return;
+  const cur=(u.products||[]).join('、');
+  const v=prompt('商品リスト(読点「、」区切りで編集)',cur);
+  if(v===null)return;
+  u.products=v.split(/[、,]/).map(x=>x.trim()).filter(Boolean);
+  buTouch(u);
+}
+function buEditComm(unitId){
+  const u=buGet(unitId);if(!u)return;
+  const c=Object.assign({},buComm(u));
+  const ask=(label,cur)=>{const v=prompt(label,String(cur));return v===null?null:(Number(v)||0);};
+  let v;
+  if((v=ask('成約: 佐々木さん本人(円)',c.saleSasaki))===null)return;c.saleSasaki=v;
+  if((v=ask('成約: スタッフ本人(円)',c.saleStaff))===null)return;c.saleStaff=v;
+  if((v=ask('成約: スタッフ獲得時の佐々木さん管理報酬(円)',c.saleMgr))===null)return;c.saleMgr=v;
+  if((v=ask('採用: 佐々木さん本人(円)',c.recruitSasaki))===null)return;c.recruitSasaki=v;
+  if((v=ask('採用: スタッフ本人(円)',c.recruitStaff))===null)return;c.recruitStaff=v;
+  if((v=ask('採用: スタッフ獲得時の佐々木さん管理報酬(円)',c.recruitMgr))===null)return;c.recruitMgr=v;
+  u.comm=c;
+  buTouch(u);
+  toast('報酬規程を更新しました(今後の記録から適用)');
+}
+function buDelUnit(unitId){
+  const u=buGet(unitId);if(!u)return;
+  if(!confirm(`事業部「${u.name}」を削除しますか?(記録もすべて消えます)`))return;
+  if(!confirm('本当に削除しますか?元に戻せません。'))return;
+  S.bizUnits=(S.bizUnits||[]).filter(x=>x.id!==unitId);
+  save();render();
+}
 function buEditUnit(unitId){
   const u=buGet(unitId);if(!u)return;
   const name=prompt('事業部名',u.name);if(name===null)return;
@@ -2688,6 +2792,8 @@ ${units.map(u=>{
       <span style="font-weight:800;color:var(--green)">¥${sum.toLocaleString()}</span>
       <span style="font-size:11px;color:var(--t3)">/ ¥${(u.salesTarget||0).toLocaleString()}</span>
       <button class="btn btn-g btn-xs" onclick="buEditUnit('${u.id}')">目標/名称</button>
+      <button class="btn btn-g btn-xs" onclick="buEditComm('${u.id}')">報酬率</button>
+      <button class="btn btn-g btn-xs" onclick="buDelUnit('${u.id}')">✕</button>
     </div>
   </div>
   <div style="background:var(--card2);border-radius:6px;height:6px;margin:8px 0 12px;overflow:hidden"><div style="height:100%;width:${upct}%;background:var(--purple)"></div></div>
@@ -2728,7 +2834,8 @@ ${units.map(u=>{
   <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">💰 営業記録(成約)</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
     <input id="bu-client-${u.id}" placeholder="クライアント名" style="flex:2;min-width:110px">
-    <input id="bu-product-${u.id}" placeholder="商品(HP/派遣等)" style="flex:1;min-width:80px">
+    <select id="bu-product-${u.id}" style="flex:1;min-width:110px">${(u.products||[]).map(p=>`<option>${esc(p)}</option>`).join('')}<option>その他</option></select>
+    <button class="btn btn-g btn-xs" title="商品リストを編集" onclick="buEditProducts('${u.id}')">🛠</button>
     <input id="bu-amount-${u.id}" type="number" placeholder="金額(円)" style="width:90px">
     <select id="bu-reptype-${u.id}">${BU_REP_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
     <input id="bu-rep-${u.id}" placeholder="獲得者名(スタッフ時)" style="width:110px">
@@ -2746,7 +2853,7 @@ ${units.map(u=>{
   <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px">🤝 採用記録(候補者・スカウト)</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
     <input id="bu-rname-${u.id}" placeholder="名前" style="flex:1;min-width:100px">
-    <input id="bu-rrole-${u.id}" placeholder="役割(編集者/営業スタッフ)" style="flex:1;min-width:110px">
+    <select id="bu-rrole-${u.id}" style="min-width:110px">${BU_ROLE_OPTIONS.map(r=>`<option>${r}</option>`).join('')}</select>
     <select id="bu-rreptype-${u.id}" title="採用の獲得者">${BU_REP_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
     <input id="bu-rrep-${u.id}" placeholder="獲得者名(スタッフ時)" style="width:100px">
     <button class="btn btn-p btn-sm" onclick="buAddRecruit('${u.id}')">＋追加</button>
@@ -9432,7 +9539,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-7';
+const APP_VERSION='20260703-8';
 
 render();
 function forceAppUpdate(){
