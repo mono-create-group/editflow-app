@@ -2408,6 +2408,130 @@ function buSeed(){
   }
 }
 function buGet(id){return (S.bizUnits||[]).find(u=>u.id===id);}
+// 事業ごとの初期ロードマップ・イシュー(2026-07-03時点。以後はアプリ上で編集)
+const BU_PLAN_SEEDS={
+  bu_hp:{
+    roadmap:[
+      {t:'3業種テンプレ完成(居酒屋/宿/美容室)',st:'done'},
+      {t:'営業リスト315件(自動抽出)',st:'done'},
+      {t:'AIヒーロー画像/映像の組み込み',st:'doing'},
+      {t:'初成約→初納品(事例化)',st:'todo'},
+      {t:'月額管理の運用開始(オーナー画面)',st:'todo'},
+    ],
+    issues:[
+      {t:'商談数が足りない',why:'成約率10%前提。まず事例3件が紹介の火種',tasks:[
+        {x:'DM第1弾5通の確認・送信',o:'会長'},
+        {x:'電話アポ開始(14〜17時・スクリプトあり)',o:'佐々木'},
+        {x:'初期事例3件の獲得(パイロット価格可)',o:'佐々木/会長'},
+      ]},
+      {t:'納品体制の整備',why:'成約後に回らないと解約・悪評になる',tasks:[
+        {x:'契約書雛形(データ引き渡し条項)確定',o:'会長(レイ案あり)'},
+        {x:'写真受領→制作→確認の流れを1件通す',o:'AI+会長'},
+      ]},
+    ],
+  },
+  bu_dispatch:{
+    roadmap:[
+      {t:'サイト/自動受付/管理画面/支払い 完成',st:'done'},
+      {t:'E2E実操作テスト(全動線パス)',st:'done'},
+      {t:'営業開始(DM5社送信)',st:'doing'},
+      {t:'編集者10名体制(ショート5/長尺3/サムネ2)',st:'doing'},
+      {t:'トライアル初受注→本契約1号',st:'todo'},
+    ],
+    issues:[
+      {t:'編集者の頭数不足(在籍2名)',why:'派遣を名乗るには10名規模が必要。採用が事業の上限を決める',tasks:[
+        {x:'採用方針MTG(アジェンダ共有済み)',o:'会長+佐々木'},
+        {x:'スカウトDM開始(文面あり・報酬:採用1人¥1,000)',o:'佐々木'},
+        {x:'採用投稿をX/Threadsに投稿(文面あり)',o:'会長'},
+        {x:'一覧のテスト行2件を削除(E2Eテスト/航汰)',o:'会長'},
+      ]},
+      {t:'クライアント開拓',why:'動画を出し続けている事業者が本命',tasks:[
+        {x:'派遣DM5社(ScaleX等・下書きあり)を送信',o:'会長'},
+        {x:'DM第2弾10社の下書き',o:'AI(アオイ)'},
+      ]},
+    ],
+  },
+  bu_shift:{
+    roadmap:[
+      {t:'本番稼働(認証/勤務条件/日報/LINE共有)',st:'done'},
+      {t:'LINE公式アカウント接続(審査待ち)',st:'doing'},
+      {t:'パイロット3施設(母のホテル含む)',st:'todo'},
+      {t:'有料10施設(月額¥2,980)',st:'todo'},
+    ],
+    issues:[
+      {t:'LINE審査が律速',why:'申請は会長のみ可能。審査5〜10営業日',tasks:[
+        {x:'LINE公式アカウントを申請する',o:'会長'},
+      ]},
+      {t:'パイロット施設の獲得',why:'実運用の声が営業資材になる',tasks:[
+        {x:'母のホテルで実運用を開始する',o:'会長'},
+        {x:'営業スタッフ採用(報酬:採用1人¥3,000)',o:'佐々木'},
+      ]},
+    ],
+  },
+};
+function buEnsurePlan(u){
+  if(!u)return;
+  let changed=false;
+  const seed=BU_PLAN_SEEDS[u.id]||{roadmap:[],issues:[]};
+  if(!Array.isArray(u.roadmap)){u.roadmap=seed.roadmap.map(r=>({id:uid(),title:r.t,st:r.st,note:''}));changed=true;}
+  if(!Array.isArray(u.issues)){u.issues=seed.issues.map(i=>({id:uid(),title:i.t,why:i.why,tasks:i.tasks.map(t=>({id:uid(),text:t.x,owner:t.o,done:false}))}));changed=true;}
+  if(changed){u.updatedAt=Date.now();save();}
+}
+const BU_RM_STATES=[['todo','予定','var(--t3)'],['doing','進行中','var(--amber)'],['done','完了','var(--green)']];
+function buCyclePlan(unitId,rid){
+  const u=buGet(unitId);if(!u)return;
+  const r=(u.roadmap||[]).find(x=>x.id===rid);if(!r)return;
+  const order=['todo','doing','done'];
+  r.st=order[(order.indexOf(r.st)+1)%3];
+  buTouch(u);
+}
+function buAddPlan(unitId){
+  const u=buGet(unitId);if(!u)return;
+  const t=(prompt('ロードマップ項目')||'').trim();if(!t)return;
+  u.roadmap.push({id:uid(),title:t,st:'todo',note:''});
+  buTouch(u);
+}
+function buDelPlan(unitId,rid){
+  const u=buGet(unitId);if(!u)return;
+  if(!confirm('この項目を削除しますか?'))return;
+  u.roadmap=(u.roadmap||[]).filter(x=>x.id!==rid);
+  buTouch(u);
+}
+function buToggleTask(unitId,iid,tid){
+  const u=buGet(unitId);if(!u)return;
+  const i=(u.issues||[]).find(x=>x.id===iid);if(!i)return;
+  const t=(i.tasks||[]).find(x=>x.id===tid);if(!t)return;
+  t.done=!t.done;
+  buTouch(u);
+}
+function buAddIssue(unitId){
+  const u=buGet(unitId);if(!u)return;
+  const t=(prompt('イシュー(課題)のタイトル')||'').trim();if(!t)return;
+  const why=(prompt('なぜ重要か(省略可)')||'').trim();
+  u.issues.push({id:uid(),title:t,why,tasks:[]});
+  buTouch(u);
+}
+function buAddITask(unitId,iid){
+  const u=buGet(unitId);if(!u)return;
+  const i=(u.issues||[]).find(x=>x.id===iid);if(!i)return;
+  const t=(prompt('タスク内容')||'').trim();if(!t)return;
+  const o=(prompt('担当(佐々木/会長/AI等・省略可)')||'').trim();
+  i.tasks.push({id:uid(),text:t,owner:o,done:false});
+  buTouch(u);
+}
+function buDelIssue(unitId,iid){
+  const u=buGet(unitId);if(!u)return;
+  if(!confirm('このイシューを削除しますか?(中のタスクも消えます)'))return;
+  u.issues=(u.issues||[]).filter(x=>x.id!==iid);
+  buTouch(u);
+}
+function buDelITask(unitId,iid,tid){
+  const u=buGet(unitId);if(!u)return;
+  const i=(u.issues||[]).find(x=>x.id===iid);if(!i)return;
+  i.tasks=(i.tasks||[]).filter(x=>x.id!==tid);
+  buTouch(u);
+}
+
 function buTouch(u){u.updatedAt=Date.now();save();render();}
 function buCommission(u,kind,repType){
   const c=buComm(u);
@@ -2505,6 +2629,7 @@ function buAddUnit(){
 }
 function rBizUnits(){
   buSeed();
+  (S.bizUnits||[]).forEach(buEnsurePlan);
   const units=S.bizUnits||[];
   let mSales=0,mTarget=0,mSasaki=0,mStaff=0;
   units.forEach(u=>{
@@ -2547,6 +2672,35 @@ ${units.map(u=>{
     規程: 成約=佐々木¥${buComm(u).saleSasaki.toLocaleString()} ／ スタッフ¥${buComm(u).saleStaff.toLocaleString()}(+佐々木¥${buComm(u).saleMgr.toLocaleString()})
     ${buComm(u).recruitSasaki?` ・ ${esc(buComm(u).recruitLabel||'採用')}=佐々木¥${buComm(u).recruitSasaki.toLocaleString()} ／ スタッフ¥${buComm(u).recruitStaff.toLocaleString()}(+佐々木¥${buComm(u).recruitMgr.toLocaleString()})`:''}
   </div>
+  <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">🗺 ロードマップ <button class="btn btn-g btn-xs" onclick="buAddPlan('${u.id}')">＋</button></div>
+  ${(u.roadmap||[]).map(rm=>{const st=BU_RM_STATES.find(x=>x[0]===rm.st)||BU_RM_STATES[0];return`
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--card2);font-size:12px;align-items:center">
+      <div style="min-width:0;${rm.st==='done'?'color:var(--t3);text-decoration:line-through':''}">${esc(rm.title)}</div>
+      <div style="white-space:nowrap">
+        <button class="btn btn-g btn-xs" style="color:${st[2]};font-weight:800" onclick="buCyclePlan('${u.id}','${rm.id}')">${st[1]}</button>
+        <button class="btn btn-g btn-xs" onclick="buDelPlan('${u.id}','${rm.id}')">✕</button>
+      </div>
+    </div>`;}).join('')}
+
+  <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px">🔥 イシュー・タスク <button class="btn btn-g btn-xs" onclick="buAddIssue('${u.id}')">＋イシュー</button></div>
+  ${(u.issues||[]).map(iss=>{
+    const dn=(iss.tasks||[]).filter(t=>t.done).length,tt=(iss.tasks||[]).length;
+    return`<div style="border:1px solid var(--card2);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div style="min-width:0"><b style="font-size:12.5px">${esc(iss.title)}</b>
+          ${iss.why?`<div style="font-size:10.5px;color:var(--t3)">${esc(iss.why)}</div>`:''}</div>
+        <div style="white-space:nowrap;font-size:11px;color:${dn===tt&&tt>0?'var(--green)':'var(--amber)'};font-weight:800">${dn}/${tt}
+          <button class="btn btn-g btn-xs" onclick="buAddITask('${u.id}','${iss.id}')">＋</button>
+          <button class="btn btn-g btn-xs" onclick="buDelIssue('${u.id}','${iss.id}')">✕</button></div>
+      </div>
+      ${(iss.tasks||[]).map(tk=>`
+      <div style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12px;cursor:pointer" onclick="buToggleTask('${u.id}','${iss.id}','${tk.id}')">
+        <div style="width:15px;height:15px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;${tk.done?'background:var(--green);color:#fff':'border:1.5px solid var(--t3)'}">${tk.done?'✓':''}</div>
+        <div style="min-width:0;flex:1;${tk.done?'text-decoration:line-through;color:var(--t3)':''}">${esc(tk.text)}${tk.owner?` <span style="color:var(--t3);font-size:10px">@${esc(tk.owner)}</span>`:''}</div>
+        <button class="btn btn-g btn-xs" onclick="event.stopPropagation();buDelITask('${u.id}','${iss.id}','${tk.id}')">✕</button>
+      </div>`).join('')}
+    </div>`;}).join('')}
+
   <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">💰 営業記録(成約)</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
     <input id="bu-client-${u.id}" placeholder="クライアント名" style="flex:2;min-width:110px">
@@ -9358,7 +9512,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-5';
+const APP_VERSION='20260703-6';
 
 render();
 function forceAppUpdate(){
