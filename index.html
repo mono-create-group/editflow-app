@@ -2780,36 +2780,48 @@ ${units.map(u=>{
     規程: 成約=佐々木¥${buComm(u).saleSasaki.toLocaleString()} ／ スタッフ¥${buComm(u).saleStaff.toLocaleString()}(+佐々木¥${buComm(u).saleMgr.toLocaleString()})
     ${buComm(u).recruitSasaki?` ・ ${esc(buComm(u).recruitLabel||'採用')}=佐々木¥${buComm(u).recruitSasaki.toLocaleString()} ／ スタッフ¥${buComm(u).recruitStaff.toLocaleString()}(+佐々木¥${buComm(u).recruitMgr.toLocaleString()})`:''}
   </div>
-  <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">🗺 ロードマップ <button class="btn btn-g btn-xs" onclick="buAddPlan('${u.id}')">＋</button></div>
-  ${(u.roadmap||[]).map(rm=>{const st=BU_RM_STATES.find(x=>x[0]===rm.st)||BU_RM_STATES[0];return`
-    <div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--card2);font-size:12px;align-items:center">
-      <div style="min-width:0;${rm.st==='done'?'color:var(--t3);text-decoration:line-through':''}">${esc(rm.title)}</div>
-      <div style="white-space:nowrap">
-        <button class="btn btn-g btn-xs" style="color:${st[2]};font-weight:800" onclick="buCyclePlan('${u.id}','${rm.id}')">${st[1]}</button>
-        <button class="btn btn-g btn-xs" onclick="buDelPlan('${u.id}','${rm.id}')">✕</button>
-      </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;background:var(--card2);border-radius:10px;padding:9px 14px;margin:16px 0 6px">
+    <span style="font-weight:800;font-size:13.5px">🗺 ロードマップ</span>
+    <button class="btn btn-g btn-xs" onclick="buAddPlan('${u.id}')">＋ 追加</button>
+  </div>
+  ${(u.roadmap||[]).map(rm=>{const C={todo:['予定','#94a3b8'],doing:['進行中','#f59e0b'],done:['完了','#16a34a']};const st=C[rm.st]||C.todo;return`
+    <div style="display:flex;gap:12px;padding:10px 6px;border-bottom:1px solid var(--card2);align-items:center">
+      <span onclick="buCyclePlan('${u.id}','${rm.id}')" style="cursor:pointer;flex-shrink:0;min-width:62px;text-align:center;background:${st[1]};color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:99px;user-select:none" title="タップで切替">${st[0]}</span>
+      <div style="min-width:0;flex:1;font-size:13.5px;line-height:1.6;${rm.st==='done'?'color:var(--t3);text-decoration:line-through':''}">${esc(rm.title)}</div>
+      <button class="btn btn-g btn-xs" onclick="buDelPlan('${u.id}','${rm.id}')">✕</button>
     </div>`;}).join('')}
 
-  <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px">🔥 イシュー・タスク <button class="btn btn-g btn-xs" onclick="buAddIssue('${u.id}')">＋イシュー</button></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;background:var(--card2);border-radius:10px;padding:9px 14px;margin:18px 0 8px">
+    <span style="font-weight:800;font-size:13.5px">🔥 イシュー・タスク</span>
+    <button class="btn btn-g btn-xs" onclick="buAddIssue('${u.id}')">＋ イシュー追加</button>
+  </div>
   ${(u.issues||[]).map(iss=>{
     const dn=(iss.tasks||[]).filter(t=>t.done).length,tt=(iss.tasks||[]).length;
-    return`<div style="border:1px solid var(--card2);border-radius:10px;padding:10px 12px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
-        <div style="min-width:0"><b style="font-size:12.5px">${esc(iss.title)}</b>
-          ${iss.why?`<div style="font-size:10.5px;color:var(--t3)">${esc(iss.why)}</div>`:''}</div>
-        <div style="white-space:nowrap;font-size:11px;color:${dn===tt&&tt>0?'var(--green)':'var(--amber)'};font-weight:800">${dn}/${tt}
+    const okAll=dn===tt&&tt>0;
+    return`<div style="border:1px solid var(--card2);border-left:4px solid ${okAll?'#16a34a':'#f59e0b'};border-radius:12px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:4px">
+        <div style="min-width:0">
+          <div style="font-size:14px;font-weight:800;line-height:1.5">${esc(iss.title)}</div>
+          ${iss.why?`<div style="font-size:11.5px;color:var(--t3);line-height:1.6;margin-top:2px">${esc(iss.why)}</div>`:''}
+        </div>
+        <div style="white-space:nowrap;display:flex;gap:4px;align-items:center">
+          <span style="background:${okAll?'#dcfce7':'#fef3c7'};color:${okAll?'#166534':'#92400e'};font-size:11.5px;font-weight:800;padding:3px 10px;border-radius:99px">${dn}/${tt}</span>
           <button class="btn btn-g btn-xs" onclick="buAddITask('${u.id}','${iss.id}')">＋</button>
-          <button class="btn btn-g btn-xs" onclick="buDelIssue('${u.id}','${iss.id}')">✕</button></div>
+          <button class="btn btn-g btn-xs" onclick="buDelIssue('${u.id}','${iss.id}')">✕</button>
+        </div>
       </div>
       ${(iss.tasks||[]).map(tk=>`
-      <div style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12px;cursor:pointer" onclick="buToggleTask('${u.id}','${iss.id}','${tk.id}')">
-        <div style="width:15px;height:15px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;${tk.done?'background:var(--green);color:#fff':'border:1.5px solid var(--t3)'}">${tk.done?'✓':''}</div>
-        <div style="min-width:0;flex:1;${tk.done?'text-decoration:line-through;color:var(--t3)':''}">${esc(tk.text)}${tk.owner?` <span style="color:var(--t3);font-size:10px">@${esc(tk.owner)}</span>`:''}</div>
+      <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 2px;border-top:1px solid var(--card2);cursor:pointer" onclick="buToggleTask('${u.id}','${iss.id}','${tk.id}')">
+        <div style="width:19px;height:19px;border-radius:6px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:12px;${tk.done?'background:#16a34a;color:#fff':'border:2px solid var(--t3)'}">${tk.done?'✓':''}</div>
+        <div style="min-width:0;flex:1">
+          <div style="font-size:13.5px;line-height:1.6;${tk.done?'text-decoration:line-through;color:var(--t3)':''}">${esc(tk.text)}</div>
+          ${tk.owner?`<div style="font-size:11px;color:var(--t3)">👤 ${esc(tk.owner)}</div>`:''}
+        </div>
         <button class="btn btn-g btn-xs" onclick="event.stopPropagation();buDelITask('${u.id}','${iss.id}','${tk.id}')">✕</button>
       </div>`).join('')}
     </div>`;}).join('')}
 
-  <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">💰 営業記録(成約)</div>
+  <div style="display:flex;align-items:center;background:var(--card2);border-radius:10px;padding:9px 14px;margin:18px 0 8px"><span style="font-weight:800;font-size:13.5px">💰 営業記録(成約)</span></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
     <input id="bu-client-${u.id}" placeholder="クライアント名" style="flex:2;min-width:110px">
     <select id="bu-product-${u.id}" style="flex:1;min-width:110px">${(u.products||[]).map(p=>`<option>${esc(p)}</option>`).join('')}<option>その他</option></select>
@@ -2828,7 +2840,7 @@ ${units.map(u=>{
         <button class="btn btn-g btn-xs" onclick="buDelSale('${u.id}','${sl.id}')">✕</button></div>
     </div>`).join('')}
 
-  <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px">🤝 採用記録(候補者・スカウト)</div>
+  <div style="display:flex;align-items:center;background:var(--card2);border-radius:10px;padding:9px 14px;margin:18px 0 8px"><span style="font-weight:800;font-size:13.5px">🤝 採用記録(候補者・スカウト)</span></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
     <input id="bu-rname-${u.id}" placeholder="名前" style="flex:1;min-width:100px">
     <select id="bu-rrole-${u.id}" style="min-width:110px">${BU_ROLE_OPTIONS.map(r=>`<option>${r}</option>`).join('')}</select>
@@ -2849,7 +2861,7 @@ ${units.map(u=>{
       </div>
     </div>`).join('')}
 
-  <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px">📝 事業部メモ(ロードマップ・営業/採用に必要な情報)</div>
+  <div style="display:flex;align-items:center;background:var(--card2);border-radius:10px;padding:9px 14px;margin:18px 0 8px"><span style="font-weight:800;font-size:13.5px">📝 事業部メモ</span></div>
   <textarea style="width:100%;min-height:70px" placeholder="ターゲット、トーク、リンク、決め事などを自由に記録"
     onchange="buSetNotes('${u.id}',this.value)">${esc(u.notes||'')}</textarea>
 </div>`;}).join('')}
@@ -9692,7 +9704,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-8';
+const APP_VERSION='20260703-9';
 
 render();
 function forceAppUpdate(){

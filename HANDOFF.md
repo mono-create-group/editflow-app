@@ -1,6 +1,14 @@
 # EditFlow 引き継ぎドキュメント
 
-最終更新: 2026-07-03 / APP_VERSION `20260628-18`
+最終更新: 2026-07-03(深夜) / APP_VERSION `20260703-2`
+
+> 【v20260703-2の変更】
+> - 新ビュー **🏢経営ボード**(`rBizBoard` / データ定義はコード内 `BIZ_BOARD` 定数 / チェック状態は `S.bizBoard`)。
+>   項目定義の更新はClaude Codeで `BIZ_BOARD` を編集する運用。
+> - **JST日付バグを全面修正**: `Date.prototype.toLocalYmd()` を追加し
+>   `toISOString().slice(0,10)` を全箇所置換(週表示・明日/期限計算・ストリーク等の-1日ズレ解消)。
+>   **今後、日付文字列は必ず `today()` か `d.toLocalYmd()` を使うこと。`toISOString().slice(0,10)` は禁止。**
+> - コミット済み・未push(デプロイは会長判断)。
 
 このファイルは EditFlow（クリエイター向け業務管理PWA）と mono.create 事業管理ツール統合作業の
 引き継ぎ用まとめ。**別セッションはまずこれを読むこと。**
