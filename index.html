@@ -722,6 +722,7 @@ const BUILTIN_VIEWS=[
   {id:'aichat',label:'AIアシスタント',icon:'🤖'},
   {id:'fitness',label:'フィットネス',icon:'💪'},
   {id:'bizboard',label:'経営ボード',icon:'🏢'},
+  {id:'bizunits',label:'事業部ボード',icon:'🏬'},
 ];
 
 const DB_OLD='ef_v4';
@@ -765,7 +766,7 @@ function _applyCloudData(json){
   const cloud=JSON.parse(json);
   const def=defState();
   S=migrate(Object.assign(def,cloud));
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -817,7 +818,7 @@ function fbSetupRealtimeSync(){
 // チームデータのみ shared/team に相乗りさせ、全員で同じ案件を見られるようにする。
 // Firestoreルールが共有アクセスを許可していれば自動で有効化。許可されない場合は
 // permission-denied を検知して自動で個人モードへフォールバック（現状維持・無害）。
-const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs'];
+const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits'];
 let TEAM_SHARE_OK=null;      // null=未判定 / true=共有有効 / false=個人モード
 let _teamUnsub=null;
 window._teamSnap=window._teamSnap||{};
@@ -1535,6 +1536,7 @@ function defState(){return{
   divisions:[],
   fsChecked:{},
   bizBoard:{done:{},extra:[]},
+  bizUnits:[],
 };}
 function migrate(d){
   // migrate ef_v4 → ef_v5
@@ -2216,7 +2218,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -2377,6 +2379,189 @@ ${BIZ_BOARD.issues.map(i=>{
   <div style="font-size:10.5px;color:var(--t3);margin-top:8px">※ボードの項目定義の更新はClaude Code(CEO)が行います。チェック状態と追加タスクはこの端末+同期先に保存されます。</div>
 </div>`;
 }
+// ===事業部ボード(佐々木さんと共有: 事業部ごとの目標・営業/採用記録)===
+// データはTEAM_KEYS('bizUnits')でチーム共有。誰のアカウントでも同じ内容が見える
+// コミッション規程(2026-07-03 会長決定):
+//   佐々木さん本人の成約 = ¥10,000/件
+//   営業スタッフの成約   = スタッフ¥5,000 + 佐々木さん(管理報酬)¥5,000 ※解釈要確認
+const BU_COMMISSION={sasaki:10000,staff:5000,staffMgr:5000};
+const BU_REP_TYPES=[['sasaki','佐々木さん本人'],['staff','営業スタッフ'],['other','その他(報酬なし)']];
+const BU_RECRUIT_STATUS=['候補','連絡済','面談予定','採用','見送り・離脱'];
+
+function buSeed(){
+  if(!Array.isArray(S.bizUnits))S.bizUnits=[];
+  if(S.bizUnits.length===0){
+    const now=Date.now();
+    S.bizUnits=[
+      {id:'bu_hp',name:'HP構築事業',salesTarget:250000,sales:[],recruits:[],notes:'',updatedAt:now},
+      {id:'bu_dispatch',name:'編集者派遣事業',salesTarget:250000,sales:[],recruits:[],notes:'',updatedAt:now},
+      {id:'bu_shift',name:'シフトさん(SaaS)',salesTarget:29800,sales:[],recruits:[],notes:'',updatedAt:now},
+    ];
+    save();
+  }
+}
+function buGet(id){return (S.bizUnits||[]).find(u=>u.id===id);}
+function buTouch(u){u.updatedAt=Date.now();save();render();}
+function buCommission(repType){
+  if(repType==='sasaki')return{sasaki:BU_COMMISSION.sasaki,staff:0};
+  if(repType==='staff')return{sasaki:BU_COMMISSION.staffMgr,staff:BU_COMMISSION.staff};
+  return{sasaki:0,staff:0};
+}
+function buThisMonth(dateStr){
+  const now=new Date();
+  const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  return String(dateStr||'').startsWith(ym);
+}
+function buAddSale(unitId){
+  const u=buGet(unitId);if(!u)return;
+  const client=(document.getElementById(`bu-client-${unitId}`).value||'').trim();
+  const amount=Number(document.getElementById(`bu-amount-${unitId}`).value||0);
+  const repType=document.getElementById(`bu-reptype-${unitId}`).value;
+  const rep=(document.getElementById(`bu-rep-${unitId}`).value||'').trim();
+  const product=(document.getElementById(`bu-product-${unitId}`).value||'').trim();
+  if(!client||!amount){toast('クライアント名と金額を入力してください','warn');return;}
+  const c=buCommission(repType);
+  u.sales=u.sales||[];
+  u.sales.unshift({id:uid(),date:today(),client,product,amount,repType,rep:rep||(repType==='sasaki'?'佐々木':''),
+    commSasaki:c.sasaki,commStaff:c.staff,updatedAt:Date.now()});
+  buTouch(u);
+  toast('成約を記録しました');
+}
+function buDelSale(unitId,saleId){
+  const u=buGet(unitId);if(!u)return;
+  if(!confirm('この成約記録を削除しますか?'))return;
+  u.sales=(u.sales||[]).filter(x=>x.id!==saleId);
+  buTouch(u);
+}
+function buAddRecruit(unitId){
+  const u=buGet(unitId);if(!u)return;
+  const name=(document.getElementById(`bu-rname-${unitId}`).value||'').trim();
+  const role=(document.getElementById(`bu-rrole-${unitId}`).value||'').trim();
+  if(!name){toast('名前を入力してください','warn');return;}
+  u.recruits=u.recruits||[];
+  u.recruits.unshift({id:uid(),date:today(),name,role,status:'候補',note:'',updatedAt:Date.now()});
+  buTouch(u);
+}
+function buSetRecruit(unitId,rid,field,value){
+  const u=buGet(unitId);if(!u)return;
+  const r=(u.recruits||[]).find(x=>x.id===rid);if(!r)return;
+  r[field]=value;r.updatedAt=Date.now();
+  buTouch(u);
+}
+function buDelRecruit(unitId,rid){
+  const u=buGet(unitId);if(!u)return;
+  if(!confirm('この採用記録を削除しますか?'))return;
+  u.recruits=(u.recruits||[]).filter(x=>x.id!==rid);
+  buTouch(u);
+}
+function buEditRecruitNote(unitId,rid){
+  const u=buGet(unitId);if(!u)return;
+  const r=(u.recruits||[]).find(x=>x.id===rid);if(!r)return;
+  const v=prompt('メモ(面談日・条件・所感など)',r.note||'');
+  if(v===null)return;
+  r.note=v;r.updatedAt=Date.now();
+  buTouch(u);
+}
+function buSetNotes(unitId,val){
+  const u=buGet(unitId);if(!u)return;
+  u.notes=val;u.updatedAt=Date.now();save();
+}
+function buEditUnit(unitId){
+  const u=buGet(unitId);if(!u)return;
+  const name=prompt('事業部名',u.name);if(name===null)return;
+  const target=prompt('今月の売上目標(円)',String(u.salesTarget||0));if(target===null)return;
+  u.name=name.trim()||u.name;
+  u.salesTarget=Number(target)||0;
+  buTouch(u);
+}
+function buAddUnit(){
+  const name=(prompt('新しい事業部名')||'').trim();if(!name)return;
+  S.bizUnits.push({id:uid(),name,salesTarget:0,sales:[],recruits:[],notes:'',updatedAt:Date.now()});
+  save();render();
+}
+function rBizUnits(){
+  buSeed();
+  const units=S.bizUnits||[];
+  let mSales=0,mTarget=0,mSasaki=0,mStaff=0;
+  units.forEach(u=>{
+    mTarget+=(u.salesTarget||0);
+    (u.sales||[]).forEach(sl=>{if(buThisMonth(sl.date)){mSales+=(sl.amount||0);mSasaki+=(sl.commSasaki||0);mStaff+=(sl.commStaff||0);}});
+  });
+  const pct=_pct(mSales,mTarget||1);
+  return`${secTitle('🏬 事業部ボード — 佐々木さんと共有(全アカウント同期)')}
+<div style="font-size:11px;color:var(--t3);margin-bottom:12px">
+  事業部ごとに目標・営業記録・採用記録・メモを共有します。<b>HP構築+編集者派遣で今月¥500,000が全社目標</b>(2026-07-03 会長決定)。<br>
+  コミッション: 佐々木さん成約=¥10,000/件 ／ 営業スタッフ成約=スタッフ¥5,000+佐々木さん¥5,000(管理報酬)。
+</div>
+<div class="card" style="margin-bottom:12px;border-left:3px solid var(--green)">
+  <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div><div style="font-size:11px;color:var(--t3);font-weight:700">今月の売上(全事業部)</div>
+    <div style="font-weight:800;font-size:22px;color:var(--green)">¥${mSales.toLocaleString()} <span style="font-size:12px;color:var(--t3)">/ 目標¥${mTarget.toLocaleString()}</span></div></div>
+    <div style="text-align:right"><div style="font-size:11px;color:var(--t3);font-weight:700">今月のコミッション</div>
+    <div style="font-size:13px">佐々木さん: <b>¥${mSasaki.toLocaleString()}</b> ／ スタッフ計: <b>¥${mStaff.toLocaleString()}</b></div></div>
+  </div>
+  <div style="background:var(--card2);border-radius:6px;height:8px;margin-top:10px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--green)"></div></div>
+  <div style="font-size:11px;color:var(--t3);margin-top:4px">達成率 ${pct}%</div>
+</div>
+${units.map(u=>{
+  const monthSales=(u.sales||[]).filter(sl=>buThisMonth(sl.date));
+  const sum=monthSales.reduce((a,x)=>a+(x.amount||0),0);
+  const upct=_pct(sum,u.salesTarget||1);
+  return`<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
+    <div style="font-weight:800;font-size:15px">${esc(u.name)}</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-weight:800;color:var(--green)">¥${sum.toLocaleString()}</span>
+      <span style="font-size:11px;color:var(--t3)">/ ¥${(u.salesTarget||0).toLocaleString()}</span>
+      <button class="btn btn-g btn-xs" onclick="buEditUnit('${u.id}')">目標/名称</button>
+    </div>
+  </div>
+  <div style="background:var(--card2);border-radius:6px;height:6px;margin:8px 0 12px;overflow:hidden"><div style="height:100%;width:${upct}%;background:var(--purple)"></div></div>
+
+  <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">💰 営業記録(成約)</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+    <input id="bu-client-${u.id}" placeholder="クライアント名" style="flex:2;min-width:110px">
+    <input id="bu-product-${u.id}" placeholder="商品(HP/派遣等)" style="flex:1;min-width:80px">
+    <input id="bu-amount-${u.id}" type="number" placeholder="金額(円)" style="width:90px">
+    <select id="bu-reptype-${u.id}">${BU_REP_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
+    <input id="bu-rep-${u.id}" placeholder="獲得者名(スタッフ時)" style="width:110px">
+    <button class="btn btn-p btn-sm" onclick="buAddSale('${u.id}')">＋記録</button>
+  </div>
+  ${!(u.sales||[]).length?`<div style="font-size:11.5px;color:var(--t3);margin-bottom:10px">まだ成約記録がありません</div>`:
+  (u.sales||[]).slice(0,8).map(sl=>`
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--card2);font-size:12px;align-items:center">
+      <div style="min-width:0"><b>${esc(sl.client)}</b> ${sl.product?esc(sl.product):''} <span style="color:var(--t3)">${esc(sl.date)} / ${esc(sl.rep||(sl.repType==='sasaki'?'佐々木':'-'))}</span></div>
+      <div style="white-space:nowrap">¥${(sl.amount||0).toLocaleString()}
+        <span style="color:var(--t3);font-size:10.5px">報酬:佐々木¥${(sl.commSasaki||0).toLocaleString()}${sl.commStaff?`+ｽﾀｯﾌ¥${sl.commStaff.toLocaleString()}`:''}</span>
+        <button class="btn btn-g btn-xs" onclick="buDelSale('${u.id}','${sl.id}')">✕</button></div>
+    </div>`).join('')}
+
+  <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px">🤝 採用記録(候補者・スカウト)</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+    <input id="bu-rname-${u.id}" placeholder="名前" style="flex:1;min-width:100px">
+    <input id="bu-rrole-${u.id}" placeholder="役割(編集者/営業スタッフ)" style="flex:1;min-width:120px">
+    <button class="btn btn-p btn-sm" onclick="buAddRecruit('${u.id}')">＋追加</button>
+  </div>
+  ${!(u.recruits||[]).length?`<div style="font-size:11.5px;color:var(--t3);margin-bottom:10px">まだ採用記録がありません</div>`:
+  (u.recruits||[]).slice(0,10).map(r=>`
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--card2);font-size:12px;align-items:center">
+      <div style="min-width:0"><b>${esc(r.name)}</b> <span style="color:var(--t3)">${esc(r.role||'')} / ${esc(r.date)}</span>
+        ${r.note?`<div style="color:var(--t3);font-size:10.5px">${esc(r.note)}</div>`:''}</div>
+      <div style="white-space:nowrap">
+        <select onchange="buSetRecruit('${u.id}','${r.id}','status',this.value)">${BU_RECRUIT_STATUS.map(st=>`<option ${st===r.status?'selected':''}>${st}</option>`).join('')}</select>
+        <button class="btn btn-g btn-xs" onclick="buEditRecruitNote('${u.id}','${r.id}')" title="メモ">✎</button>
+        <button class="btn btn-g btn-xs" onclick="buDelRecruit('${u.id}','${r.id}')">✕</button>
+      </div>
+    </div>`).join('')}
+
+  <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px">📝 事業部メモ(ロードマップ・営業/採用に必要な情報)</div>
+  <textarea style="width:100%;min-height:70px" placeholder="ターゲット、トーク、リンク、決め事などを自由に記録"
+    onchange="buSetNotes('${u.id}',this.value)">${esc(u.notes||'')}</textarea>
+</div>`;}).join('')}
+<button class="btn btn-g btn-sm" onclick="buAddUnit()">＋ 事業部を追加</button>
+<div style="font-size:10.5px;color:var(--t3);margin-top:10px">※Googleアカウントでサインインすると全員に同期されます。佐々木さんにもこのページの使い方を共有してください。</div>`;
+}
+
 // ===DASHBOARD===
 function rDashTeamSummary(){
   const deals=(S.pipeline||[]).filter(d=>!d.deleted);
@@ -9141,7 +9326,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-3';
+const APP_VERSION='20260703-4';
 
 render();
 function forceAppUpdate(){
