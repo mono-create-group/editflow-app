@@ -2384,7 +2384,14 @@ ${BIZ_BOARD.issues.map(i=>{
 // コミッション規程(2026-07-03 会長決定):
 //   佐々木さん本人の成約 = ¥10,000/件
 //   営業スタッフの成約   = スタッフ¥5,000 + 佐々木さん(管理報酬)¥5,000 ※解釈要確認
-const BU_COMMISSION={sasaki:10000,staff:5000,staffMgr:5000};
+// 事業部別コミッション規程(2026-07-03 会長改定)
+// sale=成約1件 / recruit=採用1人 / mgr=スタッフ獲得時に佐々木さんへ入る管理報酬
+const BU_COMM_PRESETS={
+  bu_hp:      {saleSasaki:10000,saleStaff:5000,saleMgr:5000, recruitSasaki:0,recruitStaff:0,recruitMgr:0, recruitLabel:''},
+  bu_dispatch:{saleSasaki:1000, saleStaff:1000,saleMgr:500,  recruitSasaki:1000,recruitStaff:1000,recruitMgr:500, recruitLabel:'編集者採用'},
+  bu_shift:   {saleSasaki:5000, saleStaff:5000,saleMgr:1000, recruitSasaki:3000,recruitStaff:3000,recruitMgr:1500, recruitLabel:'営業スタッフ採用'},
+};
+function buComm(u){return (u&&u.comm)||BU_COMM_PRESETS[u&&u.id]||{saleSasaki:0,saleStaff:0,saleMgr:0,recruitSasaki:0,recruitStaff:0,recruitMgr:0,recruitLabel:''};}
 const BU_REP_TYPES=[['sasaki','佐々木さん本人'],['staff','営業スタッフ'],['other','その他(報酬なし)']];
 const BU_RECRUIT_STATUS=['候補','連絡済','面談予定','採用','見送り・離脱'];
 
@@ -2402,9 +2409,15 @@ function buSeed(){
 }
 function buGet(id){return (S.bizUnits||[]).find(u=>u.id===id);}
 function buTouch(u){u.updatedAt=Date.now();save();render();}
-function buCommission(repType){
-  if(repType==='sasaki')return{sasaki:BU_COMMISSION.sasaki,staff:0};
-  if(repType==='staff')return{sasaki:BU_COMMISSION.staffMgr,staff:BU_COMMISSION.staff};
+function buCommission(u,kind,repType){
+  const c=buComm(u);
+  if(kind==='sale'){
+    if(repType==='sasaki')return{sasaki:c.saleSasaki,staff:0};
+    if(repType==='staff')return{sasaki:c.saleMgr,staff:c.saleStaff};
+  }else if(kind==='recruit'){
+    if(repType==='sasaki')return{sasaki:c.recruitSasaki,staff:0};
+    if(repType==='staff')return{sasaki:c.recruitMgr,staff:c.recruitStaff};
+  }
   return{sasaki:0,staff:0};
 }
 function buThisMonth(dateStr){
@@ -2420,7 +2433,7 @@ function buAddSale(unitId){
   const rep=(document.getElementById(`bu-rep-${unitId}`).value||'').trim();
   const product=(document.getElementById(`bu-product-${unitId}`).value||'').trim();
   if(!client||!amount){toast('クライアント名と金額を入力してください','warn');return;}
-  const c=buCommission(repType);
+  const c=buCommission(u,'sale',repType);
   u.sales=u.sales||[];
   u.sales.unshift({id:uid(),date:today(),client,product,amount,repType,rep:rep||(repType==='sasaki'?'佐々木':''),
     commSasaki:c.sasaki,commStaff:c.staff,updatedAt:Date.now()});
@@ -2438,14 +2451,25 @@ function buAddRecruit(unitId){
   const name=(document.getElementById(`bu-rname-${unitId}`).value||'').trim();
   const role=(document.getElementById(`bu-rrole-${unitId}`).value||'').trim();
   if(!name){toast('名前を入力してください','warn');return;}
+  const repType=document.getElementById(`bu-rreptype-${unitId}`).value;
+  const rep=(document.getElementById(`bu-rrep-${unitId}`).value||'').trim();
   u.recruits=u.recruits||[];
-  u.recruits.unshift({id:uid(),date:today(),name,role,status:'候補',note:'',updatedAt:Date.now()});
+  u.recruits.unshift({id:uid(),date:today(),name,role,status:'候補',note:'',repType,rep:rep||(repType==='sasaki'?'佐々木':''),hiredDate:'',commSasaki:0,commStaff:0,updatedAt:Date.now()});
   buTouch(u);
 }
 function buSetRecruit(unitId,rid,field,value){
   const u=buGet(unitId);if(!u)return;
   const r=(u.recruits||[]).find(x=>x.id===rid);if(!r)return;
   r[field]=value;r.updatedAt=Date.now();
+  if(field==='status'){
+    if(value==='採用'&&!r.hiredDate){
+      r.hiredDate=today();
+      const c=buCommission(u,'recruit',r.repType||'other');
+      r.commSasaki=c.sasaki;r.commStaff=c.staff;
+    }else if(value!=='採用'){
+      r.hiredDate='';r.commSasaki=0;r.commStaff=0;
+    }
+  }
   buTouch(u);
 }
 function buDelRecruit(unitId,rid){
@@ -2486,12 +2510,13 @@ function rBizUnits(){
   units.forEach(u=>{
     mTarget+=(u.salesTarget||0);
     (u.sales||[]).forEach(sl=>{if(buThisMonth(sl.date)){mSales+=(sl.amount||0);mSasaki+=(sl.commSasaki||0);mStaff+=(sl.commStaff||0);}});
+    (u.recruits||[]).forEach(r=>{if(r.hiredDate&&buThisMonth(r.hiredDate)){mSasaki+=(r.commSasaki||0);mStaff+=(r.commStaff||0);}});
   });
   const pct=_pct(mSales,mTarget||1);
   return`${secTitle('🏬 事業部ボード — 佐々木さんと共有(全アカウント同期)')}
 <div style="font-size:11px;color:var(--t3);margin-bottom:12px">
-  事業部ごとに目標・営業記録・採用記録・メモを共有します。<b>HP構築+編集者派遣で今月¥500,000が全社目標</b>(2026-07-03 会長決定)。<br>
-  コミッション: 佐々木さん成約=¥10,000/件 ／ 営業スタッフ成約=スタッフ¥5,000+佐々木さん¥5,000(管理報酬)。
+  事業部ごとに目標・営業記録・採用記録・メモを共有します。<b>HP構築+編集者派遣で今月¥500,000が全社目標</b>。<br>
+  報酬は事業部ごとの規程で自動計算(各カードに明記)。営業成約も採用も、スタッフ獲得時は佐々木さんに管理報酬が入ります。
 </div>
 <div class="card" style="margin-bottom:12px;border-left:3px solid var(--green)">
   <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -2518,6 +2543,10 @@ ${units.map(u=>{
   </div>
   <div style="background:var(--card2);border-radius:6px;height:6px;margin:8px 0 12px;overflow:hidden"><div style="height:100%;width:${upct}%;background:var(--purple)"></div></div>
 
+  <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">
+    規程: 成約=佐々木¥${buComm(u).saleSasaki.toLocaleString()} ／ スタッフ¥${buComm(u).saleStaff.toLocaleString()}(+佐々木¥${buComm(u).saleMgr.toLocaleString()})
+    ${buComm(u).recruitSasaki?` ・ ${esc(buComm(u).recruitLabel||'採用')}=佐々木¥${buComm(u).recruitSasaki.toLocaleString()} ／ スタッフ¥${buComm(u).recruitStaff.toLocaleString()}(+佐々木¥${buComm(u).recruitMgr.toLocaleString()})`:''}
+  </div>
   <div style="font-weight:700;font-size:12.5px;margin-bottom:6px">💰 営業記録(成約)</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
     <input id="bu-client-${u.id}" placeholder="クライアント名" style="flex:2;min-width:110px">
@@ -2539,13 +2568,16 @@ ${units.map(u=>{
   <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px">🤝 採用記録(候補者・スカウト)</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
     <input id="bu-rname-${u.id}" placeholder="名前" style="flex:1;min-width:100px">
-    <input id="bu-rrole-${u.id}" placeholder="役割(編集者/営業スタッフ)" style="flex:1;min-width:120px">
+    <input id="bu-rrole-${u.id}" placeholder="役割(編集者/営業スタッフ)" style="flex:1;min-width:110px">
+    <select id="bu-rreptype-${u.id}" title="採用の獲得者">${BU_REP_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
+    <input id="bu-rrep-${u.id}" placeholder="獲得者名(スタッフ時)" style="width:100px">
     <button class="btn btn-p btn-sm" onclick="buAddRecruit('${u.id}')">＋追加</button>
   </div>
   ${!(u.recruits||[]).length?`<div style="font-size:11.5px;color:var(--t3);margin-bottom:10px">まだ採用記録がありません</div>`:
   (u.recruits||[]).slice(0,10).map(r=>`
     <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--card2);font-size:12px;align-items:center">
-      <div style="min-width:0"><b>${esc(r.name)}</b> <span style="color:var(--t3)">${esc(r.role||'')} / ${esc(r.date)}</span>
+      <div style="min-width:0"><b>${esc(r.name)}</b> <span style="color:var(--t3)">${esc(r.role||'')} / ${esc(r.date)}${r.rep?` / 獲得:${esc(r.rep)}`:''}</span>
+        ${r.hiredDate?`<div style="color:var(--green);font-size:10.5px;font-weight:700">採用(${esc(r.hiredDate)}) 報酬: 佐々木¥${(r.commSasaki||0).toLocaleString()}${r.commStaff?` + ｽﾀｯﾌ¥${r.commStaff.toLocaleString()}`:''}</div>`:''}
         ${r.note?`<div style="color:var(--t3);font-size:10.5px">${esc(r.note)}</div>`:''}</div>
       <div style="white-space:nowrap">
         <select onchange="buSetRecruit('${u.id}','${r.id}','status',this.value)">${BU_RECRUIT_STATUS.map(st=>`<option ${st===r.status?'selected':''}>${st}</option>`).join('')}</select>
@@ -9326,7 +9358,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-4';
+const APP_VERSION='20260703-5';
 
 render();
 function forceAppUpdate(){
