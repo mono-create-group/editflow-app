@@ -723,6 +723,7 @@ const BUILTIN_VIEWS=[
   {id:'fitness',label:'フィットネス',icon:'💪'},
   {id:'bizboard',label:'経営ボード',icon:'🏢'},
   {id:'bizunits',label:'事業部ボード',icon:'🏬'},
+  {id:'minutes',label:'議事録',icon:'📝'},
 ];
 
 const DB_OLD='ef_v4';
@@ -766,7 +767,7 @@ function _applyCloudData(json){
   const cloud=JSON.parse(json);
   const def=defState();
   S=migrate(Object.assign(def,cloud));
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -818,7 +819,7 @@ function fbSetupRealtimeSync(){
 // チームデータのみ shared/team に相乗りさせ、全員で同じ案件を見られるようにする。
 // Firestoreルールが共有アクセスを許可していれば自動で有効化。許可されない場合は
 // permission-denied を検知して自動で個人モードへフォールバック（現状維持・無害）。
-const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits'];
+const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings'];
 let TEAM_SHARE_OK=null;      // null=未判定 / true=共有有効 / false=個人モード
 let _teamUnsub=null;
 window._teamSnap=window._teamSnap||{};
@@ -1558,6 +1559,7 @@ function defState(){return{
   fsChecked:{},
   bizBoard:{done:{},extra:[]},
   bizUnits:[],
+  teamMeetings:[],
 };}
 function migrate(d){
   // migrate ef_v4 → ef_v5
@@ -2239,7 +2241,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -2768,6 +2770,77 @@ ${units.map(u=>{
 </div>`;}).join('')}
 <button class="btn btn-g btn-sm" onclick="buAddUnit()">＋ 事業部を追加</button>
 <div style="font-size:10.5px;color:var(--t3);margin-top:10px">※Googleアカウントでサインインすると全員に同期されます。佐々木さんにもこのページの使い方を共有してください。</div>`;
+}
+
+
+// ===議事録(チーム共有: 会議のアジェンダ・メモ・決定事項)===
+function mtSeed(){
+  if(!Array.isArray(S.teamMeetings))S.teamMeetings=[];
+  if(!S.teamMeetings.find(m=>m.id==='mt_kickoff_20260703')){
+    S.teamMeetings.unshift({
+      id:'mt_kickoff_20260703',
+      date:today(),
+      title:'編集者採用&営業会議(キックオフ)',
+      attendees:'会長(中村)・佐々木楓芽',
+      agenda:[
+        '1. 現状共有(5分): 派遣サイト公開済み/在籍編集者2名/お問い合わせ自動受付・管理画面・支払い管理が稼働中',
+        '2. 役割分担の確定(10分): 採用=楓芽さん(スカウトDM・面談・合否)/営業=楓芽さん+営業スタッフ/文面・リスト・資料はAIが供給',
+        '3. 報酬の確認(5分):',
+        '   ・編集者派遣: 成約¥1,000/件・編集者採用¥1,000/人(スタッフ獲得時は楓芽さんに+¥500)',
+        '   ・シフトさん: 成約¥5,000/件・営業スタッフ採用¥3,000/人(スタッフ時は楓芽さんに+¥1,500)',
+        '   ・HP構築: 成約¥10,000/件(スタッフ¥5,000+楓芽さん¥5,000)',
+        '4. 採用計画(10分): 7月中に編集者10名(ショート5/長尺3/サムネ2)。スカウトDM文面と登録フォームの流れを共有',
+        '5. 営業開始(10分): 派遣DM5社(下書き済)/見込み客リスト10社/EditFlow事業部ボードで成約・採用を記録する方法',
+        '6. 宿題と次回(5分): 楓芽さん=面談枠の確保・人脈リストアップ/会長=DM送信・LINE公式アカウント申請',
+      ].join('\n'),
+      minutes:'',
+      decisions:'',
+      updatedAt:Date.now(),
+    });
+    save();
+  }
+}
+function mtAdd(){
+  const title=(prompt('会議名')||'').trim();if(!title)return;
+  S.teamMeetings.unshift({id:uid(),date:today(),title,attendees:'',agenda:'',minutes:'',decisions:'',updatedAt:Date.now()});
+  save();render();
+}
+function mtSet(id,field,value){
+  const m=(S.teamMeetings||[]).find(x=>x.id===id);if(!m)return;
+  m[field]=value;m.updatedAt=Date.now();save();
+}
+function mtDel(id){
+  if(!confirm('この議事録を削除しますか?'))return;
+  S.teamMeetings=(S.teamMeetings||[]).filter(x=>x.id!==id);
+  save();render();
+}
+function rMinutes(){
+  mtSeed();
+  const list=S.teamMeetings||[];
+  return`${secTitle('📝 議事録 — チーム共有(会長・楓芽さん共同編集)')}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  <div style="font-size:11px;color:var(--t3)">アジェンダは会議前にAIが用意。会議中は「議事メモ」に直接入力すれば全員に同期されます。</div>
+  <button class="btn btn-p btn-sm" onclick="mtAdd()">＋ 会議を追加</button>
+</div>
+${!list.length?'<div class="empty">まだ議事録がありません</div>':list.map(m=>`
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+    <div style="min-width:0">
+      <div style="font-weight:800;font-size:15px">${esc(m.title)}</div>
+      <div style="font-size:11px;color:var(--t3)">${esc(m.date)}${m.attendees?` ・ ${esc(m.attendees)}`:''}</div>
+    </div>
+    <button class="btn btn-g btn-xs" onclick="mtDel('${m.id}')">✕</button>
+  </div>
+  <div style="font-weight:700;font-size:12px;margin:10px 0 4px">出席者</div>
+  <input style="width:100%" value="${esc(m.attendees||'')}" onchange="mtSet('${m.id}','attendees',this.value)">
+  <div style="font-weight:700;font-size:12px;margin:10px 0 4px">📋 アジェンダ</div>
+  <textarea style="width:100%;min-height:150px;font-size:12.5px;line-height:1.7" onchange="mtSet('${m.id}','agenda',this.value)">${esc(m.agenda||'')}</textarea>
+  <div style="font-weight:700;font-size:12px;margin:10px 0 4px">🖊 議事メモ(会議中にここへ)</div>
+  <textarea style="width:100%;min-height:110px;font-size:12.5px;line-height:1.7" placeholder="話したこと・出た意見をそのまま記録" onchange="mtSet('${m.id}','minutes',this.value)">${esc(m.minutes||'')}</textarea>
+  <div style="font-weight:700;font-size:12px;margin:10px 0 4px">✅ 決定事項・宿題(誰が/いつまでに)</div>
+  <textarea style="width:100%;min-height:80px;font-size:12.5px;line-height:1.7" placeholder="例: 楓芽→面談枠を金曜までに3コマ確保" onchange="mtSet('${m.id}','decisions',this.value)">${esc(m.decisions||'')}</textarea>
+</div>`).join('')}
+<div style="font-size:10.5px;color:var(--t3)">※決定したタスクは「🏬事業部ボード」のイシューにも転記すると進捗管理できます。</div>`;
 }
 
 // ===DASHBOARD===
@@ -9359,7 +9432,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-6';
+const APP_VERSION='20260703-7';
 
 render();
 function forceAppUpdate(){
