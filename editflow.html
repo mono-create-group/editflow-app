@@ -2123,12 +2123,14 @@ function rLockScreen(){
     ${todayGoals.length?`<div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:6px">📅 今月・来月の目標</div>
     ${todayGoals.slice(0,5).map(g=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;font-size:13px">
       <span style="font-size:16px">${GOAL_CATS.find(c=>c.v===g.category)?.l.split(' ')[0]||'🎯'}</span>
+      <span style="font-size:10px;font-weight:800;color:var(--purple);background:rgba(139,92,246,.14);padding:2px 8px;border-radius:99px;white-space:nowrap">${esc((S.divisions||[]).find(d=>d.id===g.divisionId&&!d.deleted)?.name||'全社')}</span>
       <span style="flex:1">${esc(g.title)}</span>
       ${g.progress?`<span style="font-size:11px;color:var(--t2)">${g.progress}%</span>`:''}
     </div>`).join('')}`:''}
     ${longGoals.length?`<div style="font-size:12px;font-weight:700;color:var(--blue);margin-top:10px;margin-bottom:6px">🚀 長期目標</div>
     ${longGoals.slice(0,3).map(g=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--bdim);border-radius:8px;margin-bottom:5px;font-size:13px">
       <span style="font-size:16px">${g.horizon==='year1'?'🌱':g.horizon==='year5'?'🌟':'✨'}</span>
+      <span style="font-size:10px;font-weight:800;color:var(--blue);background:rgba(59,130,246,.14);padding:2px 8px;border-radius:99px;white-space:nowrap">${esc((S.divisions||[]).find(d=>d.id===g.divisionId&&!d.deleted)?.name||'全社')}</span>
       <span style="flex:1">${esc(g.title)}</span>
     </div>`).join('')}`:''}
     <button class="btn btn-g btn-sm" style="margin-top:8px" onclick="V='goals';render()">目標・KPI管理ページを開く →</button>
@@ -5306,7 +5308,7 @@ function rGoalTree(){
         <span style="font-size:16px;flex-shrink:0">${hz.icon}</span>
         <div style="flex:1;min-width:0;cursor:pointer" onclick="GV='${g.horizon}';render()">
           <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.title)}</div>
-          <div style="font-size:11px;color:var(--t2);margin-top:1px">${hz.l}${g.deadline?` · 期限:${g.deadline}`:''}</div>
+          <div style="font-size:11px;color:var(--t2);margin-top:1px">${hz.l} · 🏬${esc((S.divisions||[]).find(d=>d.id===g.divisionId&&!d.deleted)?.name||'全社')}${g.deadline?` · 期限:${g.deadline}`:''}</div>
         </div>
         <div style="flex-shrink:0;text-align:right;display:flex;align-items:center;gap:8px">
           <div>
@@ -9619,7 +9621,7 @@ initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260703-12';
+const APP_VERSION='20260704-13';
 
 render();
 function forceAppUpdate(){
