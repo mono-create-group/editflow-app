@@ -401,6 +401,30 @@ a{color:inherit;text-decoration:none}
 @keyframes celebrate{0%{transform:scale(1)}25%{transform:scale(1.4) rotate(-5deg)}50%{transform:scale(1.2) rotate(5deg)}100%{transform:scale(1)}}
 .celebrating{animation:celebrate .4s ease}
 
+/* ─── SALES LEADS ─── */
+.sl-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:100px;font-size:12px;font-weight:700;border:1.5px solid;cursor:default}
+.sl-未接触{background:var(--card2);border-color:var(--border);color:var(--t2)}
+.sl-HP作成済{background:var(--bdim);border-color:rgba(29,78,216,0.25);color:var(--blue)}
+.sl-電話済{background:var(--cdim);border-color:rgba(14,116,144,0.25);color:var(--cyan)}
+.sl-アポ{background:var(--adim);border-color:rgba(180,83,9,0.25);color:var(--amber)}
+.sl-商談{background:var(--pdim);border-color:rgba(109,40,217,0.25);color:var(--purple)}
+.sl-成約{background:var(--gdim);border-color:rgba(5,150,105,0.25);color:var(--green)}
+.sl-失注{background:var(--rdim);border-color:rgba(220,38,38,0.25);color:var(--red)}
+.sl-row{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:6px;display:flex;align-items:flex-start;gap:12px;transition:all .15s;box-shadow:var(--shadow-sm)}
+.sl-row:hover{border-color:var(--t3);box-shadow:var(--shadow);transform:translateY(-1px)}
+.sl-name{font-weight:700;font-size:14px;margin-bottom:3px}
+.sl-meta{font-size:11px;color:var(--t2);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sl-inline-input{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:12px;color:var(--text);min-width:100px;max-width:200px}
+.sl-inline-input:focus{border-color:var(--purple);outline:none}
+.sl-status-btn{padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700;border:1.5px solid;cursor:pointer;transition:all .15s}
+.sl-status-btn:hover{filter:brightness(0.9)}
+.sl-summary-chip{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:100px;font-size:13px;font-weight:700;border:1.5px solid;margin-right:6px;margin-bottom:6px}
+.sl-pager{display:flex;align-items:center;gap:8px;margin-top:14px;justify-content:center}
+.sl-pager button{padding:5px 13px;border-radius:8px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--card);color:var(--t2);cursor:pointer;transition:all .15s}
+.sl-pager button:hover:not(:disabled){border-color:var(--purple);color:var(--purple)}
+.sl-pager button:disabled{opacity:.4;cursor:default}
+.sl-pager span{font-size:12px;color:var(--t2)}
+
 /* ─── SCROLLBAR ─── */
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -724,6 +748,7 @@ const BUILTIN_VIEWS=[
   {id:'bizboard',label:'経営ボード',icon:'🏢'},
   {id:'bizunits',label:'事業部ボード',icon:'🏬'},
   {id:'minutes',label:'議事録',icon:'📝'},
+  {id:'salesleads',label:'営業リスト',icon:'📞'},
 ];
 
 const DB_OLD='ef_v4';
@@ -1533,7 +1558,7 @@ let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[],
-  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[],
+  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[], salesLeads:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
   goalReviews:{},
@@ -2230,7 +2255,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -9768,13 +9793,266 @@ function initReminders(){
     checkDeadlineReminders();
   }
 }
+// ===営業リスト===
+const SL_STATUSES=['未接触','HP作成済','電話済','アポ','商談','成約','失注'];
+const SL_STATUS_NEXT={'未接触':'電話済','電話済':'アポ','アポ':'商談','商談':'成約','HP作成済':'電話済','成約':'成約','失注':'失注'};
+let _slPage=0;
+let _slFilterStatus='all';
+let _slFilterGenre='all';
+let _slSearch='';
+const SL_PAGE_SIZE=100;
+const SL_GOAL_MONTH=10; // 今月の成約目標件数
+
+function slStatusClass(s){return 'sl-'+(s||'未接触');}
+function slChip(s){return`<span class="sl-chip ${slStatusClass(s)}">${esc(s||'未接触')}</span>`;}
+
+function slFilteredLeads(){
+  const q=_slSearch.toLowerCase();
+  return (S.salesLeads||[]).filter(l=>{
+    if(l.deleted)return false;
+    if(_slFilterStatus!=='all'&&l.status!==_slFilterStatus)return false;
+    if(_slFilterGenre!=='all'&&l.genre!==_slFilterGenre)return false;
+    if(q&&!(l.name||'').toLowerCase().includes(q)&&!(l.address||'').toLowerCase().includes(q))return false;
+    return true;
+  });
+}
+
+function rSalesLeads(){
+  if(!S.salesLeads)S.salesLeads=[];
+  const all=S.salesLeads.filter(l=>!l.deleted);
+  const total=all.length;
+  const counts={};
+  SL_STATUSES.forEach(s=>{counts[s]=all.filter(l=>l.status===s).length;});
+  const thisMonth=new Date().toISOString().slice(0,7);
+  const wonThisMonth=all.filter(l=>l.status==='成約'&&(l.wonAt||'').startsWith(thisMonth)).length;
+
+  // genres for filter
+  const genres=[...new Set(all.map(l=>l.genre||'').filter(Boolean))].sort();
+
+  const filtered=slFilteredLeads();
+  const totalPages=Math.max(1,Math.ceil(filtered.length/SL_PAGE_SIZE));
+  if(_slPage>=totalPages)_slPage=totalPages-1;
+  const pageLeads=filtered.slice(_slPage*SL_PAGE_SIZE,(_slPage+1)*SL_PAGE_SIZE);
+
+  // ─── 集計チップ ───
+  const summaryHtml=`
+    <div style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:0">
+      <span class="sl-summary-chip" style="background:var(--card2);border-color:var(--border);color:var(--t2)">総数 <strong style="color:var(--text)">${total}</strong></span>
+      <span class="sl-summary-chip sl-未接触" style="border:1.5px solid var(--border)">未接触 <strong>${counts['未接触']||0}</strong></span>
+      <span class="sl-summary-chip sl-アポ" style="border:1.5px solid rgba(180,83,9,0.25)">アポ <strong>${counts['アポ']||0}</strong></span>
+      <span class="sl-summary-chip sl-商談" style="border:1.5px solid rgba(109,40,217,0.25)">商談 <strong>${counts['商談']||0}</strong></span>
+      <span class="sl-summary-chip sl-成約" style="border:1.5px solid rgba(5,150,105,0.25)">成約 <strong>${wonThisMonth}</strong>/<span style="font-weight:400">${SL_GOAL_MONTH}件目標</span>
+        <span style="font-size:10px;opacity:.7">(今月)</span>
+      </span>
+    </div>`;
+
+  // ─── フィルタバー ───
+  const statusFilterHtml=`<div class="filter-bar" style="margin-bottom:8px">
+    ${['all',...SL_STATUSES].map(s=>`<button class="fbtn${_slFilterStatus===s?' act':''}" onclick="_slFilterStatus='${s}';_slPage=0;render()">${s==='all'?'すべて':s}</button>`).join('')}
+  </div>`;
+
+  const genreFilterHtml=genres.length?`<div class="filter-bar" style="margin-bottom:8px">
+    <button class="fbtn${_slFilterGenre==='all'?' act':''}" onclick="_slFilterGenre='all';_slPage=0;render()">全業種</button>
+    ${genres.map(g=>`<button class="fbtn${_slFilterGenre===g?' act':''}" onclick="_slFilterGenre='${esc(g)}';_slPage=0;render()">${esc(g)}</button>`).join('')}
+  </div>`:'';
+
+  const searchHtml=`<div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
+    <input type="search" placeholder="店名・住所で検索…" value="${esc(_slSearch)}" oninput="_slSearch=this.value;_slPage=0;render()" style="max-width:280px">
+    <span style="font-size:12px;color:var(--t2)">${filtered.length}件</span>
+  </div>`;
+
+  // ─── リスト行 ───
+  const rowsHtml=pageLeads.length===0?`<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">該当なし</div></div>`
+    :pageLeads.map(l=>{
+      const sid=l.id;
+      const statusBtns=SL_STATUSES.map(s=>
+        `<button class="sl-status-btn ${slStatusClass(s)}" onclick="slSetStatus('${sid}','${s}')" style="opacity:${l.status===s?1:.45}">${s}</button>`
+      ).join('');
+      return`<div class="sl-row">
+        <div style="flex:1;min-width:0">
+          <div class="sl-name">${esc(l.name||'')}</div>
+          <div class="sl-meta">
+            ${l.genre?`<span class="badge bk">${esc(l.genre)}</span>`:''}
+            ${l.phone?`<a href="tel:${esc(l.phone)}" style="color:var(--blue);font-size:11px">📞 ${esc(l.phone)}</a>`:''}
+            ${l.hp?`<span style="font-size:11px">HP: ${esc(l.hp)}</span>`:''}
+            ${l.instagram?`<span style="font-size:11px">IG: ${esc(l.instagram)}</span>`:''}
+            ${l.approach?`<span style="font-size:11px;color:var(--t3)">${esc(l.approach)}</span>`:''}
+          </div>
+          ${l.address?`<div style="font-size:11px;color:var(--t3);margin-top:2px">${esc(l.address)}</div>`:''}
+          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+            <span style="font-size:11px;color:var(--t2)">次アクション:</span>
+            <input type="date" class="sl-inline-input" value="${esc(l.nextAction||'')}" onchange="slUpdate('${sid}','nextAction',this.value)" style="width:130px">
+            <input type="text" class="sl-inline-input" placeholder="メモ…" value="${esc(l.memo||'')}" onchange="slUpdate('${sid}','memo',this.value)" style="flex:1;min-width:120px;max-width:300px">
+          </div>
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${statusBtns}</div>
+        </div>
+        <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          ${slChip(l.status)}
+          ${l.rating?`<span style="font-size:11px;color:var(--amber)">★${esc(String(l.rating))}</span>`:''}
+          <button class="tact del" onclick="slDelete('${sid}')" title="削除">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+
+  // ─── ページャー ───
+  const pagerHtml=`<div class="sl-pager">
+    <button onclick="_slPage=Math.max(0,_slPage-1);render()" ${_slPage===0?'disabled':''}>← 前</button>
+    <span>${_slPage+1} / ${totalPages}ページ</span>
+    <button onclick="_slPage=Math.min(${totalPages-1},_slPage+1);render()" ${_slPage>=totalPages-1?'disabled':''}>次 →</button>
+  </div>`;
+
+  // ─── インポートパネル ───
+  const importHtml=`<div class="card" style="margin-bottom:18px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">CSVインポート</div>
+    <div style="font-size:11px;color:var(--t2);margin-bottom:8px">列順: 店名,業種,電話,住所,評価,口コミ数,HP有無,Instagram,アプローチ手段,状態,次アクション日,メモ</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <label style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1.5px solid var(--border);border-radius:var(--rs);cursor:pointer;font-size:12px;font-weight:600;background:var(--card);transition:all .15s" onmouseover="this.style.borderColor='var(--purple)'" onmouseout="this.style.borderColor='var(--border)'">
+        📂 ファイル選択
+        <input type="file" accept=".csv,text/csv" style="display:none" onchange="slImportFile(this)">
+      </label>
+    </div>
+    <textarea id="sl-csv-input" placeholder="CSVをここに貼り付け…(ヘッダー行は自動スキップ)" style="min-height:80px;font-size:11px;font-family:monospace;width:100%"></textarea>
+    <div style="margin-top:8px;display:flex;gap:8px">
+      <button class="btn btn-p btn-sm" onclick="slImportCSV()">📥 インポート実行</button>
+      <button class="btn btn-g btn-sm" onclick="slClearAll()">🗑 全件削除</button>
+    </div>
+    <div id="sl-import-progress" style="font-size:11px;color:var(--t2);margin-top:6px"></div>
+  </div>`;
+
+  return`<div class="ph"><div class="ph-title">📞 営業リスト</div>
+    <button class="btn btn-g btn-sm" onclick="slAddManual()">＋ 手動追加</button>
+  </div>
+  ${summaryHtml}
+  ${importHtml}
+  ${statusFilterHtml}
+  ${genreFilterHtml}
+  ${searchHtml}
+  ${rowsHtml}
+  ${filtered.length>SL_PAGE_SIZE?pagerHtml:''}`;
+}
+
+function slUpdate(id,key,val){
+  const l=(S.salesLeads||[]).find(x=>x.id===id);
+  if(!l)return;
+  l[key]=val;
+  save();
+}
+
+function slSetStatus(id,status){
+  const l=(S.salesLeads||[]).find(x=>x.id===id);
+  if(!l)return;
+  l.status=status;
+  if(status==='成約'&&!l.wonAt)l.wonAt=new Date().toISOString().slice(0,10);
+  save();
+  render();
+}
+
+function slDelete(id){
+  const l=(S.salesLeads||[]).find(x=>x.id===id);
+  if(!l)return;
+  if(!confirm(`「${l.name}」を削除しますか？`))return;
+  l.deleted=true;
+  save();render();
+}
+
+function slAddManual(){
+  if(!S.salesLeads)S.salesLeads=[];
+  const name=prompt('店名を入力:');
+  if(!name)return;
+  S.salesLeads.push({id:uid(),name:name.trim(),status:'未接触',createdAt:new Date().toISOString()});
+  save();render();
+}
+
+function slClearAll(){
+  if(!confirm('営業リストを全件削除しますか？この操作は元に戻せません。'))return;
+  S.salesLeads=[];
+  save();render();
+  toast('🗑 全件削除しました');
+}
+
+function _slParseCSV(text){
+  // ヘッダー行スキップ(店名で始まる行 or 1行目)
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length)return[];
+  let start=0;
+  if(/^店名[,\t]/.test(lines[0]))start=1;
+  const results=[];
+  for(let i=start;i<lines.length;i++){
+    // CSVパース(ダブルクォート対応)
+    const cols=[];
+    let cur='',inQ=false;
+    for(let c=0;c<lines[i].length;c++){
+      const ch=lines[i][c];
+      if(ch==='"'){if(inQ&&lines[i][c+1]==='"'){cur+='"';c++;}else inQ=!inQ;}
+      else if(ch===','&&!inQ){cols.push(cur);cur='';}
+      else cur+=ch;
+    }
+    cols.push(cur);
+    const[name,genre,phone,address,rating,reviewCount,hp,instagram,approach,status,nextAction,memo]=cols.map(s=>s.trim());
+    if(!name)continue;
+    results.push({
+      id:uid(),
+      name,genre:genre||'',phone:phone||'',address:address||'',
+      rating:rating?parseFloat(rating):null,
+      reviewCount:reviewCount?parseInt(reviewCount):null,
+      hp:hp||'',instagram:instagram||'',approach:approach||'',
+      status:SL_STATUSES.includes(status)?status:'未接触',
+      nextAction:nextAction||'',memo:memo||'',
+      createdAt:new Date().toISOString()
+    });
+  }
+  return results;
+}
+
+async function _slSaveChunked(leads){
+  if(!S.salesLeads)S.salesLeads=[];
+  // 既存とマージ(名前+電話で重複除外)
+  const existKey=new Set((S.salesLeads||[]).filter(l=>!l.deleted).map(l=>(l.name||'')+(l.phone||'')));
+  const newLeads=leads.filter(l=>!existKey.has((l.name||'')+(l.phone||'')));
+  const prog=document.getElementById('sl-import-progress');
+  const CHUNK=200;
+  let added=0;
+  for(let i=0;i<newLeads.length;i+=CHUNK){
+    S.salesLeads.push(...newLeads.slice(i,i+CHUNK));
+    added=Math.min(i+CHUNK,newLeads.length);
+    if(prog)prog.textContent=`処理中… ${added}/${newLeads.length}件`;
+    await new Promise(r=>setTimeout(r,0)); // UIブロック防止
+  }
+  save();
+  if(prog)prog.textContent=`完了: ${newLeads.length}件追加 (重複スキップ: ${leads.length-newLeads.length}件)`;
+  render();
+  toast(`📥 ${newLeads.length}件インポートしました`);
+}
+
+function slImportCSV(){
+  const el=document.getElementById('sl-csv-input');
+  if(!el)return;
+  const text=el.value.trim();
+  if(!text){toast('CSVを貼り付けてください','warn');return;}
+  const leads=_slParseCSV(text);
+  if(!leads.length){toast('有効なデータがありません','warn');return;}
+  _slSaveChunked(leads);
+}
+
+function slImportFile(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const leads=_slParseCSV(e.target.result);
+    if(!leads.length){toast('有効なデータがありません','warn');return;}
+    _slSaveChunked(leads);
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
 // ===INIT===
 updSessionCount();
 initPomo();
 initReminders();
 checkClientDraftTasks();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260704-13';
+const APP_VERSION='20260705-01';
 
 render();
 function forceAppUpdate(){
