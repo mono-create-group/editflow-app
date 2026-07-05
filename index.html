@@ -40,7 +40,10 @@
   --shadow:0 1px 3px rgba(15,23,42,.05),0 4px 20px rgba(15,23,42,.08);
   --shadow-sm:0 1px 3px rgba(15,23,42,.06);
   --shadow-lg:0 8px 32px rgba(15,23,42,.14),0 2px 6px rgba(15,23,42,.06);
+  --fs-tl-ppm:1.2px; /* 固定タイムスケジュール: 1分あたりのpx（JS側 TL_PPM と一致させる） */
+  --fs-tl-axis-w:52px; /* 時間軸の幅 */
 }
+@media(max-width:700px){:root{--fs-tl-axis-w:40px}}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,'Hiragino Sans','Yu Gothic',BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;height:100vh;overflow:hidden;display:flex;-webkit-font-smoothing:antialiased}
 button{cursor:pointer;border:none;background:none;color:inherit;font:inherit}
 input,textarea,select{background:var(--card);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font:inherit;padding:8px 12px;width:100%;outline:none;transition:border-color .2s,box-shadow .2s;box-shadow:var(--shadow-sm)}
@@ -252,6 +255,20 @@ a{color:inherit;text-decoration:none}
 .sub-blk-label{font-size:9px;opacity:.75;line-height:1;margin-bottom:1px}
 .sched-col{flex:1;min-width:0}
 @media(max-width:700px){.sched-layout{flex-direction:column}.sched-side-panel{width:100%;max-height:220px}}
+
+/* ─── 固定タイムスケジュール: 時間軸タイムライン表示 ─── */
+.fs-tl-wrap{display:flex;position:relative;min-width:280px}
+.fs-tl-axis{width:var(--fs-tl-axis-w);flex-shrink:0;position:relative;border-right:1px solid var(--border)}
+.fs-tl-tick{position:absolute;left:0;right:-1px;height:1px;background:var(--border)}
+.fs-tl-tick-hour{background:var(--t3);opacity:.6}
+.fs-tl-label{position:absolute;left:0;right:8px;transform:translateY(-50%);font-size:9px;color:var(--t3);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fs-tl-label-hour{font-size:10px;font-weight:700;color:var(--t2)}
+@media(max-width:700px){.fs-tl-label{font-size:8px;right:5px}.fs-tl-label-hour{font-size:9px}}
+.fs-tl-col{flex:1;min-width:0;position:relative;margin-left:8px}
+.fs-tl-block{box-shadow:var(--shadow-sm);border-radius:8px;font-size:12px}
+.fs-tl-block .fs-chk{width:16px;height:16px}
+.fs-tl-now{position:absolute;left:0;right:0;height:2px;background:var(--red);z-index:6;pointer-events:none}
+.fs-tl-now::before{content:'';position:absolute;left:-4px;top:-4px;width:10px;height:10px;background:var(--red);border-radius:50%}
 
 /* ─── PROJECT BOARD ─── */
 .board-wrap{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
@@ -899,7 +916,18 @@ function fbSetupTeamSync(){
   },e=>{const c=e&&e.code;if(c==='permission-denied'&&TEAM_SHARE_OK!==false){TEAM_SHARE_OK=false;renderAuthUI();}console.warn('team share sync:',c||e);});
 }
 function signInWithGoogle(){
-  fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+  const provider=new firebase.auth.GoogleAuthProvider();
+  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if(isMobile){
+    fbAuth.signInWithRedirect(provider);
+  }else{
+    fbAuth.signInWithPopup(provider).catch(e=>{
+      const c=e&&e.code;
+      if(c==='auth/popup-blocked'||c==='auth/cancelled-popup-request'||c==='auth/operation-not-supported-in-this-environment'){
+        fbAuth.signInWithRedirect(provider);
+      }
+    });
+  }
 }
 function fbSignOut(){fbAuth.signOut();}
 
@@ -910,6 +938,10 @@ function renderAuthUI(){
   const el=document.getElementById('auth-ui');if(el)el.innerHTML=html;
   const mob=document.getElementById('mob-auth-ui');if(mob)mob.innerHTML=html;
 }
+
+// スマホのsignInWithRedirectからの復帰処理。ログイン状態自体はonAuthStateChangedで拾えるため、
+// ここではリダイレクト起因のエラー（例: auth/unauthorized-domain）を握りつぶすだけに留める。
+fbAuth.getRedirectResult().catch(e=>{console.warn('getRedirectResult:',e&&e.code||e);});
 
 fbAuth.onAuthStateChanged(user=>{
   FB_USER=user;
@@ -3409,7 +3441,7 @@ function rFsDashPanel(date){
   </div>`;
   return`<div class="sched-layout" style="margin-bottom:4px">
     ${panel}
-    <div style="flex:1;min-width:0">${rFixedScheduleList(false,true,d)}</div>
+    <div class="sched-col" style="flex:1;min-width:0;overflow-x:auto">${rFixedScheduleList(false,true,d,true)}</div>
   </div>`;
 }
 function panelTaskDrop(e,targetId){
@@ -3482,8 +3514,8 @@ function rFs30MinTicks(sm,em,nowM,isNow,color){
     ${nowPct!==null?`<div style="position:absolute;left:${nowPct}%;top:-3px;width:2px;height:11px;background:${color};border-radius:1px"></div>`:''}
   </div>`;
 }
-// 固定タイムスケジュールをリスト表示（compact=trueで説明文省略、dateで対象日指定）
-function rFixedScheduleList(compact=false,droppable=false,date){
+// 固定タイムスケジュールをリスト表示（compact=trueで説明文省略、dateで対象日指定、timeline=trueで時間軸タイムライン表示）
+function rFixedScheduleList(compact=false,droppable=false,date,timeline=false){
   const fs=S.fs||DEFAULT_FS;
   if(!fs.length)return'';
   const now=new Date();
@@ -3491,7 +3523,46 @@ function rFixedScheduleList(compact=false,droppable=false,date){
   const td=date||today();
   // 今日以外は「進行中」表示をしない
   const isTargetToday=!date||date===today();
-  return fs.map((f,i)=>{
+  // タイムライン用: 各ブロックの開始/終了(分)とカラム(重なり回避)を先に計算
+  // 表示範囲は00:00〜24:00の24時間固定（会長指示2026-07-05：データの最小/最大での可変レンジ禁止）
+  const tlInfo=[];
+  const TL_START_M=0,TL_END_M=24*60;
+  const TL_PPM=1.2; // 1分あたりのpx（CSS変数 --fs-tl-ppm と一致させる）
+  const TL_MIN_BLK_H=22; // 極短時間ブロックでも内容が読める最低高さ(px)
+  if(timeline){
+    fs.forEach((f,i)=>{
+      const hasStart=f.s&&f.s!=='-1'&&f.s!=='';
+      if(!hasStart||!f.e)return;
+      let sm=tMin(f.s);
+      let em=tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e);
+      if(em<=sm)em+=24*60; // 深夜跨ぎ（例: 23:30〜翌0:30）
+      if(em<=24*60){
+        // 24:00をまたがない通常ブロック
+        tlInfo.push({i,f,sm,em,partKey:i+'a'});
+      }else{
+        // 24:00をまたぐブロック → 24時間軸内で正しい位置に出すため2分割して描画
+        // 前半: sm〜24:00
+        tlInfo.push({i,f,sm,em:24*60,partKey:i+'a',isSplit:true,splitPart:'start'});
+        // 後半: 00:00〜(em-1440)
+        tlInfo.push({i,f,sm:0,em:em-24*60,partKey:i+'b',isSplit:true,splitPart:'end'});
+      }
+    });
+    tlInfo.sort((a,b)=>a.sm-b.sm);
+    // 列割り当て（区間が重なるブロックは別カラムへ）
+    const colEnds=[]; // 各カラムの現在の終了時刻
+    tlInfo.forEach(item=>{
+      let col=colEnds.findIndex(end=>item.sm>=end);
+      if(col<0){col=colEnds.length;colEnds.push(item.em);}
+      else colEnds[col]=item.em;
+      item.col=col;
+    });
+    const maxCol=tlInfo.reduce((mx,it)=>Math.max(mx,it.col),0);
+    tlInfo.forEach(item=>{item.totalCols=maxCol+1;});
+  }
+  // 同じブロック(i)が分割される場合があるため、indexキーではなくpartKeyの配列で保持
+  const tlPartsByIndex={};
+  tlInfo.forEach(it=>{(tlPartsByIndex[it.i]=tlPartsByIndex[it.i]||[]).push(it);});
+  const blocksHtml=fs.map((f,i)=>{
     const hasStart=f.s&&f.s!=='-1'&&f.s!=='';
     const sm=hasStart?tMin(f.s):null;
     const em=tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e);
@@ -3572,10 +3643,12 @@ function rFixedScheduleList(compact=false,droppable=false,date){
     const plainTasks=hasParts?'':(droppable
       ?rDz(-1,'先頭に追加')+allBlockTasks.map((t,idx)=>rBlockTask(t)+rDz(idx,'ここに追加')).join('')
       :allBlockTasks.map(rBlockTask).join(''));
-    return`<div class="task-item fs-drop-zone" ${dropAttrs} style="border-left:3px solid ${f.c};${isNow?'background:'+f.c+'0e;':''};margin-bottom:6px;transition:background .15s;flex-direction:column;align-items:stretch;gap:0;padding:11px 14px">
-  <div style="display:flex;align-items:center;gap:9px">
+    // タイムライン表示時: 開始/終了時刻から絶対配置の位置・高さ・カラム幅を計算
+    // 深夜跨ぎブロックは2パートに分割されているため、パートごとに1要素を描画する
+    const parts=timeline?(tlPartsByIndex[i]||[]):[null];
+    const bodyInner=`<div style="display:flex;align-items:center;gap:9px">
     <div class="fs-chk ${mainDone?'done':''}" onclick="toggleFsMain('${blockId}')"></div>
-    ${(hasStart||f.e)?`<div style="font-size:11px;color:var(--t3);flex-shrink:0;min-width:82px;font-variant-numeric:tabular-nums">${hasStart?f.s+'〜':''}${f.e||''}</div>`:''}
+    ${(hasStart||f.e)?`<div style="font-size:11px;color:var(--t3);flex-shrink:0;min-width:${timeline?'0':'82px'};font-variant-numeric:tabular-nums">${hasStart?f.s+'〜':''}${f.e||''}</div>`:''}
     <div style="flex:1;min-width:0">
       ${hasParts
         ?`<div style="font-weight:700;font-size:13px;${mainDone?'text-decoration:line-through;color:var(--t3)':'color:var(--text)'}">${isNow?'▶ ':''}<span style="color:${f.c}">${esc(f.t.split('→')[0].trim())}</span><span style="color:var(--t3);font-size:11px;margin-left:4px">→ ${allParts.length}項目</span></div>`
@@ -3588,11 +3661,48 @@ function rFixedScheduleList(compact=false,droppable=false,date){
       ${droppable&&!hasParts?`<button class="btn btn-xs" style="background:${f.c}12;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700" onclick="openFsTaskModal('${blockId}',9999,'${f.s||''}','${td}')">＋</button>`:''}
     </div>
   </div>
-  ${!compact&&hasStart&&f.e?rFs30MinTicks(sm,em,nowM,isNow,f.c):''}
+  ${!compact&&!timeline&&hasStart&&f.e?rFs30MinTicks(sm,em,nowM,isNow,f.c):''}
   ${hasParts&&!compact?`<div style="margin:8px 0 2px 28px;padding-top:6px;border-top:1px solid ${f.c}18">${subList}</div>`:''}
-  ${!hasParts&&plainTasks?`<div style="margin:4px 0 0 28px">${plainTasks}</div>`:''}
-</div>`;
-  }).join('');
+  ${!hasParts&&plainTasks?`<div style="margin:4px 0 0 28px">${plainTasks}</div>`:''}`;
+    return parts.map(tl=>{
+      const tlStyle=tl?(()=>{
+        const top=(tl.sm-TL_START_M)*TL_PPM;
+        const rawH=(tl.em-tl.sm)*TL_PPM;
+        const h=Math.max(rawH,TL_MIN_BLK_H);
+        const colW=100/tl.totalCols;
+        const left=`calc(${(tl.col*colW).toFixed(3)}% + ${tl.col?2:0}px)`;
+        const width=`calc(${colW.toFixed(3)}% - ${tl.col<tl.totalCols-1?4:2}px)`;
+        return`position:absolute;top:${top}px;height:${h}px;left:${left};width:${width};z-index:${isNow?5:1};overflow:${rawH<h?'hidden':'auto'}`;
+      })():'';
+      const blockBaseStyle=`border-left:3px solid ${f.c};${isNow?'background:'+f.c+'0e':'background:var(--card)'};transition:background .15s;flex-direction:column;align-items:stretch;gap:0;padding:${timeline?'8px 10px':'11px 14px'};${tlStyle}`;
+      // 分割ブロックの後半パート（00:00始まりの続き）には「(つづき)」の目印を付ける
+      const splitNote=tl&&tl.splitPart==='end'?`<div style="font-size:10px;color:${f.c};opacity:.75;margin-bottom:2px">↳ 前日${f.s||''}〜からの続き</div>`:'';
+      return`<div class="task-item fs-drop-zone${timeline?' fs-tl-block':''}" ${dropAttrs} style="${blockBaseStyle}">${splitNote}${bodyInner}</div>`;
+    }).join('');
+  });
+  if(!timeline)return blocksHtml.join('');
+  // タイムライン: 左に時間軸、右に絶対配置ブロック列
+  return rFsTimelineWrap(blocksHtml,isTargetToday,nowM,TL_START_M,TL_END_M,TL_PPM);
+}
+// タイムライン全体のラッパー（時間軸目盛り + ブロック絶対配置カラム）を生成
+function rFsTimelineWrap(blocksHtml,isTargetToday,nowM,TL_START_M,TL_END_M,TL_PPM){
+  const totalH=(TL_END_M-TL_START_M)*TL_PPM;
+  const ticks=[];
+  for(let m=TL_START_M;m<=TL_END_M;m+=30){
+    const top=(m-TL_START_M)*TL_PPM;
+    const isHour=m%60===0;
+    const h=Math.floor(m/60)%24,mi=m%60;
+    ticks.push(`<div class="fs-tl-tick${isHour?' fs-tl-tick-hour':''}" style="top:${top}px"></div>
+      <div class="fs-tl-label${isHour?' fs-tl-label-hour':''}" style="top:${top}px">${mi===0?`${h}:00`:`${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}`}</div>`);
+  }
+  const nowTop=(isTargetToday&&nowM>=TL_START_M&&nowM<=TL_END_M)?(nowM-TL_START_M)*TL_PPM:null;
+  return`<div class="fs-tl-wrap" style="height:${totalH}px">
+    <div class="fs-tl-axis" style="height:${totalH}px">${ticks.join('')}</div>
+    <div class="fs-tl-col" style="height:${totalH}px">
+      ${blocksHtml.join('')}
+      ${nowTop!==null?`<div class="fs-tl-now" style="top:${nowTop}px"></div>`:''}
+    </div>
+  </div>`;
 }
 
 // 指定日に予定されている習慣を返す
@@ -10150,7 +10260,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260705-04';
+const APP_VERSION='20260705-05';
 
 render();
 function forceAppUpdate(){
