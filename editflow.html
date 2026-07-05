@@ -899,10 +899,7 @@ function fbSetupTeamSync(){
   },e=>{const c=e&&e.code;if(c==='permission-denied'&&TEAM_SHARE_OK!==false){TEAM_SHARE_OK=false;renderAuthUI();}console.warn('team share sync:',c||e);});
 }
 function signInWithGoogle(){
-  const provider=new firebase.auth.GoogleAuthProvider();
-  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if(isMobile){fbAuth.signInWithRedirect(provider);}
-  else{fbAuth.signInWithPopup(provider);}
+  fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 }
 function fbSignOut(){fbAuth.signOut();}
 
@@ -913,11 +910,6 @@ function renderAuthUI(){
   const el=document.getElementById('auth-ui');if(el)el.innerHTML=html;
   const mob=document.getElementById('mob-auth-ui');if(mob)mob.innerHTML=html;
 }
-
-// モバイルリダイレクト後の結果処理
-fbAuth.getRedirectResult().then(result=>{
-  if(result&&result.user)toast('☁️ Googleサインイン完了');
-}).catch(e=>console.error('redirect sign-in error:',e));
 
 fbAuth.onAuthStateChanged(user=>{
   FB_USER=user;
@@ -1354,24 +1346,10 @@ function startSheetsAutoSync(){
   },30*60*1000);
 }
 function gcalSilentReconnect(){
+  // ページロード時のauto-popup はブラウザにブロックされるため
+  // サイドバーに「再接続」ボタンを表示するだけにする
   if(!S.settings?.gcalConnected)return;
-  // Google API がロード済みならサイレントトークン取得を試みる（prompt:'' = ポップアップ不要）
-  if(typeof google!=='undefined'&&google.accounts?.oauth2){
-    _gcalInitAndAuth(GCAL_CLIENT_ID,true);
-  } else {
-    // API未ロードならロード完了後に再試行（最大3秒待ち）
-    let waited=0;
-    const poll=setInterval(()=>{
-      waited+=500;
-      if(typeof google!=='undefined'&&google.accounts?.oauth2){
-        clearInterval(poll);
-        _gcalInitAndAuth(GCAL_CLIENT_ID,true);
-      } else if(waited>=3000){
-        clearInterval(poll);
-        renderGcalUI(); // タイムアウト時は手動再接続ボタンを表示
-      }
-    },500);
-  }
+  renderGcalUI(); // 「再接続が必要」ボタンを表示
 }
 function gcalManualReconnect(){
   // ユーザーのクリックで呼ばれる（popup許可されている）
@@ -1535,7 +1513,8 @@ const GOAL_HORIZONS=[{v:'this_month',l:'今月の目標',icon:'📅'},{v:'next_m
 const UNIFIED_HORIZONS=[
   {v:'1w',         l:'今週',   icon:'⚡', kpi:'1w',  goals:null},
   {v:'this_month', l:'今月',   icon:'📅', kpi:'1m',  goals:'this_month'},
-  {v:'next_month', l:'来月',   icon:'🗓', kpi:'nm',  goals:'next_month'},
+  {v:'next_month', l:'来月',   icon:'🗓', kpi:null,  goals:'next_month'},
+  {v:'3m',         l:'3ヶ月後', icon:'🗒', kpi:'3m',  goals:null},
   {v:'6m',         l:'半年後',  icon:'📆', kpi:'6m',  goals:null},
   {v:'year1',      l:'1年後',  icon:'🌱', kpi:'1y',  goals:'year1'},
   {v:'year5',      l:'5年後',  icon:'🚀', kpi:'5y',  goals:'year5'},
@@ -1724,12 +1703,13 @@ function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMont
 Date.prototype.toLocalYmd=function(){return`${this.getFullYear()}-${String(this.getMonth()+1).padStart(2,'0')}-${String(this.getDate()).padStart(2,'0')}`;};
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function fmt(d){
+function fmt(d,time){
   if(!d)return'';
   const dt=new Date(d+'T00:00:00'),now=new Date();now.setHours(0,0,0,0);
   const diff=Math.round((dt-now)/86400000);
+  const suffix=time?` ${time}`:'';
   if(diff<0)return`${Math.abs(diff)}日超過`;
-  if(diff===0)return'今日';if(diff===1)return'明日';return`${diff}日後`;
+  if(diff===0)return`今日${suffix}`;if(diff===1)return`明日${suffix}`;return`${diff}日後${suffix}`;
 }
 function urgCls(d){
   if(!d)return'';
@@ -1752,7 +1732,7 @@ function getMonthDays(off){
   const first=new Date(y,m,1),last=new Date(y,m+1,0);
   const sd=(first.getDay()+6)%7;
   const days=Array(sd).fill(null);
-  for(let i=1;i<=last.getDate();i++){const d=new Date(y,m,i);days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);}
+  for(let i=1;i<=last.getDate();i++){const _d=new Date(y,m,i);days.push(`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`);}
   while(days.length%7!==0)days.push(null);
   return{y:first.getFullYear(),m:first.getMonth(),days};
 }
@@ -2564,7 +2544,6 @@ ${bizState().userIssues.map(i=>{
   <div style="font-size:10.5px;color:var(--t3);margin-top:8px">※目標・ロードマップは ✎ でその場編集、状態ラベルはタップで切替できます。編集内容はGoogleサインインでクラウドにも保存されます。</div>
 </div>`;
 }
-
 // ===事業部ボード(佐々木さんと共有: 事業部ごとの目標・営業/採用記録)===
 // データはTEAM_KEYS('bizUnits')でチーム共有。誰のアカウントでも同じ内容が見える
 // コミッション規程(2026-07-03 会長決定):
@@ -3264,7 +3243,7 @@ function miniTask(t,isOver){
     <div class="chk ${t.done?'done':''}" onclick="toggleDone('${t.id}')"></div>
     <div class="task-body">
       <div class="task-ttl ${t.done?'done':''}">${esc(t.title)}</div>
-      ${isOver?`<span class="badge br" style="margin-top:3px">${fmt(t.dueDate)}</span>`:''}
+      ${isOver?`<span class="badge br" style="margin-top:3px">${fmt(t.dueDate,t.dueTime)}</span>`:''}
     </div>
   </div>`;
 }
@@ -3318,7 +3297,7 @@ function openFrogPicker(){
 <div style="display:flex;flex-direction:column;gap:5px;max-height:340px;overflow-y:auto">
   ${tasks.map(t=>`<div class="postpone-opt ${S.frogId===t.id?'sel':''}" style="${S.frogId===t.id?'border-color:var(--purple);color:var(--pl)':''}" onclick="setFrog('${t.id}');closeModal();render()">
     ${S.frogId===t.id?'🐸 ':''}${esc(t.title)}
-    ${t.dueDate?`<span style="float:right;font-size:11px;color:var(--t3)">${fmt(t.dueDate)}</span>`:''}
+    ${t.dueDate?`<span style="float:right;font-size:11px;color:var(--t3)">${fmt(t.dueDate,t.dueTime)}</span>`:''}
   </div>`).join('')}
 </div>`);
 }
@@ -3480,6 +3459,29 @@ function fsDashPanelDrop(e,date){
   _taskDragId=null;
 }
 
+// <input type=time>にセット可能な値のみ返す（'24:00'や'-1'等の特殊値は空欄にしてHTMLバリデーションエラーを防ぐ。データは書き換えない）
+function fsTimeInputVal(v){return /^([01]\d|2[0-3]):[0-5]\d$/.test(v)?v:'';}
+// ブロックの開始〜終了を30分刻みの目盛りバーとして表示（見た目のみ・データ構造は変更しない）
+function rFs30MinTicks(sm,em,nowM,isNow,color){
+  if(sm===null||em===null||em<=sm)return'';
+  const dur=em-sm;
+  if(dur<=0||dur>24*60)return'';
+  const step=30;
+  const ticks=[];
+  for(let m=sm-(sm%step);m<=em;m+=step){
+    if(m<sm||m>em)continue;
+    const pct=((m-sm)/dur*100).toFixed(2);
+    const h=Math.floor(m/60)%24,mi=m%60;
+    const lbl=mi===0?`${h}時`:`${h}:${String(mi).padStart(2,'0')}`;
+    ticks.push(`<div style="position:absolute;left:${pct}%;top:0;height:100%;border-left:1px solid ${color}30"></div>
+      <div style="position:absolute;left:${pct}%;top:100%;transform:translateX(-50%);font-size:9px;color:var(--t3);white-space:nowrap;margin-top:2px">${lbl}</div>`);
+  }
+  const nowPct=isNow&&nowM>=sm&&nowM<=em?((nowM-sm)/dur*100).toFixed(2):null;
+  return`<div style="position:relative;height:5px;margin:2px 0 14px 28px;background:${color}12;border-radius:3px">
+    ${ticks.join('')}
+    ${nowPct!==null?`<div style="position:absolute;left:${nowPct}%;top:-3px;width:2px;height:11px;background:${color};border-radius:1px"></div>`:''}
+  </div>`;
+}
 // 固定タイムスケジュールをリスト表示（compact=trueで説明文省略、dateで対象日指定）
 function rFixedScheduleList(compact=false,droppable=false,date){
   const fs=S.fs||DEFAULT_FS;
@@ -3586,6 +3588,7 @@ function rFixedScheduleList(compact=false,droppable=false,date){
       ${droppable&&!hasParts?`<button class="btn btn-xs" style="background:${f.c}12;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700" onclick="openFsTaskModal('${blockId}',9999,'${f.s||''}','${td}')">＋</button>`:''}
     </div>
   </div>
+  ${!compact&&hasStart&&f.e?rFs30MinTicks(sm,em,nowM,isNow,f.c):''}
   ${hasParts&&!compact?`<div style="margin:8px 0 2px 28px;padding-top:6px;border-top:1px solid ${f.c}18">${subList}</div>`:''}
   ${!hasParts&&plainTasks?`<div style="margin:4px 0 0 28px">${plainTasks}</div>`:''}
 </div>`;
@@ -3649,7 +3652,7 @@ function rTaskItem(t,draggable=false){
     </div>
     ${t.description?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(t.description)}</div>`:''}
     <div class="task-meta">
-      ${t.dueDate?`<span class="badge ${isOver?'br':urgCls(t.dueDate)==='soon'?'ba':'bk'}">📅 ${fmt(t.dueDate)}</span>`:''}
+      ${t.dueDate?`<span class="badge ${isOver?'br':urgCls(t.dueDate)==='soon'?'ba':'bk'}">📅 ${fmt(t.dueDate,t.dueTime)}</span>`:''}
       ${t.startTime?`<span class="badge bb">🕐 ${t.startTime}${t.endTime?'〜'+t.endTime:''}${(t.timeSlots?.length)?` <span style="font-size:9px;opacity:.7">1/${t.timeSlots.length+1}</span>`:''}</span>`:''}
       ${(t.timeSlots||[]).map((sl,i)=>sl.s?`<span class="badge bb">🕐 ${sl.s}${sl.e?'〜'+sl.e:''} <span style="font-size:9px;opacity:.7">${i+2}/${t.timeSlots.length+1}</span></span>`:'').join('')}
       ${t.priority?`<span class="badge ${pmap[t.priority]}">${plbl[t.priority]}</span>`:''}
@@ -4084,31 +4087,6 @@ ${(()=>{
   if(!warnings.length)return'';
   return`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px">${warnings.join('')}</div>`;
 })()}
-${(()=>{
-  const td=today(),_tmD=new Date(),_=_tmD.setDate(_tmD.getDate()+1),tm=_tmD.toLocaleDateString('sv-SE');
-  const active=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
-  const rows=[];
-  const fmt2=d=>{if(!d)return'';const[,m,day]=d.split('-');return`${+m}/${+day}`;};
-  const jobLink=(j,labels)=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onclick="openJobModal('${j.id}')">
-    <span style="font-size:12px;min-width:60px;color:var(--t2)">${labels.join(' ')}</span>
-    <span style="font-size:13px;font-weight:600;flex:1">${esc(j.title)}</span>
-    ${j.clientName?`<span style="font-size:11px;color:var(--t3)">${esc(j.clientName)}</span>`:''}
-  </div>`;
-  for(const day of[td,tm]){
-    const label=day===td?'今日':'明日';
-    const col=day===td?'var(--red)':'var(--amber)';
-    const editorJobs=active.filter(j=>j.editorDraftDate===day);
-    const clientJobs=active.filter(j=>j.deliveryDate===day);
-    if(!editorJobs.length&&!clientJobs.length)continue;
-    rows.push(`<div style="background:var(--card);border:1.5px solid ${col};border-radius:10px;padding:12px 14px">
-      <div style="font-weight:700;font-size:13px;color:${col};margin-bottom:8px">📅 ${label}の納品予定</div>
-      ${editorJobs.length?`<div style="margin-bottom:6px"><div style="font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.5px;margin-bottom:3px">✏️ 編集者納品</div>${editorJobs.map(j=>jobLink(j,[fmt2(j.editorDraftDate)])).join('')}</div>`:''}
-      ${clientJobs.length?`<div><div style="font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.5px;margin-bottom:3px">🎬 クライアント最終納品</div>${clientJobs.map(j=>jobLink(j,[fmt2(j.deliveryDate)])).join('')}</div>`:''}
-    </div>`);
-  }
-  if(!rows.length)return'';
-  return`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:8px">${rows.join('')}</div>`;
-})()}
 ${{board:rProjBoard,deadline:rProjDeadline,listing:rProjListing,list:()=>rProjList(clients),clients:rProjClients,profit:rProjProfit,payment:rProjPayment,invoice:rProjInvoice,completed:rProjCompleted,worker:rProjWorker,priority:rProjPriority}[PVMT]?.()??rProjBoard()}`;
 }
 
@@ -4418,6 +4396,40 @@ function rProjCard(j){
   ${j.deliveryDate?`<div class="proj-due-label ${uc}">📅 納品: ${j.deliveryDate} (${fmt(j.deliveryDate)})</div>`:''}
   ${(j.subtasks||[]).length?`<div class="subtask-list">${(j.subtasks||[]).map((s,i)=>`<div class="sub-item"><div class="sub-chk ${s.done?'done':''}" onclick="event.stopPropagation();toggleJobSub('${j.id}',${i})"></div><span style="${s.done?'text-decoration:line-through;color:var(--t3)':''}font-size:11px">${esc(s.title)}</span></div>`).join('')}</div>`:''}
 </div>`;
+}
+
+// 今日・明日が期限（編集者初稿・クライアント初稿）の案件一覧
+function rProjDeadline(){
+  const td=today();
+  const dt=new Date();dt.setDate(dt.getDate()+1);
+  const tmr=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  const active=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
+  const todayJobs=active.filter(j=>j.editorDraftDate===td||j.clientDraftDate===td);
+  const tmrJobs=active.filter(j=>j.editorDraftDate===tmr||j.clientDraftDate===tmr);
+  if(!todayJobs.length&&!tmrJobs.length)
+    return`<div class="empty"><div class="empty-icon">📅</div><div class="empty-title">今日・明日が期限の案件はありません</div><div style="color:var(--t2)">編集者初稿・クライアント初稿の提出期限が近づくとここに表示されます</div></div>`;
+  const row=(j,date,color)=>{
+    const parts=[];
+    if(j.editorDraftDate===date)parts.push('✏️ 編集者初稿');
+    if(j.clientDraftDate===date)parts.push('📋 クライアント初稿');
+    const cl=S.clients.find(c=>c.id===j.clientId);
+    const wNames=getJobWorkerNames(j);
+    return`<div class="card card-sm" style="margin-bottom:8px;border-left:4px solid ${color};cursor:pointer" onclick="openJobModal('${j.id}')">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px">${cl?'👤 '+esc(cl.name)+'　':''}${wNames?'🛠 '+esc(wNames):''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:12px;font-weight:700;color:${color}">${parts.join(' / ')}</div>
+          <span class="badge ${SCOLBG[j.status]||'bk'}" style="margin-top:3px">${j.status}</span>
+        </div>
+      </div>
+    </div>`;
+  };
+  return`
+  ${todayJobs.length?`<div style="font-weight:800;font-size:14px;color:var(--red);margin:4px 0 8px">🔴 本日が期限（${todayJobs.length}件）</div>${todayJobs.map(j=>row(j,td,'var(--red)')).join('')}`:''}
+  ${tmrJobs.length?`<div style="font-weight:800;font-size:14px;color:var(--amber);margin:16px 0 8px">🟡 明日が期限（${tmrJobs.length}件）</div>${tmrJobs.map(j=>row(j,tmr,'var(--amber)')).join('')}`:''}`;
 }
 
 // ===請求書ページ===
@@ -4730,40 +4742,6 @@ function rProjCompleted(){
   ${totalIn?`<div><div style="font-size:11px;color:var(--t2)">完了案件 総売上</div><div style="font-size:20px;font-weight:700;color:var(--blue)">¥${totalIn.toLocaleString()}</div></div>`:''}
 </div>
 ${done.map(j=>rJobItem(j)).join('')}`;
-}
-
-// 今日・明日が期限（編集者初稿・クライアント初稿）の案件一覧
-function rProjDeadline(){
-  const td=today();
-  const dt=new Date();dt.setDate(dt.getDate()+1);
-  const tmr=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-  const active=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル');
-  const todayJobs=active.filter(j=>j.editorDraftDate===td||j.clientDraftDate===td);
-  const tmrJobs=active.filter(j=>j.editorDraftDate===tmr||j.clientDraftDate===tmr);
-  if(!todayJobs.length&&!tmrJobs.length)
-    return`<div class="empty"><div class="empty-icon">📅</div><div class="empty-title">今日・明日が期限の案件はありません</div><div style="color:var(--t2)">編集者初稿・クライアント初稿の提出期限が近づくとここに表示されます</div></div>`;
-  const row=(j,date,color)=>{
-    const parts=[];
-    if(j.editorDraftDate===date)parts.push('✏️ 編集者初稿');
-    if(j.clientDraftDate===date)parts.push('📋 クライアント初稿');
-    const cl=S.clients.find(c=>c.id===j.clientId);
-    const wNames=getJobWorkerNames(j);
-    return`<div class="card card-sm" style="margin-bottom:8px;border-left:4px solid ${color};cursor:pointer" onclick="openJobModal('${j.id}')">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</div>
-          <div style="font-size:12px;color:var(--t2);margin-top:2px">${cl?'👤 '+esc(cl.name)+'　':''}${wNames?'🛠 '+esc(wNames):''}</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:12px;font-weight:700;color:${color}">${parts.join(' / ')}</div>
-          <span class="badge ${SCOLBG[j.status]||'bk'}" style="margin-top:3px">${j.status}</span>
-        </div>
-      </div>
-    </div>`;
-  };
-  return`
-  ${todayJobs.length?`<div style="font-weight:800;font-size:14px;color:var(--red);margin:4px 0 8px">🔴 本日が期限（${todayJobs.length}件）</div>${todayJobs.map(j=>row(j,td,'var(--red)')).join('')}`:''}
-  ${tmrJobs.length?`<div style="font-weight:800;font-size:14px;color:var(--amber);margin:16px 0 8px">🟡 明日が期限（${tmrJobs.length}件）</div>${tmrJobs.map(j=>row(j,tmr,'var(--amber)')).join('')}`:''}`;
 }
 
 function rProjList(clients){
@@ -5783,6 +5761,49 @@ function rUnifiedHorizonTab(div,tabDef){
 </div>`;
   }
 
+  // ===今月専用: 3ヶ月後のKPIから今月必要数値を算出===
+  let monthlyCtx='';
+  if(tabDef.v==='this_month'){
+    const kpi3m=div?(div.horizons?.['3m']?.kpis||[]):[];
+    // 3ヶ月後まで残り月数（今月含む）≈ 3
+    const monthsTo3m=Math.max(1,3);
+    const neededRows3m=kpi3m.map(k=>{
+      const alreadyDone=k.current||0;
+      const remaining=Math.max(0,(k.target||0)-alreadyDone);
+      const monthlyNeed=Math.ceil(remaining/monthsTo3m);
+      const pct=k.target>0?Math.min(100,Math.round(alreadyDone/k.target*100)):0;
+      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+      return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <div style="flex:1;font-weight:700;font-size:13px">${esc(k.title)}</div>
+    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}">${pct}%</span>
+  </div>
+  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
+    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">3ヶ月後目標</div>
+      <div style="font-weight:700">${(k.target||0).toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">達成済</div>
+      <div style="font-weight:700;color:var(--${col})">${alreadyDone.toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:${monthlyNeed>0?'linear-gradient(135deg,#3b82f618,#7c3aed12)':'var(--gdim)'};padding:7px 4px;border-radius:6px;border:1px solid ${monthlyNeed>0?'var(--blue)':'var(--green)'}">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">今月必要</div>
+      <div style="font-weight:800;color:${monthlyNeed>0?'var(--blue)':'var(--green)'}">${monthlyNeed>0?monthlyNeed.toLocaleString()+esc(k.unit||''):'達成済✓'}</div>
+    </div>
+  </div>
+</div>`;
+    });
+    monthlyCtx=`<div style="margin-bottom:14px">
+  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">🗒 今月必要な目標数値（3ヶ月後KPIより）</div>
+  ${neededRows3m.length?neededRows3m.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">🗒</div>3ヶ月後タブにKPIを追加すると自動計算されます</div>`}
+  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='3m';render()">3ヶ月後のKPIを管理 →</button>
+</div>`;
+  }
+
   // ===目標カードセクション===
   let goalsSection='';
   if(tabDef.goals){
@@ -5855,24 +5876,181 @@ ${kpiRows}
   }
 
   // ===来月: 3ヶ月後のKPIから今月必要数値を算出===
-  // ===来月: 達成実績ボックスのみ===
   let nextMonthCtx='';
   if(tabDef.v==='next_month'){
     const now=new Date(td);
     const nm=new Date(now.getFullYear(),now.getMonth()+1,1);
     const nmEnd=new Date(now.getFullYear(),now.getMonth()+2,0);
     const nmStr=`${nm.getFullYear()}-${String(nm.getMonth()+1).padStart(2,'0')}`;
-    const nmEndStr=`${nmEnd.getFullYear()}-${String(nmEnd.getMonth()+1).padStart(2,'0')}-${String(nmEnd.getDate()).padStart(2,'0')}`;
-    nextMonthCtx=rAchievementBox(nmStr+'-01',nmEndStr,'来月');
+    // 3ヶ月後のKPIを取得
+    const kpi3m=div?(div.horizons?.['3m']?.kpis||[]):[];
+    // すでに達成した数値（ログ・完了案件から）
+    const {sales:salesNow,hires:hiresNow,profit:profitNow}=getAchievements(null,td);
+    // 3ヶ月後まで残り月数（来月から3ヶ月後 ≈ 2ヶ月）
+    const monthsTo3m=Math.max(1,3);
+    const neededRows=kpi3m.map(k=>{
+      const alreadyDone=k.current||0;
+      const remaining=Math.max(0,(k.target||0)-alreadyDone);
+      const monthlyNeed=Math.ceil(remaining/monthsTo3m);
+      const pct=k.target>0?Math.min(100,Math.round(alreadyDone/k.target*100)):0;
+      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+      return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <div style="flex:1;font-weight:700;font-size:13px">${esc(k.title)}</div>
+    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}">${pct}%</span>
+  </div>
+  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
+    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">3ヶ月後目標</div>
+      <div style="font-weight:700">${(k.target||0).toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">達成済</div>
+      <div style="font-weight:700;color:var(--${col})">${alreadyDone.toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#3b82f618,#7c3aed12);padding:7px 4px;border-radius:6px;border:1px solid var(--blue)">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">来月必要</div>
+      <div style="font-weight:800;color:var(--blue)">${monthlyNeed.toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+  </div>
+</div>`;
+    });
+    nextMonthCtx=`<div style="margin-bottom:14px">
+  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">🗒 来月必要な目標数値（3ヶ月後KPIより）</div>
+  ${neededRows.length?neededRows.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">🗒</div>3ヶ月後タブにKPIを追加すると自動計算されます</div>`}
+  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='3m';render()">3ヶ月後のKPIを管理 →</button>
+</div>
+${rAchievementBox(nmStr+'-01',nmEnd.toLocalYmd(),'来月')}`;
   }
 
-  // ===半年後: 達成実績ボックスのみ===
+  // ===3ヶ月後: 半年後のKPIから月次必要数値を算出===
+  let q3Ctx='';
+  if(tabDef.v==='3m'){
+    const now=new Date(td);
+    const kpi6m=div?(div.horizons?.['6m']?.kpis||[]):[];
+    // 半年後まで残り月数（今月含む）≈ 6
+    const monthsTo6m=Math.max(1,6);
+    const neededRows6m=kpi6m.map(k=>{
+      const alreadyDone=k.current||0;
+      const remaining=Math.max(0,(k.target||0)-alreadyDone);
+      const monthlyNeed=Math.ceil(remaining/monthsTo6m);
+      const pct=k.target>0?Math.min(100,Math.round(alreadyDone/k.target*100)):0;
+      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+      return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <div style="flex:1;font-weight:700;font-size:13px">${esc(k.title)}</div>
+    <span class="badge b${col==='green'?'g':col==='blue'?'b':col==='amber'?'a':'r'}">${pct}%</span>
+  </div>
+  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
+    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">半年後目標</div>
+      <div style="font-weight:700">${(k.target||0).toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">達成済</div>
+      <div style="font-weight:700;color:var(--${col})">${alreadyDone.toLocaleString()}${esc(k.unit||'')}</div>
+    </div>
+    <div style="background:${monthlyNeed>0?'linear-gradient(135deg,#3b82f618,#7c3aed12)':'var(--gdim)'};padding:7px 4px;border-radius:6px;border:1px solid ${monthlyNeed>0?'var(--blue)':'var(--green)'}">
+      <div style="color:var(--t2);font-size:11px;margin-bottom:2px">月次必要</div>
+      <div style="font-weight:800;color:${monthlyNeed>0?'var(--blue)':'var(--green)'}">${monthlyNeed>0?monthlyNeed.toLocaleString()+esc(k.unit||''):'達成済✓'}</div>
+    </div>
+  </div>
+</div>`;
+    });
+    // 直近3ヶ月の達成実績
+    const dt3mAgo=new Date(now.getFullYear(),now.getMonth()-2,1);
+    const from3m=`${dt3mAgo.getFullYear()}-${String(dt3mAgo.getMonth()+1).padStart(2,'0')}-01`;
+    q3Ctx=`<div style="margin-bottom:14px">
+  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">📆 月次必要な目標数値（半年後KPIより）</div>
+  ${neededRows6m.length?neededRows6m.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">📆</div>半年後タブにKPIを追加すると自動計算されます</div>`}
+  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='6m';render()">半年後のKPIを管理 →</button>
+</div>
+${rAchievementBox(from3m,td,'直近3ヶ月')}`;
+  }
+
+  // ===半年後: 1年後の目標から月次必要数値を算出===
   let halfYearCtx='';
   if(tabDef.v==='6m'){
+    const year1Goals6m=(S.goals||[]).filter(g=>!g.deleted&&g.horizon==='year1'&&(div?.id?g.divisionId===div.id:!g.divisionId));
     const now=new Date(td);
+    const endOfYear6m=g=>g.deadline?new Date(g.deadline):new Date(now.getFullYear(),11,31);
+    const monthsLeft6m=g=>{
+      const end=endOfYear6m(g);
+      return Math.max(1,Math.round((end-new Date(now.getFullYear(),now.getMonth(),1))/(1000*60*60*24*30.44)));
+    };
+    const neededRows1y=year1Goals6m.map(g=>{
+      const icon=GOAL_CATS.find(c=>c.v===g.category)?.l.split(' ')[0]||'🌱';
+      const ml=monthsLeft6m(g);
+      const isRev=(g.category==='revenue'||g.targetAmount>0)&&g.targetAmount>0;
+      const isSales=g.category==='sales'&&g.targetSalesCount>0;
+      const isHire=g.category==='hire'&&g.targetHireCount>0;
+      let target,current,unit,monthlyNeed,pct;
+      if(isRev){
+        const rs=revGoalStats(g);
+        target=g.targetAmount;current=rs.earned;unit='円';
+        pct=rs.pct;monthlyNeed=Math.ceil(rs.remaining/ml);
+      }else if(isSales){
+        const won=S.logs.filter(l=>!l.deleted&&l.type==='sales'&&l.result==='成約').length;
+        target=g.targetSalesCount;current=won;unit='件';
+        pct=Math.min(100,Math.round(won/target*100));
+        monthlyNeed=Math.ceil(Math.max(0,target-won)/ml);
+      }else if(isHire){
+        const hired=S.logs.filter(l=>!l.deleted&&l.type==='hire'&&l.result==='内定').length;
+        target=g.targetHireCount;current=hired;unit='人';
+        pct=Math.min(100,Math.round(hired/target*100));
+        monthlyNeed=Math.ceil(Math.max(0,target-hired)/ml);
+      }else{
+        target=100;current=g.progress||0;unit='%';
+        pct=g.progress||0;
+        monthlyNeed=Math.ceil(Math.max(0,100-pct)/ml);
+      }
+      const col=pct>=100?'green':pct>=60?'blue':pct>=30?'amber':'red';
+      const bc=col==='green'?'bg':col==='blue'?'bb':col==='amber'?'ba':'br';
+      const fmtVal=v=>isRev?`¥${v.toLocaleString()}`:v.toLocaleString()+unit;
+      return`<div class="card card-sm" style="margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:18px">${icon}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;color:var(--t2);margin-bottom:1px">🌱 1年後の目標</div>
+      <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.title)}</div>
+    </div>
+    <span class="badge ${bc}">${pct}%</span>
+  </div>
+  <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden">
+    <div style="height:100%;background:var(--${col});width:${pct}%;border-radius:3px;transition:width .4s"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;text-align:center">
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);margin-bottom:2px;font-size:11px">年間目標</div>
+      <div style="font-weight:700;font-size:13px">${fmtVal(target)}</div>
+    </div>
+    <div style="background:var(--card2);padding:7px 4px;border-radius:6px">
+      <div style="color:var(--t2);margin-bottom:2px;font-size:11px">現状累計</div>
+      <div style="font-weight:700;font-size:13px;color:var(--${col})">${fmtVal(current)}</div>
+    </div>
+    <div style="background:${monthlyNeed>0?'linear-gradient(135deg,#3b82f618,#7c3aed12)':'var(--gdim)'};padding:7px 4px;border-radius:6px;border:1px solid ${monthlyNeed>0?'var(--blue)':'var(--green)'}">
+      <div style="color:var(--t2);margin-bottom:2px;font-size:11px">月次必要</div>
+      <div style="font-weight:800;font-size:13px;color:${monthlyNeed>0?'var(--blue)':'var(--green)'}">${monthlyNeed>0?fmtVal(monthlyNeed):'達成済✓'}</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin-top:6px;text-align:right">年末まで約${ml}ヶ月${g.deadline?` (期限: ${g.deadline})`:'（年末まで）'}</div>
+</div>`;
+    });
+    // 直近6ヶ月の達成実績
     const dt6mAgo=new Date(now.getFullYear(),now.getMonth()-5,1);
     const from6m=`${dt6mAgo.getFullYear()}-${String(dt6mAgo.getMonth()+1).padStart(2,'0')}-01`;
-    halfYearCtx=rAchievementBox(from6m,td,'直近6ヶ月');
+    halfYearCtx=`<div style="margin-bottom:14px">
+  <div style="font-size:14px;font-weight:800;color:var(--blue);margin-bottom:10px">🌱 月次必要な目標数値（1年後の目標より）</div>
+  ${neededRows1y.length?neededRows1y.join(''):`<div style="text-align:center;padding:20px;background:var(--card2);border-radius:12px;color:var(--t2);font-size:13px"><div style="font-size:24px;margin-bottom:6px">🌱</div>1年後タブで目標を追加すると自動計算されます</div>`}
+  <button class="btn btn-g btn-xs" style="margin-top:10px" onclick="GV='year1';render()">1年後の目標を管理 →</button>
+</div>
+${rAchievementBox(from6m,td,'直近6ヶ月')}`;
   }
 
   // ===達成実績ボックス（今週・今月・1年後タブ）===
@@ -5891,7 +6069,7 @@ ${kpiRows}
     achieveBox=rAchievementBox(yStart,yEnd,'今年');
   }
 
-  return weeklyCtx+nextMonthCtx+halfYearCtx+achieveBox+goalsSection+kpiSection;
+  return weeklyCtx+monthlyCtx+nextMonthCtx+q3Ctx+halfYearCtx+achieveBox+goalsSection+kpiSection;
 }
 
 // ===達成実績ヘルパー===
@@ -7272,10 +7450,10 @@ ${secTitle('📅 固定タイムスケジュール')}
         <button class="tact" style="padding:1px 5px;font-size:11px;line-height:1.2;opacity:${i===S.fs.length-1?'0.2':'0.7'}" ${i===S.fs.length-1?'disabled':''} onclick="fsMove(${i},1)" title="下へ">▼</button>
       </div>
       <div class="sched-edit-color" style="background:${f.c}"></div>
-      <input style="width:54px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${f.s}" onchange="S.fs[${i}].s=this.value" placeholder="開始">
+      <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.s)}" onchange="S.fs[${i}].s=this.value" placeholder="開始">
       <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.s?'0.7':'0.2'}" onclick="S.fs[${i}].s='';save();render()" title="開始時間をクリア">✕</button>
       <span style="color:var(--t2)">〜</span>
-      <input style="width:54px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${f.e}" onchange="S.fs[${i}].e=this.value" placeholder="終了">
+      <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.e)}" onchange="S.fs[${i}].e=this.value" placeholder="${f.e==='24:00'?'24:00(終日)':'終了'}">
       <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.e?'0.7':'0.2'}" onclick="S.fs[${i}].e='';save();render()" title="終了時間をクリア">✕</button>
       <input style="flex:1;padding:4px 8px;font-size:12px" value="${esc(f.t)}" onchange="S.fs[${i}].t=this.value" placeholder="内容">
       <input type="color" value="${f.c}" style="width:32px;height:32px;padding:2px;border-radius:6px;cursor:pointer;background:none;border:1px solid var(--border)" onchange="S.fs[${i}].c=this.value">
@@ -7892,7 +8070,12 @@ function openTaskModal(id,preDate,withTime){
 <div class="fg"><div class="fl">タスク名 *</div><input id="t-ttl" value="${esc(t?.title||'')}" placeholder="何をする？"></div>
 <div class="fg"><div class="fl">詳細</div><textarea id="t-desc" rows="2">${esc(t?.description||'')}</textarea></div>
 <div class="frow">
-  <div class="fg"><div class="fl">期限日</div><input type="date" id="t-due" value="${t?.dueDate||preDate||''}"></div>
+  <div class="fg"><div class="fl">期限日</div>
+    <div style="display:flex;gap:6px">
+      <input type="date" id="t-due" value="${t?.dueDate||preDate||''}" style="flex:1">
+      <input type="time" step="60" id="t-due-time" value="${fsTimeInputVal(t?.dueTime)}" placeholder="時刻(任意)" style="width:88px;flex-shrink:0" title="納期の時刻（任意）">
+    </div>
+  </div>
   <div class="fg"><div class="fl">優先度</div>
     <select id="t-pri">
       <option value="">なし</option>
@@ -7982,12 +8165,14 @@ function saveTask(){
     s:r.querySelector('.ts-start')?.value||'',
     e:r.querySelector('.ts-end')?.value||''
   })).filter(sl=>sl.s||sl.e);
+  const dueDate=document.getElementById('t-due').value||null;
+  const dueTime=dueDate?(document.getElementById('t-due-time')?.value||null):null;
   if(EID){
     const t=S.tasks.find(t=>t.id===EID);
-    if(t){Object.assign(t,{title,description:document.getElementById('t-desc').value.trim(),dueDate:document.getElementById('t-due').value||null,priority:document.getElementById('t-pri').value||null,startTime:document.getElementById('t-start').value||null,endTime:document.getElementById('t-end').value||null,timeSlots,estimatedMinutes:mins,subtasks:subs.map((s,i)=>({...s,done:t.subtasks?.[i]?.done||false}))});}
+    if(t){Object.assign(t,{title,description:document.getElementById('t-desc').value.trim(),dueDate,dueTime,priority:document.getElementById('t-pri').value||null,startTime:document.getElementById('t-start').value||null,endTime:document.getElementById('t-end').value||null,timeSlots,estimatedMinutes:mins,subtasks:subs.map((s,i)=>({...s,done:t.subtasks?.[i]?.done||false}))});}
     toast('タスクを更新しました');
   }else{
-    const t={id:uid(),title,description:document.getElementById('t-desc').value.trim(),dueDate:document.getElementById('t-due').value||null,priority:document.getElementById('t-pri').value||null,startTime:document.getElementById('t-start').value||null,endTime:document.getElementById('t-end').value||null,timeSlots,estimatedMinutes:mins,subtasks:subs,done:false,procCount:0,createdAt:new Date().toISOString()};
+    const t={id:uid(),title,description:document.getElementById('t-desc').value.trim(),dueDate,dueTime,priority:document.getElementById('t-pri').value||null,startTime:document.getElementById('t-start').value||null,endTime:document.getElementById('t-end').value||null,timeSlots,estimatedMinutes:mins,subtasks:subs,done:false,procCount:0,createdAt:new Date().toISOString()};
     // 固定スケジュール内挿入の場合: fsBlockId/fsSlotをセット
     if(window._fsPendingBlockId!==undefined){
       t.fsBlockId=window._fsPendingBlockId;
@@ -9965,7 +10150,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260705-03';
+const APP_VERSION='20260705-04';
 
 render();
 function forceAppUpdate(){
