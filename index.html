@@ -9796,12 +9796,21 @@ function initReminders(){
 // ===営業リスト===
 const SL_STATUSES=['未接触','HP作成済','電話済','アポ','商談','成約','失注'];
 const SL_STATUS_NEXT={'未接触':'電話済','電話済':'アポ','アポ':'商談','商談':'成約','HP作成済':'電話済','成約':'成約','失注':'失注'};
+const SL_REGIONS=['旭川','札幌','その他'];
 let _slPage=0;
 let _slFilterStatus='all';
 let _slFilterGenre='all';
+let _slFilterRegion='all';
 let _slSearch='';
 const SL_PAGE_SIZE=100;
 const SL_GOAL_MONTH=10; // 今月の成約目標件数
+
+function slRegion(address){
+  if(!address)return 'その他';
+  if(address.includes('旭川市'))return '旭川';
+  if(address.includes('札幌市'))return '札幌';
+  return 'その他';
+}
 
 function slStatusClass(s){return 'sl-'+(s||'未接触');}
 function slChip(s){return`<span class="sl-chip ${slStatusClass(s)}">${esc(s||'未接触')}</span>`;}
@@ -9812,6 +9821,7 @@ function slFilteredLeads(){
     if(l.deleted)return false;
     if(_slFilterStatus!=='all'&&l.status!==_slFilterStatus)return false;
     if(_slFilterGenre!=='all'&&l.genre!==_slFilterGenre)return false;
+    if(_slFilterRegion!=='all'&&(l.region||slRegion(l.address||''))!==_slFilterRegion)return false;
     if(q&&!(l.name||'').toLowerCase().includes(q)&&!(l.address||'').toLowerCase().includes(q))return false;
     return true;
   });
@@ -9829,12 +9839,24 @@ function rSalesLeads(){
   // genres for filter
   const genres=[...new Set(all.map(l=>l.genre||'').filter(Boolean))].sort();
 
+  // 地域別集計
+  const regionCounts={};
+  SL_REGIONS.forEach(r=>{
+    const rLeads=all.filter(l=>(l.region||slRegion(l.address||''))===r);
+    regionCounts[r]={
+      total:rLeads.length,
+      未接触:rLeads.filter(l=>l.status==='未接触').length,
+      アポ:rLeads.filter(l=>l.status==='アポ').length,
+      成約:rLeads.filter(l=>l.status==='成約').length,
+    };
+  });
+
   const filtered=slFilteredLeads();
   const totalPages=Math.max(1,Math.ceil(filtered.length/SL_PAGE_SIZE));
   if(_slPage>=totalPages)_slPage=totalPages-1;
   const pageLeads=filtered.slice(_slPage*SL_PAGE_SIZE,(_slPage+1)*SL_PAGE_SIZE);
 
-  // ─── 集計チップ ───
+  // ─── 全体集計チップ ───
   const summaryHtml=`
     <div style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:0">
       <span class="sl-summary-chip" style="background:var(--card2);border-color:var(--border);color:var(--t2)">総数 <strong style="color:var(--text)">${total}</strong></span>
@@ -9846,6 +9868,28 @@ function rSalesLeads(){
       </span>
     </div>`;
 
+  // ─── 地域別まとめ ───
+  const regionSummaryHtml=`
+    <div class="card" style="margin-bottom:14px;padding:12px 14px">
+      <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px;letter-spacing:.03em">地域別まとめ</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        ${SL_REGIONS.map(r=>{
+          const rc=regionCounts[r];
+          const isActive=_slFilterRegion===r;
+          return`<div onclick="_slFilterRegion='${r}';_slPage=0;render()" style="flex:1;min-width:130px;padding:10px 12px;border-radius:var(--rs);border:1.5px solid ${isActive?'var(--purple)':'var(--border)'};background:${isActive?'rgba(109,40,217,0.07)':'var(--card2)'};cursor:pointer;transition:all .15s">
+            <div style="font-size:13px;font-weight:700;color:${isActive?'var(--purple)':'var(--text)'};margin-bottom:6px">${r}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:11px">
+              <span style="color:var(--t2)">総数 <strong style="color:var(--text)">${rc.total}</strong></span>
+              <span style="color:var(--t3)">未接触 <strong>${rc['未接触']}</strong></span>
+              <span style="color:var(--amber)">アポ <strong>${rc['アポ']}</strong></span>
+              <span style="color:var(--green)">成約 <strong>${rc['成約']}</strong></span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${_slFilterRegion!=='all'?`<div style="margin-top:8px;font-size:11px;color:var(--purple)">▼ 「${_slFilterRegion}」でフィルタ中 — <button class="btn btn-g btn-xs" onclick="_slFilterRegion='all';_slPage=0;render()">解除</button></div>`:''}
+    </div>`;
+
   // ─── フィルタバー ───
   const statusFilterHtml=`<div class="filter-bar" style="margin-bottom:8px">
     ${['all',...SL_STATUSES].map(s=>`<button class="fbtn${_slFilterStatus===s?' act':''}" onclick="_slFilterStatus='${s}';_slPage=0;render()">${s==='all'?'すべて':s}</button>`).join('')}
@@ -9855,6 +9899,11 @@ function rSalesLeads(){
     <button class="fbtn${_slFilterGenre==='all'?' act':''}" onclick="_slFilterGenre='all';_slPage=0;render()">全業種</button>
     ${genres.map(g=>`<button class="fbtn${_slFilterGenre===g?' act':''}" onclick="_slFilterGenre='${esc(g)}';_slPage=0;render()">${esc(g)}</button>`).join('')}
   </div>`:'';
+
+  const regionFilterHtml=`<div class="filter-bar" style="margin-bottom:8px">
+    <button class="fbtn${_slFilterRegion==='all'?' act':''}" onclick="_slFilterRegion='all';_slPage=0;render()">全地域</button>
+    ${SL_REGIONS.map(r=>`<button class="fbtn${_slFilterRegion===r?' act':''}" onclick="_slFilterRegion='${r}';_slPage=0;render()">${r}</button>`).join('')}
+  </div>`;
 
   const searchHtml=`<div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
     <input type="search" placeholder="店名・住所で検索…" value="${esc(_slSearch)}" oninput="_slSearch=this.value;_slPage=0;render()" style="max-width:280px">
@@ -9923,9 +9972,11 @@ function rSalesLeads(){
     <button class="btn btn-g btn-sm" onclick="slAddManual()">＋ 手動追加</button>
   </div>
   ${summaryHtml}
+  ${regionSummaryHtml}
   ${importHtml}
   ${statusFilterHtml}
   ${genreFilterHtml}
+  ${regionFilterHtml}
   ${searchHtml}
   ${rowsHtml}
   ${filtered.length>SL_PAGE_SIZE?pagerHtml:''}`;
@@ -9993,6 +10044,7 @@ function _slParseCSV(text){
     results.push({
       id:uid(),
       name,genre:genre||'',phone:phone||'',address:address||'',
+      region:slRegion(address||''),
       rating:rating?parseFloat(rating):null,
       reviewCount:reviewCount?parseInt(reviewCount):null,
       hp:hp||'',instagram:instagram||'',approach:approach||'',
@@ -10046,13 +10098,27 @@ function slImportFile(input){
   reader.readAsText(file,'UTF-8');
 }
 
+// ===MIGRATION: 既存leadへ地域を後付け===
+function slMigrateRegions(){
+  if(!S.salesLeads)return;
+  let migrated=0;
+  S.salesLeads.forEach(l=>{
+    if(!l.region){
+      l.region=slRegion(l.address||'');
+      migrated++;
+    }
+  });
+  if(migrated>0){save();console.log(`[slMigrateRegions] ${migrated}件に地域を付与しました`);}
+}
+
 // ===INIT===
 updSessionCount();
 initPomo();
 initReminders();
 checkClientDraftTasks();
+slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260705-02';
+const APP_VERSION='20260705-03';
 
 render();
 function forceAppUpdate(){
