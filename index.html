@@ -256,30 +256,59 @@ a{color:inherit;text-decoration:none}
 .sched-col{flex:1;min-width:0}
 @media(max-width:700px){.sched-layout{flex-direction:column}.sched-side-panel{width:100%;max-height:220px}}
 
-/* ─── 固定タイムスケジュール: 時間軸タイムライン表示（会長指示2026-07-05: 帯+浮きカード方式） ─── */
-.fs-tl-wrap{display:flex;position:relative;min-width:280px}
-.fs-tl-axis{width:var(--fs-tl-axis-w);flex-shrink:0;position:relative;border-right:1px solid var(--border)}
-.fs-tl-tick{position:absolute;left:0;right:-1px;height:1px;background:var(--border)}
-.fs-tl-tick-hour{background:var(--t3);opacity:.6}
-.fs-tl-label{position:absolute;left:0;right:8px;transform:translateY(-50%);font-size:9px;color:var(--t3);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
-.fs-tl-label-hour{font-size:10px;font-weight:700;color:var(--t2)}
-@media(max-width:700px){.fs-tl-label{font-size:8px;right:5px}.fs-tl-label-hour{font-size:9px}}
-.fs-tl-col{flex:1;min-width:0;position:relative;margin-left:8px;cursor:copy}
-.fs-tl-col:hover{background:rgba(109,40,217,0.02)}
-.fs-tl-now{position:absolute;left:0;right:0;height:2px;background:var(--red);z-index:6;pointer-events:none}
-.fs-tl-now::before{content:'';position:absolute;left:-4px;top:-4px;width:10px;height:10px;background:var(--red);border-radius:50%}
-/* 背景レイヤー: 時間範囲を薄い色で塗る帯（Googleカレンダー背景予定風） */
-.fs-tl-band{position:absolute;left:2px;right:2px;border-left:3px solid var(--band-c,var(--purple));border-radius:4px;pointer-events:auto;z-index:1;box-sizing:border-box;overflow:hidden}
-.fs-tl-band.fs-drag-over{outline:2px dashed var(--band-c,var(--purple));outline-offset:-2px}
-.fs-tl-band-label{position:absolute;top:2px;left:6px;right:6px;font-size:10px;font-weight:700;color:var(--band-c,var(--purple));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:auto;cursor:pointer;line-height:1.3}
-/* 前景レイヤー: チェック項目をまとめたコンパクトな浮きカード */
-.fs-tl-card{position:absolute;width:70%;max-width:420px;background:var(--card);border:1.5px solid var(--border);border-left:3px solid var(--card-c,var(--purple));border-radius:8px;box-shadow:var(--shadow-sm);font-size:12px;padding:7px 10px;z-index:3;cursor:default}
+/* ─── 固定タイムスケジュール: Structured風タイムライン表示（会長指示2026-07-06） ─── */
+/* 中央レール＋円形ノード＋浮きカード方式。画像/アイコン素材やStructuredの文言は使用せず全て自作CSS/SVG。 */
+.fs-tl-daynav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;padding:2px 2px 12px;border-bottom:1px solid var(--border)}
+.fs-tl-daynav-btn{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--card2);border:1px solid var(--border);color:var(--t2);font-size:15px;font-weight:700;transition:background .15s,border-color .15s,color .15s}
+.fs-tl-daynav-btn:hover{background:var(--pdim);border-color:var(--purple);color:var(--purple)}
+.fs-tl-daynav-label{font-size:14px;font-weight:800;color:var(--text);letter-spacing:.2px}
+.fs-tl-daynav-sub{font-size:11px;font-weight:600;color:var(--t3);margin-left:6px}
+.fs-tl-daynav-today{font-size:11px;font-weight:700;color:var(--purple);background:var(--pdim);border:1px solid rgba(109,40,217,0.25);border-radius:99px;padding:3px 10px;margin-left:8px}
+.fs-tl-wrap{display:flex;position:relative;min-width:280px;padding:6px 0 24px}
+.fs-tl-axis{width:var(--fs-tl-axis-w);flex-shrink:0;position:relative}
+.fs-tl-tick{position:absolute;left:0;right:-1px;height:1px;background:transparent}
+.fs-tl-label{position:absolute;left:0;right:10px;transform:translateY(-50%);font-size:9px;color:var(--t3);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fs-tl-label-hour{font-size:10.5px;font-weight:700;color:var(--t2)}
+@media(max-width:700px){.fs-tl-label{font-size:8px;right:7px}.fs-tl-label-hour{font-size:9px}}
+.fs-tl-col{flex:1;min-width:0;position:relative;margin-left:4px;cursor:default}
+/* 中央レール: 縦の帯（実線=予定あり、点線=空き時間） */
+.fs-tl-rail{position:absolute;left:22px;width:3px;border-radius:99px;background:var(--border);z-index:0}
+.fs-tl-rail-gap{position:absolute;left:21px;width:2px;border-left:2px dotted var(--t3);opacity:.55;z-index:0;pointer-events:auto;cursor:copy}
+.fs-tl-rail-gap:hover{opacity:1}
+.fs-tl-gap-plus{position:absolute;left:5px;top:50%;transform:translateY(-50%) scale(.6);width:34px;height:34px;border-radius:50%;background:var(--card);border:1.5px dashed var(--purple);color:var(--purple);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;opacity:0;transition:opacity .15s,transform .15s;pointer-events:none;box-shadow:var(--shadow-sm)}
+.fs-tl-rail-gap:hover .fs-tl-gap-plus{opacity:1;transform:translateY(-50%) scale(1)}
+.fs-tl-now{position:absolute;left:0;right:0;height:2px;background:var(--red);z-index:8;pointer-events:none}
+.fs-tl-now::before{content:'';position:absolute;left:15px;top:-4.5px;width:10px;height:10px;background:var(--red);border-radius:50%;box-shadow:0 0 0 3px rgba(220,38,38,0.18)}
+.fs-tl-now-chip{position:absolute;left:-2px;top:-9px;transform:translateX(-100%);background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;white-space:nowrap;font-variant-numeric:tabular-nums;box-shadow:var(--shadow-sm)}
+@media(max-width:700px){.fs-tl-now-chip{display:none}}
+/* ノード: レール上の円形アイコンバッジ */
+.fs-tl-node{position:absolute;left:5px;width:34px;height:34px;border-radius:50%;background:var(--node-c,var(--purple));display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;z-index:5;cursor:pointer;box-shadow:0 0 0 3px var(--card),var(--shadow-sm);transition:transform .15s;user-select:none}
+.fs-tl-node:hover{transform:scale(1.08)}
+.fs-tl-node.done{background:var(--node-c,var(--purple));opacity:.55}
+.fs-tl-node-check{color:#fff;font-size:15px;font-weight:900}
+.fs-tl-node-glyph{color:#fff;font-weight:800;font-size:13px}
+@media(max-width:700px){.fs-tl-node{width:30px;height:30px;left:7px}}
+/* カード: ノードの右に配置する角丸カード */
+.fs-tl-card{position:absolute;left:54px;right:8px;max-width:460px;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow-sm);font-size:12.5px;padding:12px 16px;z-index:3;cursor:default;transition:opacity .2s}
 .fs-tl-card.fs-drag-over{outline:2px dashed var(--purple);outline-offset:-2px;background:var(--pdim)!important}
+.fs-tl-card.done{opacity:.6}
 .fs-tl-card .fs-chk{width:15px;height:15px}
-@media(max-width:700px){.fs-tl-card{width:88%}}
+.fs-tl-card-title{font-weight:700;font-size:13.5px;color:var(--text);line-height:1.35}
+.fs-tl-card-title.done{text-decoration:line-through;color:var(--t3)}
+.fs-tl-card-meta{font-size:11px;color:var(--t3);margin-top:3px;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
+.fs-tl-card-dur{background:var(--card2);border-radius:99px;padding:1px 8px;font-weight:600;color:var(--t2)}
+@media(max-width:700px){.fs-tl-card{left:44px;right:4px;padding:10px 12px}}
 /* 時刻付きタスク（帯に属さない単発タスク）の小チップ */
-.fs-tl-chip{position:absolute;left:2px;right:2px;background:var(--card);border:1.5px solid var(--purple);border-radius:6px;font-size:11px;padding:3px 8px;z-index:2;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:6px;cursor:grab}
+.fs-tl-chip{position:absolute;left:54px;right:8px;background:var(--card);border:1.5px solid var(--purple);border-radius:10px;font-size:11px;padding:5px 10px;z-index:2;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:6px;cursor:grab}
 .fs-tl-chip.fs-drag-over{outline:2px dashed var(--purple);background:var(--pdim)!important}
+@media(max-width:700px){.fs-tl-chip{left:44px;right:4px}}
+/* サブタスク: 丸型チェックボックス行 */
+.fs-tl-sub-row{display:flex;align-items:center;gap:8px;padding:4px 2px}
+.fs-tl-sub-chk-round{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;cursor:pointer;transition:background .15s,border-color .15s;position:relative}
+.fs-tl-sub-chk-round.done{background:var(--purple);border-color:var(--purple)}
+.fs-tl-sub-chk-round.done::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:900}
+@keyframes fsTlFadeDone{from{opacity:1}to{opacity:.6}}
+.fs-tl-card.done{animation:fsTlFadeDone .25s ease forwards}
 
 /* ─── PROJECT BOARD ─── */
 .board-wrap{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
@@ -3436,7 +3465,7 @@ function rFsDashPanel(date){
     ondragleave="fsDashPanelDragLeave(event)"
     ondrop="fsDashPanelDrop(event,'${d}')">
     <div class="sched-side-hdr">
-      <span>📋 タスク</span>
+      <span>📥 インボックス</span>
       <span style="font-size:11px;background:var(--border);padding:1px 6px;border-radius:10px">${panelTasks.length}</span>
     </div>
     <div style="padding:6px 8px 4px">
@@ -3655,6 +3684,20 @@ function rFixedScheduleList(compact=false,droppable=false,date,timeline=false){
 // ===== タイムライン表示（会長指示2026-07-05: 帯+浮きカード方式） =====
 // 背景レイヤー=時間範囲を薄色で塗った帯（Googleカレンダー背景予定風）、前景レイヤー=チェック項目のコンパクトな浮きカード。
 // カード同士は「後のカードtop = max(自身の開始位置, 直前カード底+8px)」で必ず押し下げて重なりゼロにする。
+// 所要時間を「◯時間◯分」形式に整形（会長指示2026-07-06: Structured同等の所要時間表示）
+function fsDurationLabel(sm,em){
+  let dur=em-sm;if(dur<0)dur+=24*60;
+  const h=Math.floor(dur/60),m=dur%60;
+  if(h&&m)return`${h}時間${m}分`;
+  if(h)return`${h}時間`;
+  return`${m}分`;
+}
+// ブロックのノード表示文字（icon優先・未設定はタイトル頭文字。絵文字/文字とも先頭1書記素で概算）
+function fsNodeGlyph(f){
+  if(f.icon)return f.icon;
+  const t=(f.t||'').split('→')[0].trim();
+  return t?[...t][0]:'・';
+}
 function rFsTimelineView(fs,droppable,td,isTargetToday,nowM){
   const TL_START_M=0,TL_END_M=24*60;
   const TL_PPM=1.2; // 1分あたりのpx（CSS変数 --fs-tl-ppm と一致させる）
@@ -3676,39 +3719,44 @@ function rFsTimelineView(fs,droppable,td,isTargetToday,nowM){
       bands.push({i,f,blockId,sm:0,em:em-24*60,isNow:isTargetToday&&nowM<(em-24*60),splitPart:'end'});
     }
   });
-  // 2) 帯の列割り当て（重なる帯は横に並べる）
   bands.sort((a,b)=>a.sm-b.sm);
-  const colEnds=[];
-  bands.forEach(b=>{
-    let col=colEnds.findIndex(end=>b.sm>=end);
-    if(col<0){col=colEnds.length;colEnds.push(b.em);}
-    else colEnds[col]=b.em;
-    b.col=col;
-  });
-  const maxCol=bands.reduce((mx,b)=>Math.max(mx,b.col),0);
-  const totalCols=maxCol+1;
-  // 3) 帯HTML生成（背景レイヤー: pointer-events:autoでドロップ受付、クリックでの新規追加はしない＝ラベル以外はクリック無視）
+  // 2) 中央レール: 予定がある区間は実線、空いている区間は点線（クリック/ホバーで＋表示→タスク追加）
+  const railSegs=[];
+  {
+    const covered=bands.map(b=>[b.sm,b.em]).sort((a,b)=>a[0]-b[0]);
+    let cursor=TL_START_M;
+    covered.forEach(([s,e])=>{
+      if(s>cursor)railSegs.push({top:cursor,h:s-cursor,gap:true});
+      if(e>cursor){railSegs.push({top:Math.max(s,cursor),h:e-Math.max(s,cursor),gap:false});cursor=Math.max(cursor,e);}
+    });
+    if(cursor<TL_END_M)railSegs.push({top:cursor,h:TL_END_M-cursor,gap:true});
+  }
+  const railHtml=railSegs.map(seg=>{
+    const top=(seg.top-TL_START_M)*TL_PPM;
+    const h=Math.max(seg.h*TL_PPM,2);
+    if(seg.gap){
+      return`<div class="fs-tl-rail-gap" style="top:${top}px;height:${h}px" onclick="fsTlColClick(event,'${td}')" title="クリックしてこの時間にタスクを追加">
+  <div class="fs-tl-gap-plus">＋</div>
+</div>`;
+    }
+    return`<div class="fs-tl-rail" style="top:${top}px;height:${h}px"></div>`;
+  }).join('');
+  // 3) 帯クリックでのタスク追加を受け付ける透明ドロップ領域（見た目はレールのみ・帯背景色は表示しない）
   const bandsHtml=bands.map(b=>{
-    const{f,blockId,sm,em,isNow,splitPart}=b;
+    const{f,blockId,sm,em,splitPart}=b;
     const top=(sm-TL_START_M)*TL_PPM;
     const h=Math.max((em-sm)*TL_PPM,18);
-    const colW=100/totalCols;
-    const left=`calc(${(b.col*colW).toFixed(3)}% + ${b.col?2:0}px)`;
-    const width=`calc(${colW.toFixed(3)}% - ${b.col<totalCols-1?4:2}px)`;
     const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${b.i})" ondragleave="fsBlockDragLeave(event,${b.i})" ondrop="fsBlockDrop(event,'${f.s}','${blockId}',${b.i},'${td}')" id="fs-block-${b.i}${splitPart||''}"`:'';
-    const labelTime=splitPart==='end'?`↳${f.s||''}〜からの続き`:`${f.s}〜${f.e}`;
-    const label=`${esc(labelTime)} ${esc((f.t||'').split('→')[0].trim())}`;
-    return`<div class="fs-tl-band" ${dropAttrs} style="top:${top}px;height:${h}px;left:${left};width:${width};--band-c:${f.c};background:${f.c}${isNow?'2a':'14'}">
-  <div class="fs-tl-band-label" onclick="event.stopPropagation();openFsTaskModal('${blockId}',9999,'${f.s||''}','${td}')" title="クリックしてこの時間帯にタスクを追加">${label}</div>
-</div>`;
+    return`<div class="fs-tl-band" ${dropAttrs} style="top:${top}px;height:${h}px;left:0;right:0;background:transparent;border-left:none"></div>`;
   }).join('');
-  // 4) 前景カード: ブロック本体（チェック項目）を開始位置に配置し、重なりは押し下げて回避
+  // 4) 前景カード: ブロック本体を開始位置のノードに揃えて配置し、重なりは押し下げて回避
   //    カードは開始時刻順（同時刻は元のfs順）でソートしてから積み上げる
   const cardSeeds=bands.filter(b=>b.splitPart!=='end').map(b=>({...b,sortKey:b.sm}));
   cardSeeds.sort((a,b)=>a.sortKey-b.sortKey||a.i-b.i);
   let prevBottom=-Infinity;
+  const nodesHtml=[];
   const cardsHtml=cardSeeds.map(b=>{
-    const{f,i,blockId,sm,isNow}=b;
+    const{f,i,blockId,sm,em,isNow}=b;
     const blockId2=blockId;
     const idealTop=(sm-TL_START_M)*TL_PPM;
     const top=Math.max(idealTop,prevBottom+8);
@@ -3754,8 +3802,8 @@ function rFsTimelineView(fs,droppable,td,isTargetToday,nowM){
       subList+=beforeAll.map(rBlockTask).join('');
       allParts.forEach((item,idx)=>{
         const done=!!ck.subs[idx];
-        subList+=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px">
-  <div class="fs-sub-chk ${done?'done':''}" onclick="event.stopPropagation();toggleFsSub('${blockId2}',${idx})"></div>
+        subList+=`<div class="fs-tl-sub-row">
+  <div class="fs-tl-sub-chk-round ${done?'done':''}" onclick="event.stopPropagation();toggleFsSub('${blockId2}',${idx})"></div>
   <span style="font-size:12px;flex:1;${done?'text-decoration:line-through;color:var(--t3)':'color:var(--text)'}">${esc(item)}</span>
 </div>`;
         const atSlot=allBlockTasks.filter(t=>(t.fsSlot??9999)===idx);
@@ -3770,21 +3818,32 @@ function rFsTimelineView(fs,droppable,td,isTargetToday,nowM){
       :allBlockTasks.map(rBlockTask).join(''));
     const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}','${blockId2}',${i},'${td}')" id="fs-card-${i}"`:'';
     const titleHtml=hasParts
-      ?`<div style="font-weight:700;${mainDone?'text-decoration:line-through;color:var(--t3)':'color:var(--text)'}">${isNow?'▶ ':''}<span style="color:${f.c}">${esc(f.t.split('→')[0].trim())}</span><span style="color:var(--t3);font-size:10px;margin-left:4px">→ ${allParts.length}項目</span></div>`
-      :`<div style="font-weight:600;${mainDone?'text-decoration:line-through;color:var(--t3)':''}${isNow?';color:'+f.c+';font-weight:700':''}">${isNow?'▶ ':''}${esc(f.t)}</div>`;
-    const cardHtml=`<div class="fs-tl-card fs-drop-zone" ${dropAttrs} data-tl-ideal-top="${idealTop}" style="top:${top}px;--card-c:${f.c}">
-  <div style="display:flex;align-items:center;gap:8px">
-    <div class="fs-chk ${mainDone?'done':''}" style="flex-shrink:0" onclick="toggleFsMain('${blockId2}')"></div>
-    <div style="font-size:10px;color:var(--t3);flex-shrink:0;font-variant-numeric:tabular-nums">${esc(f.s)}〜${esc(f.e)}</div>
-    <div style="flex:1;min-width:0;font-size:12px">${titleHtml}</div>
+      ?`<span class="fs-tl-card-title ${mainDone?'done':''}">${isNow?'▶ ':''}<span style="color:${f.c}">${esc(f.t.split('→')[0].trim())}</span><span style="color:var(--t3);font-size:10px;margin-left:4px;font-weight:600">→ ${allParts.length}項目</span></span>`
+      :`<span class="fs-tl-card-title ${mainDone?'done':''}" style="${isNow&&!mainDone?'color:'+f.c:''}">${isNow?'▶ ':''}${esc(f.t)}</span>`;
+    const durLbl=fsDurationLabel(sm,em);
+    const cardHtml=`<div class="fs-tl-card fs-drop-zone ${mainDone?'done':''}" ${dropAttrs} data-tl-ideal-top="${idealTop}" style="top:${top}px;--card-c:${f.c}">
+  <div style="display:flex;align-items:flex-start;gap:8px">
+    <div style="flex:1;min-width:0">
+      ${titleHtml}
+      <div class="fs-tl-card-meta">
+        <span>${esc(f.s)}–${esc(f.e==='24:00'?'24:00':f.e)}</span>
+        <span class="fs-tl-card-dur">${durLbl}</span>
+        ${isNow?`<span style="color:${f.c};font-weight:700">● 進行中</span>`:''}
+      </div>
+    </div>
     ${droppable&&!hasParts?`<button class="btn btn-xs" style="background:${f.c}12;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0" onclick="event.stopPropagation();openFsTaskModal('${blockId2}',9999,'${f.s||''}','${td}')">＋</button>`:''}
   </div>
-  ${hasParts?`<div style="margin:6px 0 0 23px;padding-top:5px;border-top:1px solid ${f.c}18">${subList}</div>`:''}
-  ${!hasParts&&plainTasks?`<div style="margin:4px 0 0 23px">${plainTasks}</div>`:''}
+  ${hasParts?`<div style="margin:8px 0 0 2px;padding-top:7px;border-top:1px solid ${f.c}18">${subList}</div>`:''}
+  ${!hasParts&&plainTasks?`<div style="margin:6px 0 0 2px">${plainTasks}</div>`:''}
 </div>`;
+    // ノード（レール上の円形バッジ）は対応カードの実際の縦位置に揃える（押し下げでカードが動いたらノードも追従し重なりを防ぐ）。
+    // data-tl-ideal-topはブロック本来の開始時刻位置として保持し、レールのクリック判定等の基準に使う。
+    nodesHtml.push(`<div class="fs-tl-node ${mainDone?'done':''}" data-tl-ideal-top="${idealTop}" style="top:${top}px;--node-c:${f.c}" onclick="event.stopPropagation();toggleFsMain('${blockId2}')" title="${esc(f.t.split('→')[0].trim())}（タップで完了）">
+  ${mainDone?`<span class="fs-tl-node-check">✓</span>`:`<span class="fs-tl-node-glyph">${esc(fsNodeGlyph(f))}</span>`}
+</div>`);
     // 実測ではなく概算高さでprevBottomを進める（項目数から見積もり。実高さはブラウザ側でauto）
     const estLines=1+(hasParts?allParts.length:0)+(allBlockTasks.length*1.4);
-    const estH=30+estLines*22;
+    const estH=44+estLines*22;
     prevBottom=top+estH;
     return cardHtml;
   }).join('');
@@ -3812,15 +3871,18 @@ function rFsTimelineView(fs,droppable,td,isTargetToday,nowM){
       <div class="fs-tl-label${isHour?' fs-tl-label-hour':''}" style="top:${top}px">${mi===0?`${h}:00`:`${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}`}</div>`);
   }
   const nowTop=(isTargetToday&&nowM>=TL_START_M&&nowM<=TL_END_M)?(nowM-TL_START_M)*TL_PPM:null;
+  const nowLabel=isTargetToday?`${String(Math.floor(nowM/60)).padStart(2,'0')}:${String(nowM%60).padStart(2,'0')}`:'';
   // 空き時間クリックでのタスク追加は常時有効（ダッシュボード/編集画面どちらでも動く。ドラッグ割当のdroppable設定とは独立）
   const colClickAttr=`onclick="fsTlColClick(event,'${td}')"`;
   return`<div class="fs-tl-wrap" style="height:${totalH}px">
     <div class="fs-tl-axis" style="height:${totalH}px">${ticks.join('')}</div>
     <div class="fs-tl-col" style="height:${totalH}px" ${colClickAttr}>
+      ${railHtml}
       ${bandsHtml}
+      ${nodesHtml.join('')}
       ${cardsHtml}
       ${chipsHtml}
-      ${nowTop!==null?`<div class="fs-tl-now" style="top:${nowTop}px"></div>`:''}
+      ${nowTop!==null?`<div class="fs-tl-now" style="top:${nowTop}px"><span class="fs-tl-now-chip">${nowLabel}</span></div>`:''}
     </div>
   </div>`;
 }
@@ -3845,10 +3907,13 @@ function fsTlColClick(e,date){
 function layoutFsTimelineCards(){
   document.querySelectorAll('.fs-tl-col').forEach(col=>{
     let prevBottom=-Infinity;
-    col.querySelectorAll('.fs-tl-card[data-tl-ideal-top]').forEach(card=>{
+    const cards=[...col.querySelectorAll('.fs-tl-card[data-tl-ideal-top]')];
+    const nodes=[...col.querySelectorAll('.fs-tl-node[data-tl-ideal-top]')];
+    cards.forEach((card,idx)=>{
       const idealTop=parseFloat(card.dataset.tlIdealTop)||0;
       const top=Math.max(idealTop,prevBottom+8);
       card.style.top=top+'px';
+      if(nodes[idx])nodes[idx].style.top=top+'px'; // ノードは対応カードの実位置に追従させ重なりを防ぐ
       prevBottom=top+card.offsetHeight;
     });
   });
@@ -3995,17 +4060,20 @@ function rTasksMonthly(){
 function schedDate(off){const d=new Date();d.setDate(d.getDate()+off);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function rTasksSchedule(){
   const d=schedDate(SD);
-  const dateLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'long'});
+  const dateLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
   const dayHabits=habitsForDate(d).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
-  const isToday=SD===0,isTomorrow=SD===1;
+  const isToday=SD===0,isTomorrow=SD===1,isYesterday=SD===-1;
   const hasFs=S.fs&&S.fs.length>0;
+  const dayWord=isToday?'今日':isTomorrow?'明日':isYesterday?'昨日':'';
   return`
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-  <div style="display:flex;align-items:center;gap:8px">
-    <button class="btn btn-g btn-sm" onclick="SD--;render()">‹</button>
-    <div style="font-size:13px;font-weight:600">${dateLabel}${isToday?' (今日)':isTomorrow?' (明日)':''}</div>
-    <button class="btn btn-g btn-sm" onclick="SD++;render()">›</button>
-    ${SD!==0?`<button class="btn btn-g btn-sm" onclick="SD=0;render()">今日</button>`:''}
+<div class="fs-tl-daynav">
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="fs-tl-daynav-btn" onclick="SD--;render()" title="前の日">‹</button>
+    <div>
+      <span class="fs-tl-daynav-label">${dayWord?dayWord+' ':''}${dateLabel}</span>
+    </div>
+    <button class="fs-tl-daynav-btn" onclick="SD++;render()" title="次の日">›</button>
+    ${SD!==0?`<button class="fs-tl-daynav-today" onclick="SD=0;render()">今日に戻る</button>`:''}
   </div>
   <div style="display:flex;gap:6px">
     <button class="btn btn-g btn-xs" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>
@@ -7709,6 +7777,7 @@ ${secTitle('📅 固定タイムスケジュール')}
         <button class="tact" style="padding:1px 5px;font-size:11px;line-height:1.2;opacity:${i===S.fs.length-1?'0.2':'0.7'}" ${i===S.fs.length-1?'disabled':''} onclick="fsMove(${i},1)" title="下へ">▼</button>
       </div>
       <div class="sched-edit-color" style="background:${f.c}"></div>
+      <input style="width:34px;flex-shrink:0;padding:4px 4px;font-size:14px;text-align:center" value="${esc(f.icon||'')}" onchange="S.fs[${i}].icon=this.value.trim();save();render()" placeholder="🔥" title="ノードに表示するアイコン（1文字・未入力ならタイトル頭文字）" maxlength="4">
       <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.s)}" onchange="S.fs[${i}].s=this.value" placeholder="開始">
       <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.s?'0.7':'0.2'}" onclick="S.fs[${i}].s='';save();render()" title="開始時間をクリア">✕</button>
       <span style="color:var(--t2)">〜</span>
@@ -7720,7 +7789,7 @@ ${secTitle('📅 固定タイムスケジュール')}
     </div>`).join('')}
   </div>
   <div style="display:flex;gap:8px;margin-top:10px">
-    <button class="btn btn-g btn-sm" onclick="S.fs.push({id:uid(),s:'',e:'',t:'',c:'#7c3aed'});save();render()">＋ 追加</button>
+    <button class="btn btn-g btn-sm" onclick="S.fs.push({id:uid(),s:'',e:'',t:'',c:'#7c3aed',icon:''});save();render()">＋ 追加</button>
     <button class="btn btn-p btn-sm" onclick="saveFS()">保存</button>
     <button class="btn btn-g btn-sm" onclick="if(confirm('デフォルトに戻しますか？')){S.fs=JSON.parse(JSON.stringify(DEFAULT_FS));save();render();}">リセット</button>
   </div>
@@ -10409,7 +10478,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260705-08';
+const APP_VERSION='20260705-09';
 
 render();
 function forceAppUpdate(){
