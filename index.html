@@ -3242,7 +3242,7 @@ ${!ci?`<div class="checkin-banner">
 </div>
 
 ${secTitle('🕐 今日のスケジュール')}
-${rFixedScheduleList(true)}
+${rFixedScheduleList(true,false,undefined,true)}
 
 ${(()=>{
   const gcEvs=gcalEventsForDate(td).sort((a,b)=>(a.start?.dateTime||'')>(b.start?.dateTime||'')?1:-1);
@@ -10260,7 +10260,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260705-05';
+const APP_VERSION='20260705-06';
 
 render();
 function forceAppUpdate(){
