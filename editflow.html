@@ -916,18 +916,28 @@ function fbSetupTeamSync(){
   },e=>{const c=e&&e.code;if(c==='permission-denied'&&TEAM_SHARE_OK!==false){TEAM_SHARE_OK=false;renderAuthUI();}console.warn('team share sync:',c||e);});
 }
 function signInWithGoogle(){
+  // スマホ含め全端末でポップアップ優先(タップ直結ならモバイルSafari/Chromeでも開ける)。
+  // リダイレクト方式はauthDomainがgithub.ioと異なるためモバイルの3rd-partyストレージ遮断で
+  // 復帰時にログインが失われる既知問題があり、最後の手段に格下げ(2026-07-05)。
   const provider=new firebase.auth.GoogleAuthProvider();
-  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if(isMobile){
-    fbAuth.signInWithRedirect(provider);
-  }else{
-    fbAuth.signInWithPopup(provider).catch(e=>{
-      const c=e&&e.code;
-      if(c==='auth/popup-blocked'||c==='auth/cancelled-popup-request'||c==='auth/operation-not-supported-in-this-environment'){
-        fbAuth.signInWithRedirect(provider);
-      }
-    });
-  }
+  fbAuth.signInWithPopup(provider).catch(e=>{
+    const c=(e&&e.code)||'';
+    if(c==='auth/popup-blocked'||c==='auth/cancelled-popup-request'||c==='auth/operation-not-supported-in-this-environment'){
+      fbAuth.signInWithRedirect(provider).catch(e2=>{showAuthError(e2);});
+    }else if(c!=='auth/popup-closed-by-user'){
+      showAuthError(e);
+    }
+  });
+}
+// サインイン失敗の原因を画面に表示(原因特定用)
+function showAuthError(e){
+  const code=(e&&e.code)||'';
+  const msg=(e&&e.message)||String(e||'');
+  let hint='';
+  if(code==='auth/unauthorized-domain')hint='このドメインがFirebaseの承認済みドメインに未登録です。';
+  else if(code==='auth/operation-not-allowed')hint='FirebaseコンソールでGoogleサインインが無効になっています。';
+  else if(code==='auth/network-request-failed')hint='通信エラーです。電波状況をご確認ください。';
+  alert('サインインに失敗しました\n'+code+(hint?'\n'+hint:'')+'\n'+msg.slice(0,120));
 }
 function fbSignOut(){fbAuth.signOut();}
 
@@ -10260,7 +10270,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260705-06';
+const APP_VERSION='20260705-07';
 
 render();
 function forceAppUpdate(){
