@@ -277,38 +277,52 @@ a{color:inherit;text-decoration:none}
 .fs-tl-rail-gap:hover{opacity:1}
 .fs-tl-gap-plus{position:absolute;left:5px;top:50%;transform:translateY(-50%) scale(.6);width:34px;height:34px;border-radius:50%;background:var(--card);border:1.5px dashed var(--purple);color:var(--purple);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;opacity:0;transition:opacity .15s,transform .15s;pointer-events:none;box-shadow:var(--shadow-sm)}
 .fs-tl-rail-gap:hover .fs-tl-gap-plus{opacity:1;transform:translateY(-50%) scale(1)}
-.fs-tl-now{position:absolute;left:0;right:0;height:2px;background:var(--red);z-index:8;pointer-events:none}
-.fs-tl-now::before{content:'';position:absolute;left:15px;top:-4.5px;width:10px;height:10px;background:var(--red);border-radius:50%;box-shadow:0 0 0 3px rgba(220,38,38,0.18)}
-.fs-tl-now-chip{position:absolute;left:-2px;top:-9px;transform:translateX(-100%);background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;white-space:nowrap;font-variant-numeric:tabular-nums;box-shadow:var(--shadow-sm)}
-@media(max-width:700px){.fs-tl-now-chip{display:none}}
-/* ノード: レール上の円形アイコンバッジ */
-.fs-tl-node{position:absolute;left:5px;width:34px;height:34px;border-radius:50%;background:var(--node-c,var(--purple));display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;z-index:5;cursor:pointer;box-shadow:0 0 0 3px var(--card),var(--shadow-sm);transition:transform .15s;user-select:none}
-.fs-tl-node:hover{transform:scale(1.08)}
-.fs-tl-node.done{background:var(--node-c,var(--purple));opacity:.55}
-.fs-tl-node-check{color:#fff;font-size:15px;font-weight:900}
-.fs-tl-node-glyph{color:#fff;font-weight:800;font-size:13px}
-@media(max-width:700px){.fs-tl-node{width:30px;height:30px;left:7px}}
-/* カード: ノードの右に配置する角丸カード */
-.fs-tl-card{position:absolute;left:54px;right:8px;max-width:460px;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow-sm);font-size:12.5px;padding:12px 16px;z-index:3;cursor:default;transition:opacity .2s}
-.fs-tl-card.fs-drag-over{outline:2px dashed var(--purple);outline-offset:-2px;background:var(--pdim)!important}
-.fs-tl-card.done{opacity:.6}
-.fs-tl-card .fs-chk{width:15px;height:15px}
-.fs-tl-card-title{font-weight:700;font-size:13.5px;color:var(--text);line-height:1.35}
-.fs-tl-card-title.done{text-decoration:line-through;color:var(--t3)}
-.fs-tl-card-meta{font-size:11px;color:var(--t3);margin-top:3px;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
-.fs-tl-card-dur{background:var(--card2);border-radius:99px;padding:1px 8px;font-weight:600;color:var(--t2)}
-@media(max-width:700px){.fs-tl-card{left:44px;right:4px;padding:10px 12px}}
+/* 現在時刻ライン: カードより背面（z-index低）、薄く。左ガター内は実線+濃いチップで可読性確保 */
+.fs-tl-now{position:absolute;left:0;right:0;height:1px;background:var(--red);z-index:1;pointer-events:none;opacity:.4}
+.fs-tl-now-gutter{position:absolute;left:0;width:var(--fs-tl-axis-w);height:2px;background:var(--red);z-index:6;pointer-events:none;opacity:1}
+.fs-tl-now-chip{position:absolute;left:2px;top:-9px;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:5px;white-space:nowrap;font-variant-numeric:tabular-nums;box-shadow:var(--shadow-sm);z-index:7}
+@media(max-width:700px){.fs-tl-now-chip{font-size:8.5px;padding:1px 4px}}
+/* 帯: ブロック範囲を示す色帯（レール上、アクセント色12〜16%半透明+左3pxボーダー） */
+.fs-tl-range-band{position:absolute;left:16px;right:8px;border-radius:6px;background:var(--band-c,var(--purple));opacity:.13;border-left:3px solid var(--band-c,var(--purple));z-index:0;pointer-events:none}
+.fs-tl-range-band.now{opacity:.2}
+/* ヘッダー: 開始時刻位置に固定表示する小型ヘッダーカード（1〜2行）。近接ブロックは右にオフセット可能 */
+.fs-tl-hdr{position:absolute;left:34px;right:8px;max-width:440px;background:var(--card);border:1px solid var(--border);border-left:3px solid var(--hdr-c,var(--purple));border-radius:10px;box-shadow:var(--shadow-sm);font-size:12px;padding:6px 10px;z-index:4;cursor:pointer;transition:box-shadow .15s,opacity .2s;display:flex;align-items:center;gap:8px}
+.fs-tl-hdr:hover{box-shadow:var(--shadow)}
+.fs-tl-hdr.fs-drag-over{outline:2px dashed var(--purple);outline-offset:-2px;background:var(--pdim)!important}
+.fs-tl-hdr.done{opacity:.6}
+.fs-tl-hdr-chk{width:20px;height:20px;border-radius:50%;border:2px solid var(--hdr-c,var(--border));flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;background:transparent;transition:background .15s}
+.fs-tl-hdr-chk.done{background:var(--hdr-c,var(--purple))}
+.fs-tl-hdr-body{flex:1;min-width:0}
+.fs-tl-hdr-title{font-weight:700;font-size:12.5px;color:var(--text);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fs-tl-hdr-title.done{text-decoration:line-through;color:var(--t3)}
+.fs-tl-hdr-meta{font-size:10.5px;color:var(--t3);margin-top:1px;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fs-tl-hdr-progress{font-size:10px;font-weight:700;background:var(--card2);border-radius:99px;padding:1px 7px;flex-shrink:0;color:var(--t2)}
+@media(max-width:700px){.fs-tl-hdr{left:26px;right:4px;padding:5px 8px}}
+/* 項目（サブタスク）行: ブロック範囲内の自分の時刻位置に絶対配置される小さな1行 */
+.fs-tl-item-row{position:absolute;left:34px;right:8px;max-width:420px;height:26px;display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0 8px;font-size:11.5px;z-index:2;box-shadow:var(--shadow-sm)}
+.fs-tl-item-row .fs-tl-sub-chk-round{width:14px;height:14px;flex-shrink:0}
+.fs-tl-item-row-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fs-tl-item-row-time{font-size:9.5px;color:var(--t3);flex-shrink:0;font-variant-numeric:tabular-nums}
+@media(max-width:700px){.fs-tl-item-row{left:26px;right:4px}}
+/* あふれた項目の「+N項目」チップ */
+.fs-tl-overflow-chip{position:absolute;left:34px;height:22px;display:flex;align-items:center;padding:0 9px;background:var(--card2);border:1px dashed var(--border);border-radius:99px;font-size:10.5px;font-weight:700;color:var(--t2);cursor:pointer;z-index:3}
+.fs-tl-overflow-chip:hover{border-color:var(--purple);color:var(--purple)}
+@media(max-width:700px){.fs-tl-overflow-chip{left:26px}}
 /* 時刻付きタスク（帯に属さない単発タスク）の小チップ */
-.fs-tl-chip{position:absolute;left:54px;right:8px;background:var(--card);border:1.5px solid var(--purple);border-radius:10px;font-size:11px;padding:5px 10px;z-index:2;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:6px;cursor:grab}
+.fs-tl-chip{position:absolute;left:34px;right:8px;background:var(--card);border:1.5px solid var(--purple);border-radius:10px;font-size:11px;padding:5px 10px;z-index:2;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:6px;cursor:grab}
 .fs-tl-chip.fs-drag-over{outline:2px dashed var(--purple);background:var(--pdim)!important}
-@media(max-width:700px){.fs-tl-chip{left:44px;right:4px}}
-/* サブタスク: 丸型チェックボックス行 */
-.fs-tl-sub-row{display:flex;align-items:center;gap:8px;padding:4px 2px}
+@media(max-width:700px){.fs-tl-chip{left:26px;right:4px}}
+/* サブタスク: 丸型チェックボックス */
 .fs-tl-sub-chk-round{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;cursor:pointer;transition:background .15s,border-color .15s;position:relative}
 .fs-tl-sub-chk-round.done{background:var(--purple);border-color:var(--purple)}
 .fs-tl-sub-chk-round.done::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:900}
 @keyframes fsTlFadeDone{from{opacity:1}to{opacity:.6}}
-.fs-tl-card.done{animation:fsTlFadeDone .25s ease forwards}
+.fs-tl-hdr.done{animation:fsTlFadeDone .25s ease forwards}
+/* 詳細パネル（ヘッダータップで開く）内の項目行 */
+.fs-detail-item{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border)}
+.fs-detail-item:last-child{border-bottom:none}
+.fs-detail-item input[type=time]{width:92px;flex-shrink:0;padding:4px 6px;font-size:12px}
+.fs-detail-item input[type=text]{flex:1;padding:4px 8px;font-size:12px}
 
 /* ─── PROJECT BOARD ─── */
 .board-wrap{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
@@ -2348,7 +2362,6 @@ function render(){
     renderNav();
     document.querySelectorAll('.nav-item,.mnav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===V));
     renderGcalUI();
-    if(document.querySelector('.fs-tl-col'))requestAnimationFrame(layoutFsTimelineCards);
   }catch(e){
     console.error('render error:',e);
     const v=document.getElementById('view');
@@ -3698,6 +3711,41 @@ function fsNodeGlyph(f){
   const t=(f.t||'').split('→')[0].trim();
   return t?[...t][0]:'・';
 }
+// 項目（サブタスク）の時刻位置レイアウト計算（会長承認済み新設計 2026-07-06）
+// - itemTimes[idx]（'HH:MM'）が設定されていればその位置（範囲外はclamp）
+// - 未設定の項目は start + i*(duration/n) で等間隔配置
+// - 同位置衝突は最小限だけ下にnudge
+// - 範囲の高さに全項目が収まらない場合、収まる分だけ返しoverflowに残りを積む
+function fsLayoutItems(allParts,itemTimes,sm,em,rangeTopPx,rangeHPx,PPM){
+  const n=allParts.length;
+  const ROW_H=26,GAP=3,PAD_TOP=4,PAD_BOTTOM=4;
+  itemTimes=itemTimes||{};
+  // 1) 理想位置（分）を算出
+  const idealMin=allParts.map((_,idx)=>{
+    const t=itemTimes[idx];
+    if(t){
+      let m=tMin(t);
+      if(m<sm)m=sm;
+      if(m>em)m=em;
+      return m;
+    }
+    return sm+(n>0?idx*((em-sm)/n):0);
+  });
+  // 2) px位置に変換し、開始順（元のidx順=時系列とみなす）でnudge衝突回避
+  let items=allParts.map((item,idx)=>({idx,item,top:rangeTopPx+(idealMin[idx]-sm)*PPM}));
+  let prevBottom=-Infinity;
+  items.forEach(o=>{
+    if(o.top<prevBottom+ROW_H+GAP)o.top=prevBottom+ROW_H+GAP;
+    prevBottom=o.top;
+  });
+  // 3) 範囲内に収まる件数を判定（範囲下端 - PAD_BOTTOM を超えたら以降はoverflow）
+  const limit=rangeTopPx+rangeHPx-PAD_BOTTOM-ROW_H;
+  const visible=[],overflow=[];
+  items.forEach(o=>{ (o.top<=limit+0.5?visible:overflow).push(o); });
+  // 範囲が極端に狭く1件も入らない場合でも先頭1件だけは表示（完全非表示を避ける）
+  if(!visible.length&&items.length){visible.push(items[0]);overflow.shift();}
+  return{visible,overflow,ROW_H};
+}
 function rFsTimelineView(fs,droppable,td,isTargetToday,nowM){
   const TL_START_M=0,TL_END_M=24*60;
   const TL_PPM=1.2; // 1分あたりのpx（CSS変数 --fs-tl-ppm と一致させる）
@@ -3741,112 +3789,73 @@ function rFsTimelineView(fs,droppable,td,isTargetToday,nowM){
     }
     return`<div class="fs-tl-rail" style="top:${top}px;height:${h}px"></div>`;
   }).join('');
-  // 3) 帯クリックでのタスク追加を受け付ける透明ドロップ領域（見た目はレールのみ・帯背景色は表示しない）
+  // 3) 帯（範囲色帯）: ブロックの開始〜終了をアクセント色12〜16%半透明+左3pxボーダーで表示。ドロップ対象も兼ねる。
   const bandsHtml=bands.map(b=>{
-    const{f,blockId,sm,em,splitPart}=b;
+    const{f,blockId,sm,em,splitPart,isNow}=b;
     const top=(sm-TL_START_M)*TL_PPM;
     const h=Math.max((em-sm)*TL_PPM,18);
     const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${b.i})" ondragleave="fsBlockDragLeave(event,${b.i})" ondrop="fsBlockDrop(event,'${f.s}','${blockId}',${b.i},'${td}')" id="fs-block-${b.i}${splitPart||''}"`:'';
-    return`<div class="fs-tl-band" ${dropAttrs} style="top:${top}px;height:${h}px;left:0;right:0;background:transparent;border-left:none"></div>`;
+    return`<div class="fs-tl-range-band fs-tl-band fs-drop-zone ${isNow?'now':''}" ${dropAttrs} style="top:${top}px;height:${h}px;--band-c:${f.c}"></div>`;
   }).join('');
-  // 4) 前景カード: ブロック本体を開始位置のノードに揃えて配置し、重なりは押し下げて回避
-  //    カードは開始時刻順（同時刻は元のfs順）でソートしてから積み上げる
-  const cardSeeds=bands.filter(b=>b.splitPart!=='end').map(b=>({...b,sortKey:b.sm}));
-  cardSeeds.sort((a,b)=>a.sortKey-b.sortKey||a.i-b.i);
-  let prevBottom=-Infinity;
-  const nodesHtml=[];
-  const cardsHtml=cardSeeds.map(b=>{
+  // 4) ヘッダー（開始時刻ピッタリに固定）+ 項目行（範囲内に時刻連動で絶対配置）
+  //    ヘッダー同士が近接する場合は右にオフセットして重なりを避ける（押し下げはしない）
+  const headerSeeds=bands.filter(b=>b.splitPart!=='end').map(b=>({...b,sortKey:b.sm}));
+  headerSeeds.sort((a,b)=>a.sortKey-b.sortKey||a.i-b.i);
+  let prevHdrTop=-Infinity,prevHdrOffset=0;
+  const headersHtml=[],itemsHtml=[];
+  headerSeeds.forEach(b=>{
     const{f,i,blockId,sm,em,isNow}=b;
     const blockId2=blockId;
-    const idealTop=(sm-TL_START_M)*TL_PPM;
-    const top=Math.max(idealTop,prevBottom+8);
-    // チェック状態・サブタスク解析（非timelineパスと同ロジック）
+    const hdrTop=(sm-TL_START_M)*TL_PPM;
+    // 近接ヘッダー（24px以内）は右にオフセットして重なり回避。ヘッダーは押し下げしない。
+    let offsetX=0;
+    if(hdrTop-prevHdrTop<24){offsetX=prevHdrOffset+18;}else{offsetX=0;}
+    prevHdrTop=hdrTop;prevHdrOffset=offsetX;
+    // チェック状態・サブタスク解析
     const titleParts=f.t.includes('→')?f.t.split('→').map(s=>s.trim()).filter(Boolean):[];
     const descParts=f.d&&f.d.includes('→')?f.d.split('→').map(s=>s.trim()).filter(Boolean):[];
     const allParts=[...titleParts,...descParts];
     const hasParts=allParts.length>=2;
     const ck=getFsCk(blockId2);
-    const allPartsDone=hasParts&&allParts.every((_,idx)=>!!ck.subs[idx]);
+    const doneCount=hasParts?allParts.filter((_,idx)=>!!ck.subs[idx]).length:0;
+    const allPartsDone=hasParts&&doneCount===allParts.length;
     const mainDone=ck.main||(hasParts&&allPartsDone);
-    const allBlockTasks=droppable?(S.tasks||[]).filter(t=>{
-      if(t.deleted)return false;
-      if(t.dueDate&&t.dueDate!==td)return false;
-      if(t.fsBlockId===blockId2)return true;
-      return false;
-    }):[];
-    const rBlockTask=t=>`<div class="task-item" id="ti-${t.id}"
-  draggable="true" ondragstart="taskDragStart(event,'${t.id}')" ondragend="taskDragEnd(event)"
-  ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
-  ondragleave="this.classList.remove('drag-over')"
-  ondrop="blockTaskDrop(event,'${t.id}')"
-  style="border-left:2px solid ${f.c};margin:2px 0;padding:6px 10px;cursor:grab;box-shadow:none;flex-shrink:0">
-  <div class="chk ${t.done?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleDone('${t.id}')"></div>
-  <div class="task-body" style="min-width:0">
-    <div class="task-ttl ${t.done?'done':''}" style="font-size:12px">${esc(t.title)}</div>
-  </div>
-  <div class="task-acts" style="opacity:1;gap:2px">
-    <button class="tact" style="padding:2px 5px;font-size:11px" onclick="openTaskModal('${t.id}')">✏️</button>
-    <button class="tact del" style="padding:2px 5px;font-size:11px" onclick="delTask('${t.id}')">🗑</button>
-  </div>
-</div>`;
-    const rDz=(slot,label)=>droppable?`<div class="fs-dropzone"
-  ondragover="fsInternalDragOver(event)" ondragleave="fsInternalDragLeave(event)"
-  ondrop="fsInternalDrop(event,'${blockId2}',${slot},'${td}','${f.s||''}')"
-  onclick="event.stopPropagation();openFsTaskModal('${blockId2}',${slot},'${f.s||''}','${td}')">
-  <div class="fs-dz-plus">＋ ${label||'ここに追加'}</div>
-</div>`:'';
-    let subList='';
-    if(hasParts){
-      const beforeAll=allBlockTasks.filter(t=>(t.fsSlot??9999)<0);
-      subList+=rDz(-1,'タスクを追加');
-      subList+=beforeAll.map(rBlockTask).join('');
-      allParts.forEach((item,idx)=>{
-        const done=!!ck.subs[idx];
-        subList+=`<div class="fs-tl-sub-row">
-  <div class="fs-tl-sub-chk-round ${done?'done':''}" onclick="event.stopPropagation();toggleFsSub('${blockId2}',${idx})"></div>
-  <span style="font-size:12px;flex:1;${done?'text-decoration:line-through;color:var(--t3)':'color:var(--text)'}">${esc(item)}</span>
-</div>`;
-        const atSlot=allBlockTasks.filter(t=>(t.fsSlot??9999)===idx);
-        subList+=rDz(idx,'タスクを追加');
-        subList+=atSlot.map(rBlockTask).join('');
-      });
-      const trailing=allBlockTasks.filter(t=>(t.fsSlot??9999)>allParts.length-1&&(t.fsSlot??9999)<9999-(allParts.length));
-      subList+=trailing.map(rBlockTask).join('');
-    }
-    const plainTasks=hasParts?'':(droppable
-      ?rDz(-1,'先頭に追加')+allBlockTasks.map((t,idx)=>rBlockTask(t)+rDz(idx,'ここに追加')).join('')
-      :allBlockTasks.map(rBlockTask).join(''));
-    const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}','${blockId2}',${i},'${td}')" id="fs-card-${i}"`:'';
-    const titleHtml=hasParts
-      ?`<span class="fs-tl-card-title ${mainDone?'done':''}">${isNow?'▶ ':''}<span style="color:${f.c}">${esc(f.t.split('→')[0].trim())}</span><span style="color:var(--t3);font-size:10px;margin-left:4px;font-weight:600">→ ${allParts.length}項目</span></span>`
-      :`<span class="fs-tl-card-title ${mainDone?'done':''}" style="${isNow&&!mainDone?'color:'+f.c:''}">${isNow?'▶ ':''}${esc(f.t)}</span>`;
     const durLbl=fsDurationLabel(sm,em);
-    const cardHtml=`<div class="fs-tl-card fs-drop-zone ${mainDone?'done':''}" ${dropAttrs} data-tl-ideal-top="${idealTop}" style="top:${top}px;--card-c:${f.c}">
-  <div style="display:flex;align-items:flex-start;gap:8px">
-    <div style="flex:1;min-width:0">
-      ${titleHtml}
-      <div class="fs-tl-card-meta">
-        <span>${esc(f.s)}–${esc(f.e==='24:00'?'24:00':f.e)}</span>
-        <span class="fs-tl-card-dur">${durLbl}</span>
-        ${isNow?`<span style="color:${f.c};font-weight:700">● 進行中</span>`:''}
-      </div>
+    const dropAttrs=droppable?`ondragover="fsBlockDragOver(event,${i})" ondragleave="fsBlockDragLeave(event,${i})" ondrop="fsBlockDrop(event,'${f.s}','${blockId2}',${i},'${td}')" id="fs-card-${i}"`:'';
+    const titleTxt=esc(f.t.split('→')[0].trim());
+    headersHtml.push(`<div class="fs-tl-hdr fs-drop-zone ${mainDone?'done':''}" ${dropAttrs} style="top:${hdrTop}px;margin-left:${offsetX}px;--hdr-c:${f.c}" onclick="openFsDetailModal('${blockId2}')" title="タップで詳細を開く">
+  <div class="fs-tl-hdr-chk ${mainDone?'done':''}" onclick="event.stopPropagation();toggleFsMain('${blockId2}')">${mainDone?'✓':''}</div>
+  <div class="fs-tl-hdr-body">
+    <div class="fs-tl-hdr-title ${mainDone?'done':''}">${isNow?'▶ ':''}${titleTxt}</div>
+    <div class="fs-tl-hdr-meta">
+      <span>${esc(f.s)}–${esc(f.e==='24:00'?'24:00':f.e)} ・ ${durLbl}</span>
+      ${isNow?`<span style="color:${f.c};font-weight:700">● 進行中</span>`:''}
     </div>
-    ${droppable&&!hasParts?`<button class="btn btn-xs" style="background:${f.c}12;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0" onclick="event.stopPropagation();openFsTaskModal('${blockId2}',9999,'${f.s||''}','${td}')">＋</button>`:''}
   </div>
-  ${hasParts?`<div style="margin:8px 0 0 2px;padding-top:7px;border-top:1px solid ${f.c}18">${subList}</div>`:''}
-  ${!hasParts&&plainTasks?`<div style="margin:6px 0 0 2px">${plainTasks}</div>`:''}
-</div>`;
-    // ノード（レール上の円形バッジ）は対応カードの実際の縦位置に揃える（押し下げでカードが動いたらノードも追従し重なりを防ぐ）。
-    // data-tl-ideal-topはブロック本来の開始時刻位置として保持し、レールのクリック判定等の基準に使う。
-    nodesHtml.push(`<div class="fs-tl-node ${mainDone?'done':''}" data-tl-ideal-top="${idealTop}" style="top:${top}px;--node-c:${f.c}" onclick="event.stopPropagation();toggleFsMain('${blockId2}')" title="${esc(f.t.split('→')[0].trim())}（タップで完了）">
-  ${mainDone?`<span class="fs-tl-node-check">✓</span>`:`<span class="fs-tl-node-glyph">${esc(fsNodeGlyph(f))}</span>`}
+  ${hasParts?`<div class="fs-tl-hdr-progress">${doneCount}/${allParts.length}</div>`:(droppable?`<button class="btn btn-xs" style="background:${f.c}12;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0" onclick="event.stopPropagation();openFsTaskModal('${blockId2}',9999,'${f.s||''}','${td}')">＋</button>`:'')}
 </div>`);
-    // 実測ではなく概算高さでprevBottomを進める（項目数から見積もり。実高さはブラウザ側でauto）
-    const estLines=1+(hasParts?allParts.length:0)+(allBlockTasks.length*1.4);
-    const estH=44+estLines*22;
-    prevBottom=top+estH;
-    return cardHtml;
-  }).join('');
+    // 項目（サブタスク）行: 範囲内の時刻位置に絶対配置。時刻未設定は等間隔、設定済みはその位置（clamp）。
+    if(hasParts){
+      const rangeTopPx=(sm-TL_START_M)*TL_PPM;
+      const rangeHPx=Math.max((em-sm)*TL_PPM,18);
+      const{visible,overflow}=fsLayoutItems(allParts,f.itemTimes,sm,em,rangeTopPx,rangeHPx,TL_PPM);
+      visible.forEach(({idx,top})=>{
+        const item=allParts[idx];
+        const done=!!ck.subs[idx];
+        const itemTime=f.itemTimes&&f.itemTimes[idx];
+        itemsHtml.push(`<div class="fs-tl-item-row" style="top:${top}px" onclick="event.stopPropagation()">
+  <div class="fs-tl-sub-chk-round ${done?'done':''}" onclick="event.stopPropagation();toggleFsSub('${blockId2}',${idx})"></div>
+  <span class="fs-tl-item-row-name" style="${done?'text-decoration:line-through;color:var(--t3)':'color:var(--text)'}">${esc(item)}</span>
+  ${itemTime?`<span class="fs-tl-item-row-time">${esc(itemTime)}</span>`:''}
+</div>`);
+      });
+      if(overflow.length){
+        const lastVisible=visible.length?visible[visible.length-1]:null;
+        const chipTop=lastVisible?lastVisible.top+30:rangeTopPx+4;
+        itemsHtml.push(`<div class="fs-tl-overflow-chip" style="top:${Math.min(chipTop,rangeTopPx+rangeHPx-22)}px" onclick="event.stopPropagation();openFsOverflowPopover(event,'${blockId2}')">+${overflow.length}項目</div>`);
+      }
+    }
+  });
   // 5) 時刻付きだが固定ブロックに属さない単発タスク（fsBlockIdなし・startTimeのみ）を小チップ表示
   const chipTasks=(S.tasks||[]).filter(t=>!t.deleted&&!t.fsBlockId&&t.dueDate===td&&t.startTime);
   const chipsHtml=chipTasks.map(t=>{
@@ -3875,21 +3884,21 @@ function rFsTimelineView(fs,droppable,td,isTargetToday,nowM){
   // 空き時間クリックでのタスク追加は常時有効（ダッシュボード/編集画面どちらでも動く。ドラッグ割当のdroppable設定とは独立）
   const colClickAttr=`onclick="fsTlColClick(event,'${td}')"`;
   return`<div class="fs-tl-wrap" style="height:${totalH}px">
-    <div class="fs-tl-axis" style="height:${totalH}px">${ticks.join('')}</div>
+    <div class="fs-tl-axis" style="height:${totalH}px">${ticks.join('')}${nowTop!==null?`<div class="fs-tl-now-gutter" style="top:${nowTop}px"></div><span class="fs-tl-now-chip" style="top:${nowTop-9}px">${nowLabel}</span>`:''}</div>
     <div class="fs-tl-col" style="height:${totalH}px" ${colClickAttr}>
       ${railHtml}
       ${bandsHtml}
-      ${nodesHtml.join('')}
-      ${cardsHtml}
+      ${nowTop!==null?`<div class="fs-tl-now" style="top:${nowTop}px"></div>`:''}
+      ${headersHtml.join('')}
+      ${itemsHtml.join('')}
       ${chipsHtml}
-      ${nowTop!==null?`<div class="fs-tl-now" style="top:${nowTop}px"><span class="fs-tl-now-chip">${nowLabel}</span></div>`:''}
     </div>
   </div>`;
 }
 // タイムライン空き部分クリック → クリックY座標から時刻算出(30分スナップ)してタスク追加モーダルを開く
 function fsTlColClick(e,date){
-  // 帯/カード/チップ/チェック/ボタン等の子要素クリックは個別ハンドラに任せ、ここでは無視
-  if(e.target.closest('.fs-tl-band,.fs-tl-card,.fs-tl-chip'))return;
+  // 帯/ヘッダー/項目/チップ/チェック/ボタン等の子要素クリックは個別ハンドラに任せ、ここでは無視
+  if(e.target.closest('.fs-tl-band,.fs-tl-hdr,.fs-tl-item-row,.fs-tl-chip,.fs-tl-overflow-chip'))return;
   const col=e.currentTarget;
   const rect=col.getBoundingClientRect();
   const y=e.clientY-rect.top;
@@ -3901,24 +3910,6 @@ function fsTlColClick(e,date){
   const timeStr=`${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}`;
   openTaskModal(null,date,timeStr);
 }
-// タイムラインの前景カードは概算高さで仮配置されているため、レンダリング後に実際の高さ(offsetHeight)で
-// 再計算し「後のカードのtop = max(自身の本来位置, 直前カードの底+8px)」を再適用して重なりを完全にゼロにする。
-// data-tl-ideal-top昇順（=開始時刻順）はサーバー側で既にDOM順として保証済み。
-function layoutFsTimelineCards(){
-  document.querySelectorAll('.fs-tl-col').forEach(col=>{
-    let prevBottom=-Infinity;
-    const cards=[...col.querySelectorAll('.fs-tl-card[data-tl-ideal-top]')];
-    const nodes=[...col.querySelectorAll('.fs-tl-node[data-tl-ideal-top]')];
-    cards.forEach((card,idx)=>{
-      const idealTop=parseFloat(card.dataset.tlIdealTop)||0;
-      const top=Math.max(idealTop,prevBottom+8);
-      card.style.top=top+'px';
-      if(nodes[idx])nodes[idx].style.top=top+'px'; // ノードは対応カードの実位置に追従させ重なりを防ぐ
-      prevBottom=top+card.offsetHeight;
-    });
-  });
-}
-
 // 指定日に予定されている習慣を返す
 function habitsForDate(date){
   const dow=new Date(date+'T00:00:00').getDay(); // 0=日, 1=月...
@@ -4279,6 +4270,112 @@ function toggleFsSub(blockId,subIdx){
   ck.subs[subIdx]=!ck.subs[subIdx];
   playCheckSound(ck.subs[subIdx]);
   save();render();
+  if(isFsDetailModalOpen(blockId))renderFsDetailModal(blockId);
+}
+// ヘッダータップで開く詳細パネル（会長承認済み新設計）: 全項目チェックリスト+編集+削除+追加をここで完結させる
+function fsFindBlock(blockId){return(S.fs||[]).find((f,i)=>(f.id||('b'+i))===blockId);}
+function fsBlockIndex(blockId){return(S.fs||[]).findIndex((f,i)=>(f.id||('b'+i))===blockId);}
+function openFsDetailModal(blockId){
+  openModal(rFsDetailModalBody(blockId));
+  const modal=document.querySelector('#modal-overlay .modal');
+  if(modal)modal.dataset.fsDetailBlock=blockId;
+}
+function isFsDetailModalOpen(blockId){
+  const modal=document.querySelector('#modal-overlay .modal');
+  return!!modal&&modal.dataset.fsDetailBlock===blockId;
+}
+function renderFsDetailModal(blockId){
+  const modal=document.querySelector('#modal-overlay .modal');
+  if(modal&&modal.dataset.fsDetailBlock===blockId)modal.innerHTML=rFsDetailModalBody(blockId);
+}
+function rFsDetailModalBody(blockId){
+  const f=fsFindBlock(blockId);
+  if(!f)return`<div class="mhdr"><div class="mtitle">見つかりません</div><button class="mclose" onclick="closeModal()">✕</button></div>`;
+  const titleParts=f.t.includes('→')?f.t.split('→').map(s=>s.trim()).filter(Boolean):[];
+  const descParts=f.d&&f.d.includes('→')?f.d.split('→').map(s=>s.trim()).filter(Boolean):[];
+  const allParts=[...titleParts,...descParts];
+  const hasParts=allParts.length>=2;
+  const ck=getFsCk(blockId);
+  const doneCount=hasParts?allParts.filter((_,idx)=>!!ck.subs[idx]).length:0;
+  const mainDone=ck.main||(hasParts&&doneCount===allParts.length);
+  const itemTimes=f.itemTimes||{};
+  const itemRows=hasParts?allParts.map((item,idx)=>{
+    const done=!!ck.subs[idx];
+    return`<div class="fs-detail-item">
+  <div class="fs-tl-sub-chk-round ${done?'done':''}" onclick="toggleFsSub('${blockId}',${idx})"></div>
+  <input type="text" value="${esc(item)}" onchange="fsDetailUpdateItemText('${blockId}',${idx},this.value)" placeholder="項目名">
+  <input type="time" step="60" value="${esc(itemTimes[idx]||'')}" onchange="fsDetailUpdateItemTime('${blockId}',${idx},this.value)" title="時刻（任意・未設定は等間隔配置）">
+  <button class="tact" style="font-size:10px;padding:2px 4px" onclick="fsDetailUpdateItemTime('${blockId}',${idx},'')" title="時刻クリア">✕</button>
+  <button class="tact del" style="font-size:11px" onclick="fsDetailDeleteItem('${blockId}',${idx})" title="項目を削除">🗑</button>
+</div>`;
+  }).join(''):`<div style="font-size:12px;color:var(--t2);padding:8px 4px">この予定には項目（→区切り）がありません。「項目を追加」で作成できます。</div>`;
+  return`<div class="mhdr"><div class="mtitle" style="color:${f.c}">${esc(f.t.split('→')[0].trim())}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div style="font-size:12px;color:var(--t2);margin-bottom:10px">${esc(f.s)}–${esc(f.e==='24:00'?'24:00':f.e)} ・ ${fsDurationLabel(tMin(f.s),tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e))}${hasParts?` ・ ${doneCount}/${allParts.length}完了`:''}</div>
+<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);margin-bottom:6px">
+  <div class="fs-tl-hdr-chk ${mainDone?'done':''}" style="--hdr-c:${f.c}" onclick="toggleFsMain('${blockId}');renderFsDetailModal('${blockId}')">${mainDone?'✓':''}</div>
+  <span style="font-size:13px;font-weight:700;${mainDone?'text-decoration:line-through;color:var(--t3)':''}">この予定全体を完了にする</span>
+</div>
+<div id="fs-detail-items">${itemRows}</div>
+<div class="mfooter" style="flex-wrap:wrap;gap:8px">
+  <button class="btn btn-g btn-sm" onclick="fsDetailAddItem('${blockId}')">＋ 項目を追加</button>
+  <button class="btn btn-p btn-sm" onclick="closeModal();render()">閉じる</button>
+</div>`;
+}
+function fsDetailUpdateItemText(blockId,idx,val){
+  const f=fsFindBlock(blockId);if(!f)return;
+  const titleParts=f.t.includes('→')?f.t.split('→').map(s=>s.trim()):[f.t];
+  const descParts=f.d&&f.d.includes('→')?f.d.split('→').map(s=>s.trim()):(f.d?[f.d]:[]);
+  if(idx<titleParts.length){titleParts[idx]=val;f.t=titleParts.join('→');}
+  else{const di=idx-titleParts.length;descParts[di]=val;f.d=descParts.join('→');}
+  save();render();
+  if(isFsDetailModalOpen(blockId))renderFsDetailModal(blockId);
+}
+function fsDetailUpdateItemTime(blockId,idx,val){
+  const f=fsFindBlock(blockId);if(!f)return;
+  if(!f.itemTimes)f.itemTimes={};
+  if(val)f.itemTimes[idx]=val;else delete f.itemTimes[idx];
+  save();render();
+}
+function fsDetailDeleteItem(blockId,idx){
+  const f=fsFindBlock(blockId);if(!f)return;
+  const titleParts=f.t.includes('→')?f.t.split('→').map(s=>s.trim()):[f.t];
+  const descParts=f.d&&f.d.includes('→')?f.d.split('→').map(s=>s.trim()):(f.d?[f.d]:[]);
+  const n=titleParts.length;
+  if(idx<n)titleParts.splice(idx,1);else descParts.splice(idx-n,1);
+  f.t=titleParts.join('→');f.d=descParts.join('→');
+  // itemTimesのインデックスを詰め直す
+  if(f.itemTimes){
+    const newTimes={};
+    Object.keys(f.itemTimes).map(Number).sort((a,b)=>a-b).forEach(k=>{
+      if(k<idx)newTimes[k]=f.itemTimes[k];
+      else if(k>idx)newTimes[k-1]=f.itemTimes[k];
+    });
+    f.itemTimes=newTimes;
+  }
+  // チェック状態のインデックスも詰め直す
+  const ck=getFsCk(blockId);
+  const newSubs={};
+  Object.keys(ck.subs).map(Number).sort((a,b)=>a-b).forEach(k=>{
+    if(k<idx)newSubs[k]=ck.subs[k];
+    else if(k>idx)newSubs[k-1]=ck.subs[k];
+  });
+  ck.subs=newSubs;
+  save();render();
+  renderFsDetailModal(blockId);
+}
+function fsDetailAddItem(blockId){
+  const f=fsFindBlock(blockId);if(!f)return;
+  const name=prompt('項目名を入力してください');
+  if(!name||!name.trim())return;
+  const titleParts=f.t.includes('→')?f.t.split('→').map(s=>s.trim()):[f.t];
+  titleParts.push(name.trim());
+  f.t=titleParts.join('→');
+  save();render();
+  renderFsDetailModal(blockId);
+}
+// あふれた項目（+Nチップ）タップ時のポップオーバー: その場で全項目チェックリストを表示（詳細モーダルを流用）
+function openFsOverflowPopover(e,blockId){
+  openFsDetailModal(blockId);
 }
 function taskListDrop(e){
   e.preventDefault();
@@ -7783,8 +7880,9 @@ ${secTitle('📅 固定タイムスケジュール')}
       <span style="color:var(--t2)">〜</span>
       <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.e)}" onchange="S.fs[${i}].e=this.value" placeholder="${f.e==='24:00'?'24:00(終日)':'終了'}">
       <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.e?'0.7':'0.2'}" onclick="S.fs[${i}].e='';save();render()" title="終了時間をクリア">✕</button>
-      <input style="flex:1;padding:4px 8px;font-size:12px" value="${esc(f.t)}" onchange="S.fs[${i}].t=this.value" placeholder="内容">
+      <input style="flex:1;padding:4px 8px;font-size:12px" value="${esc(f.t)}" onchange="S.fs[${i}].t=this.value" placeholder="内容（→区切りで複数項目）">
       <input type="color" value="${f.c}" style="width:32px;height:32px;padding:2px;border-radius:6px;cursor:pointer;background:none;border:1px solid var(--border)" onchange="S.fs[${i}].c=this.value">
+      ${f.t.includes('→')?`<button class="btn btn-xs" style="background:${f.c}12;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;flex-shrink:0" onclick="save();openFsDetailModal('${f.id||('b'+i)}')" title="項目ごとの時刻・チェックを編集">項目時刻</button>`:''}
       <button class="tact del" onclick="S.fs.splice(${i},1);save();render()">✕</button>
     </div>`).join('')}
   </div>
@@ -10478,7 +10576,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260705-09';
+const APP_VERSION='20260705-10';
 
 render();
 function forceAppUpdate(){
