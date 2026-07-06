@@ -3306,7 +3306,7 @@ ${!ci?`<div class="checkin-banner">
 </div>
 
 ${secTitle('🕐 今日のスケジュール')}
-${rFixedScheduleList(true,false,undefined,true)}
+${rFixedScheduleList(true,false,undefined,false)}
 
 ${(()=>{
   const gcEvs=gcalEventsForDate(td).sort((a,b)=>(a.start?.dateTime||'')>(b.start?.dateTime||'')?1:-1);
@@ -3505,7 +3505,7 @@ function rFsDashPanel(date){
   </div>`;
   return`<div class="sched-layout" style="margin-bottom:4px">
     ${panel}
-    <div class="sched-col" style="flex:1;min-width:0;overflow-x:auto">${rFixedScheduleList(false,true,d,true)}</div>
+    <div class="sched-col" style="flex:1;min-width:0;overflow-x:auto">${rFixedScheduleList(false,true,d,false)}</div>
   </div>`;
 }
 function panelTaskDrop(e,targetId){
@@ -10576,7 +10576,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260705-10';
+const APP_VERSION='20260705-12';
 
 render();
 function forceAppUpdate(){
