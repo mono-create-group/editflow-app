@@ -2152,6 +2152,22 @@ function rDraftReminder(){
   <button onclick="sessionStorage.setItem('ef_draft_banner_off_'+today(),'1');document.getElementById('draft-remind-banner')?.remove()" style="background:var(--border);border:none;border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;padding:6px 10px;flex-shrink:0;font-weight:700">✕</button>
 </div>`;
 }
+function rHpFeeReminder(){
+  const td=today();
+  if(sessionStorage.getItem('ef_hpfee_banner_off_'+td))return'';
+  const due=(S.hpFees||[]).filter(l=>!l.deleted&&hpFeeDue(l));
+  if(!due.length)return'';
+  const rows=due.slice(0,6).map(l=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"><span style="flex:1;font-weight:600">${esc(l.name)}</span><span style="color:var(--amber);font-size:11px;font-weight:700;flex-shrink:0">次回請求 ${hpFeeNext(l)}</span></div>`).join('');
+  return`<div id="hpfee-remind-banner" style="background:linear-gradient(135deg,#f59e0b18,#10b98112);border:2px solid var(--amber);border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:flex-start;gap:14px">
+  <span style="font-size:26px;flex-shrink:0">💴</span>
+  <div style="flex:1;min-width:0">
+    <div style="font-weight:800;color:var(--amber);font-size:14px;letter-spacing:.3px;margin-bottom:8px">HP維持費の請求時期が近い顧客が ${due.length}件 あります</div>
+    ${rows}
+    <button onclick="V='hpfee';render()" style="margin-top:9px;background:var(--amber);border:none;border-radius:8px;color:#fff;font-size:12px;cursor:pointer;padding:7px 15px;font-weight:700">維持費タブで対応する →</button>
+  </div>
+  <button onclick="sessionStorage.setItem('ef_hpfee_banner_off_'+today(),'1');document.getElementById('hpfee-remind-banner')?.remove()" style="background:var(--border);border:none;border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;padding:6px 10px;flex-shrink:0;font-weight:700">✕</button>
+</div>`;
+}
 function rGcalReminder(){
   const td=today();
   if(sessionStorage.getItem('ef_gcal_remind_off_'+td))return'';
@@ -2413,7 +2429,7 @@ function render(){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
       html=page?rCustomPage(page):`<div class="empty"><div class="empty-icon">😕</div><div>ページが見つかりません</div></div>`;
     }else{html=(views[V]||rDash)();}
-    document.getElementById('view').innerHTML=rGcalReminder()+rDraftReminder()+html;
+    document.getElementById('view').innerHTML=rHpFeeReminder()+rGcalReminder()+rDraftReminder()+html;
     renderNav();
     document.querySelectorAll('.nav-item,.mnav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===V));
     renderGcalUI();
@@ -10807,7 +10823,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260709-02';
+const APP_VERSION='20260709-03';
 
 render();
 function forceAppUpdate(){
