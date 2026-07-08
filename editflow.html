@@ -827,6 +827,8 @@ const BUILTIN_VIEWS=[
   {id:'minutes',label:'議事録',icon:'📝'},
   {id:'salesleads',label:'営業リスト',icon:'📞'},
   {id:'hpfee',label:'維持費',icon:'💴'},
+  {id:'salessites',label:'営業用サイト',icon:'🌐'},
+  {id:'templates',label:'テンプレ保管',icon:'🗂'},
 ];
 
 const DB_OLD='ef_v4';
@@ -891,7 +893,7 @@ function _applyCloudData(json){
   S=migrate(Object.assign(def,cloud));
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -951,7 +953,7 @@ function fbSetupRealtimeSync(){
 // チームデータのみ shared/team に相乗りさせ、全員で同じ案件を見られるようにする。
 // Firestoreルールが共有アクセスを許可していれば自動で有効化。許可されない場合は
 // permission-denied を検知して自動で個人モードへフォールバック（現状維持・無害）。
-const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees'];
+const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];
 let TEAM_SHARE_OK=null;      // null=未判定 / true=共有有効 / false=個人モード
 let _teamUnsub=null;
 window._teamSnap=window._teamSnap||{};
@@ -1709,7 +1711,7 @@ let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[],
-  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[], salesLeads:[], hpFees:[],
+  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[], salesLeads:[], hpFees:[], salesSites:[], templates:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
   goalReviews:{},
@@ -2423,7 +2425,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -10473,6 +10475,118 @@ function hpFeeCopyInvoice(id){
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('振込案内をコピーしました','ok')).catch(()=>{prompt('コピーしてご利用ください:',txt);});
 }
 
+// ═══ 営業用サイト管理(チーム共有・制作したHP一覧) ═══
+const SALES_SITE_STATUSES=['未公開','公開中','成約','削除'];
+function rSalesSites(){
+  if(!S.salesSites)S.salesSites=[];
+  const all=S.salesSites.filter(l=>!l.deleted);
+  const published=all.filter(l=>l.status==='公開中').length;
+  const won=all.filter(l=>l.status==='成約').length;
+  const summary=`<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px">
+    <span class="sl-summary-chip" style="background:var(--card2);border-color:var(--border)">総数 <strong style="color:var(--text)">${all.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(37,99,235,.25);color:var(--blue)">公開中 <strong>${published}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(5,150,105,.25);color:var(--green)">成約 <strong>${won}</strong></span>
+  </div>`;
+  const rows=all.length===0?`<div class="empty"><div class="empty-icon">🌐</div><div class="empty-title">営業用サイトがまだありません</div><div style="font-size:12px;color:var(--t3);margin-top:4px">「＋追加」から登録してください</div></div>`
+    :all.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(l=>{
+    const stBtns=SALES_SITE_STATUSES.map(s=>`<button class="sl-status-btn" style="opacity:${l.status===s?1:.4};border-color:var(--border)" onclick="salesSiteSetStatus('${l.id}','${s}')">${s}</button>`).join('');
+    return`<div class="sl-row">
+      <div style="flex:1;min-width:0">
+        <div class="sl-name">${esc(l.name||'')}</div>
+        <div class="sl-meta">
+          ${l.url?`<a href="${esc(l.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:11px">🌐 サイトを開く</a>`:''}
+          ${l.leadName?`<span style="font-size:11px;color:var(--t2)">見込み客: ${esc(l.leadName)}</span>`:''}
+        </div>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">業種:</span>
+          <input type="text" class="sl-inline-input" placeholder="業種" value="${esc(l.genre||'')}" onchange="salesSiteUpdate('${l.id}','genre',this.value)" style="width:130px">
+          <input type="url" class="sl-inline-input" placeholder="サイトURL" value="${esc(l.url||'')}" onchange="salesSiteUpdate('${l.id}','url',this.value)" style="width:220px">
+          <input type="text" class="sl-inline-input" placeholder="見込み客名(任意)" value="${esc(l.leadName||'')}" onchange="salesSiteUpdate('${l.id}','leadName',this.value)" style="width:150px">
+          <input type="text" class="sl-inline-input" placeholder="メモ…" value="${esc(l.note||'')}" onchange="salesSiteUpdate('${l.id}','note',this.value)" style="flex:1;min-width:120px;max-width:260px">
+        </div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">状態:</span>${stBtns}
+        </div>
+      </div>
+      <div style="flex-shrink:0"><button class="tact del" onclick="salesSiteDelete('${l.id}')" title="削除">🗑</button></div>
+    </div>`;
+  }).join('');
+  return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="font-size:18px;font-weight:800;margin:0">🌐 営業用サイト</h2>
+      <button class="btn btn-p" onclick="salesSiteAdd()">＋追加</button></div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px">制作した営業用HPの一覧です。公開状況・紐づく見込み客を管理します。</div>
+    ${summary}${rows}`;
+}
+function salesSiteAdd(){
+  if(!S.salesSites)S.salesSites=[];
+  const name=prompt('店名を入力:'); if(!name)return;
+  S.salesSites.push({id:uid(),name:name.trim(),url:'',genre:'',leadName:'',status:'未公開',note:'',createdAt:new Date().toISOString()});
+  save();render();
+}
+function salesSiteUpdate(id,field,value){
+  const l=(S.salesSites||[]).find(x=>x.id===id); if(!l)return;
+  l[field]=value; save();render();
+}
+function salesSiteSetStatus(id,status){
+  const l=(S.salesSites||[]).find(x=>x.id===id); if(!l)return;
+  l.status=status; save();render();
+}
+function salesSiteDelete(id){
+  const l=(S.salesSites||[]).find(x=>x.id===id); if(!l)return;
+  if(!confirm(`「${l.name}」を営業用サイト一覧から削除しますか？`))return;
+  l.deleted=true; save();render();
+}
+
+// ═══ テンプレ保管(チーム共有・デザインテンプレの引き出しライブラリ) ═══
+function rTemplates(){
+  if(!S.templates)S.templates=[];
+  const all=S.templates.filter(l=>!l.deleted);
+  const genreCount=new Set(all.map(l=>l.genre||'').filter(Boolean)).size;
+  const summary=`<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px">
+    <span class="sl-summary-chip" style="background:var(--card2);border-color:var(--border)">総数 <strong style="color:var(--text)">${all.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(109,40,217,.25);color:var(--purple)">業種数 <strong>${genreCount}</strong></span>
+  </div>`;
+  const rows=all.length===0?`<div class="empty"><div class="empty-icon">🗂</div><div class="empty-title">テンプレがまだありません</div><div style="font-size:12px;color:var(--t3);margin-top:4px">「＋追加」から登録してください</div></div>`
+    :all.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(l=>{
+    return`<div class="sl-row">
+      <div style="flex:1;min-width:0">
+        <div class="sl-name">${esc(l.name||'')}</div>
+        <div class="sl-meta">
+          ${l.url?`<a href="${esc(l.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:11px">🌐 テンプレを開く</a>`:''}
+        </div>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">業種:</span>
+          <input type="text" class="sl-inline-input" placeholder="業種" value="${esc(l.genre||'')}" onchange="templateUpdate('${l.id}','genre',this.value)" style="width:130px">
+          <input type="url" class="sl-inline-input" placeholder="テンプレURL" value="${esc(l.url||'')}" onchange="templateUpdate('${l.id}','url',this.value)" style="width:220px">
+          <input type="text" class="sl-inline-input" placeholder="デザイン系統" value="${esc(l.style||'')}" onchange="templateUpdate('${l.id}','style',this.value)" style="width:150px">
+          <input type="text" class="sl-inline-input" placeholder="メモ…" value="${esc(l.note||'')}" onchange="templateUpdate('${l.id}','note',this.value)" style="flex:1;min-width:120px;max-width:260px">
+        </div>
+      </div>
+      <div style="flex-shrink:0"><button class="tact del" onclick="templateDelete('${l.id}')" title="削除">🗑</button></div>
+    </div>`;
+  }).join('');
+  return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="font-size:18px;font-weight:800;margin:0">🗂 テンプレ保管</h2>
+      <button class="btn btn-p" onclick="templateAdd()">＋追加</button></div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px">デザインテンプレの引き出しライブラリです。業種・系統別に整理して次の制作に使い回します。</div>
+    ${summary}${rows}`;
+}
+function templateAdd(){
+  if(!S.templates)S.templates=[];
+  const name=prompt('テンプレ名を入力:'); if(!name)return;
+  S.templates.push({id:uid(),name:name.trim(),url:'',genre:'',style:'',note:'',createdAt:new Date().toISOString()});
+  save();render();
+}
+function templateUpdate(id,field,value){
+  const l=(S.templates||[]).find(x=>x.id===id); if(!l)return;
+  l[field]=value; save();render();
+}
+function templateDelete(id){
+  const l=(S.templates||[]).find(x=>x.id===id); if(!l)return;
+  if(!confirm(`「${l.name}」をテンプレ保管から削除しますか？`))return;
+  l.deleted=true; save();render();
+}
+
 function rSalesLeads(){
   if(!S.salesLeads)S.salesLeads=[];
   const all=S.salesLeads.filter(l=>!l.deleted);
@@ -10823,7 +10937,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260709-03';
+const APP_VERSION='20260710-01';
 
 render();
 function forceAppUpdate(){

@@ -826,6 +826,9 @@ const BUILTIN_VIEWS=[
   {id:'bizunits',label:'事業部ボード',icon:'🏬'},
   {id:'minutes',label:'議事録',icon:'📝'},
   {id:'salesleads',label:'営業リスト',icon:'📞'},
+  {id:'hpfee',label:'維持費',icon:'💴'},
+  {id:'salessites',label:'営業用サイト',icon:'🌐'},
+  {id:'templates',label:'テンプレ保管',icon:'🗂'},
 ];
 
 const DB_OLD='ef_v4';
@@ -890,7 +893,7 @@ function _applyCloudData(json){
   S=migrate(Object.assign(def,cloud));
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -950,7 +953,7 @@ function fbSetupRealtimeSync(){
 // チームデータのみ shared/team に相乗りさせ、全員で同じ案件を見られるようにする。
 // Firestoreルールが共有アクセスを許可していれば自動で有効化。許可されない場合は
 // permission-denied を検知して自動で個人モードへフォールバック（現状維持・無害）。
-const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads'];
+const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];
 let TEAM_SHARE_OK=null;      // null=未判定 / true=共有有効 / false=個人モード
 let _teamUnsub=null;
 window._teamSnap=window._teamSnap||{};
@@ -1708,7 +1711,7 @@ let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[],
-  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[], salesLeads:[],
+  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[], salesLeads:[], hpFees:[], salesSites:[], templates:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
   goalReviews:{},
@@ -2151,6 +2154,22 @@ function rDraftReminder(){
   <button onclick="sessionStorage.setItem('ef_draft_banner_off_'+today(),'1');document.getElementById('draft-remind-banner')?.remove()" style="background:var(--border);border:none;border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;padding:6px 10px;flex-shrink:0;font-weight:700">✕</button>
 </div>`;
 }
+function rHpFeeReminder(){
+  const td=today();
+  if(sessionStorage.getItem('ef_hpfee_banner_off_'+td))return'';
+  const due=(S.hpFees||[]).filter(l=>!l.deleted&&hpFeeDue(l));
+  if(!due.length)return'';
+  const rows=due.slice(0,6).map(l=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"><span style="flex:1;font-weight:600">${esc(l.name)}</span><span style="color:var(--amber);font-size:11px;font-weight:700;flex-shrink:0">次回請求 ${hpFeeNext(l)}</span></div>`).join('');
+  return`<div id="hpfee-remind-banner" style="background:linear-gradient(135deg,#f59e0b18,#10b98112);border:2px solid var(--amber);border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:flex-start;gap:14px">
+  <span style="font-size:26px;flex-shrink:0">💴</span>
+  <div style="flex:1;min-width:0">
+    <div style="font-weight:800;color:var(--amber);font-size:14px;letter-spacing:.3px;margin-bottom:8px">HP維持費の請求時期が近い顧客が ${due.length}件 あります</div>
+    ${rows}
+    <button onclick="V='hpfee';render()" style="margin-top:9px;background:var(--amber);border:none;border-radius:8px;color:#fff;font-size:12px;cursor:pointer;padding:7px 15px;font-weight:700">維持費タブで対応する →</button>
+  </div>
+  <button onclick="sessionStorage.setItem('ef_hpfee_banner_off_'+today(),'1');document.getElementById('hpfee-remind-banner')?.remove()" style="background:var(--border);border:none;border-radius:8px;color:var(--t2);font-size:12px;cursor:pointer;padding:6px 10px;flex-shrink:0;font-weight:700">✕</button>
+</div>`;
+}
 function rGcalReminder(){
   const td=today();
   if(sessionStorage.getItem('ef_gcal_remind_off_'+td))return'';
@@ -2406,13 +2425,13 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
       html=page?rCustomPage(page):`<div class="empty"><div class="empty-icon">😕</div><div>ページが見つかりません</div></div>`;
     }else{html=(views[V]||rDash)();}
-    document.getElementById('view').innerHTML=rGcalReminder()+rDraftReminder()+html;
+    document.getElementById('view').innerHTML=rHpFeeReminder()+rGcalReminder()+rDraftReminder()+html;
     renderNav();
     document.querySelectorAll('.nav-item,.mnav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===V));
     renderGcalUI();
@@ -10308,6 +10327,7 @@ function initReminders(){
 // ===営業リスト===
 const SL_STATUSES=['未接触','HP作成済','電話済','アポ','商談','成約','失注'];
 const SL_APPROACHES=['電話','メール','InstagramDM','LINE','訪問'];  // 営業方法(記録用)
+const SL_ASSIGNEES=['会長','佐々木','アオイ'];  // 営業担当者(誰が営業をかけたか)
 function slIgUrl(v){
   v=(v||'').trim();
   if(!v)return '#';
@@ -10321,6 +10341,7 @@ let _slFilterStatus='all';
 let _slFilterGenre='all';
 let _slFilterRegion='all';
 let _slFilterContact='all';  // all / ig / email / both
+let _slFilterAssignee='all';  // all / 会長 / 佐々木 / アオイ / 未割当
 let _slSearch='';
 const SL_PAGE_SIZE=100;
 const SL_GOAL_MONTH=10; // 今月の成約目標件数
@@ -10347,9 +10368,223 @@ function slFilteredLeads(){
     if(_slFilterContact==='ig'&&!hasIG)return false;
     if(_slFilterContact==='email'&&!hasEmail)return false;
     if(_slFilterContact==='both'&&!(hasIG&&hasEmail))return false;
+    if(_slFilterAssignee!=='all'){
+      if(_slFilterAssignee==='未割当'){if(l.assignee)return false;}
+      else if(l.assignee!==_slFilterAssignee)return false;
+    }
     if(q&&!(l.name||'').toLowerCase().includes(q)&&!(l.address||'').toLowerCase().includes(q))return false;
     return true;
   });
+}
+
+// ═══ HP維持費管理(年間¥10,000の徴収システム) ═══
+const HP_FEE=10000;               // 年間維持費(円)
+const HP_FEE_STATUSES=['未請求','請求済','入金済'];
+function hpFeeNext(l){             // 次回請求日=契約日の次の記念日(>=今日)
+  if(!l.contractDate)return '';
+  const c=new Date(l.contractDate); if(isNaN(c))return '';
+  const now=new Date(); now.setHours(0,0,0,0);
+  const next=new Date(c);
+  next.setFullYear(now.getFullYear());
+  if(next<now)next.setFullYear(now.getFullYear()+1);
+  return next.toISOString().slice(0,10);
+}
+function hpFeeDue(l){             // 請求すべきか(次回請求日30日以内 or 過ぎ、かつ入金済でない)
+  const n=hpFeeNext(l); if(!n)return false;
+  if(l.status==='入金済')return false;
+  const days=(new Date(n)-new Date())/86400000;
+  return days<=30;
+}
+function rHpFee(){
+  if(!S.hpFees)S.hpFees=[];
+  const all=S.hpFees.filter(l=>!l.deleted);
+  const dueList=all.filter(hpFeeDue);
+  const unpaid=all.filter(l=>l.status==='請求済');
+  const annual=all.length*HP_FEE;
+  const summary=`<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px">
+    <span class="sl-summary-chip" style="background:var(--card2);border-color:var(--border)">顧客 <strong style="color:var(--text)">${all.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(180,83,9,.25);color:var(--amber)">要請求 <strong>${dueList.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(220,38,38,.25);color:var(--red)">未回収(請求済) <strong>${unpaid.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(5,150,105,.25);color:var(--green)">年間維持費 <strong>¥${annual.toLocaleString()}</strong></span>
+  </div>`;
+  const rows=all.length===0?`<div class="empty"><div class="empty-icon">💴</div><div class="empty-title">HP顧客がまだありません</div><div style="font-size:12px;color:var(--t3);margin-top:4px">「＋顧客を追加」から登録してください</div></div>`
+    :all.slice().sort((a,b)=>(hpFeeNext(a)||'9999').localeCompare(hpFeeNext(b)||'9999')).map(l=>{
+    const next=hpFeeNext(l);
+    const due=hpFeeDue(l);
+    const stBtns=HP_FEE_STATUSES.map(s=>`<button class="sl-status-btn" style="opacity:${l.status===s?1:.4};border-color:var(--border)" onclick="hpFeeSetStatus('${l.id}','${s}')">${s}</button>`).join('');
+    return`<div class="sl-row" style="${due?'border-color:rgba(180,83,9,.5);background:var(--adim)':''}">
+      <div style="flex:1;min-width:0">
+        <div class="sl-name">${esc(l.name||'')} ${due?'<span style="font-size:10px;color:var(--amber);font-weight:700">● 要請求</span>':''}</div>
+        <div class="sl-meta">
+          ${l.url?`<a href="${esc(l.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:11px">🌐 HP</a>`:''}
+          <span style="font-size:11px;color:var(--t2)">年間維持費 ¥${HP_FEE.toLocaleString()}</span>
+          ${next?`<span style="font-size:11px;color:${due?'var(--amber)':'var(--t2)'}">次回請求: ${next}</span>`:''}
+          ${l.lastPaidAt?`<span style="font-size:11px;color:var(--green)">最終入金: ${esc(l.lastPaidAt)}</span>`:''}
+        </div>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">契約日:</span>
+          <input type="date" class="sl-inline-input" value="${esc(l.contractDate||'')}" onchange="hpFeeUpdate('${l.id}','contractDate',this.value)" style="width:130px">
+          <input type="url" class="sl-inline-input" placeholder="HP URL" value="${esc(l.url||'')}" onchange="hpFeeUpdate('${l.id}','url',this.value)" style="width:200px">
+          <input type="text" class="sl-inline-input" placeholder="メモ…" value="${esc(l.note||'')}" onchange="hpFeeUpdate('${l.id}','note',this.value)" style="flex:1;min-width:120px;max-width:260px">
+        </div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">請求状態:</span>${stBtns}
+          <button class="btn btn-g btn-xs" onclick="hpFeeCopyInvoice('${l.id}')">振込案内をコピー</button>
+          ${l.status==='入金済'?`<button class="btn btn-g btn-xs" onclick="hpFeeNextCycle('${l.id}')">翌年分へ繰越</button>`:''}
+        </div>
+      </div>
+      <div style="flex-shrink:0"><button class="tact del" onclick="hpFeeDelete('${l.id}')" title="削除">🗑</button></div>
+    </div>`;
+  }).join('');
+  return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="font-size:18px;font-weight:800;margin:0">💴 HP維持費管理</h2>
+      <button class="btn btn-p" onclick="hpFeeAdd()">＋顧客を追加</button></div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px">HP納品後の年間維持費(¥${HP_FEE.toLocaleString()}/年)の請求・入金を管理します。次回請求日が近い顧客はオレンジで表示されます。</div>
+    ${summary}${rows}`;
+}
+function hpFeeAdd(){
+  if(!S.hpFees)S.hpFees=[];
+  const name=prompt('顧客名(店名)を入力:'); if(!name)return;
+  const cd=(prompt('契約日/納品日(YYYY-MM-DD・省略可):')||'').trim();
+  S.hpFees.push({id:uid(),name:name.trim(),contractDate:cd,url:'',status:'未請求',note:'',createdAt:new Date().toISOString()});
+  save();render();
+}
+function hpFeeUpdate(id,field,value){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  l[field]=value; save();render();
+}
+function hpFeeSetStatus(id,status){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  l.status=status;
+  if(status==='入金済')l.lastPaidAt=new Date().toISOString().slice(0,10);
+  save();render();
+}
+function hpFeeNextCycle(id){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  l.status='未請求'; save();render();
+}
+function hpFeeDelete(id){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  if(!confirm(`「${l.name}」を維持費管理から削除しますか？`))return;
+  l.deleted=true; save();render();
+}
+function hpFeeCopyInvoice(id){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  const next=hpFeeNext(l)||'（契約日を入力してください）';
+  const txt=`${l.name} 御中\n\nいつもお世話になっております。mono.create（旭川）です。\nホームページの年間維持費のご案内です。\n\n■ 年間維持費：¥${HP_FEE.toLocaleString()}（税込）\n■ お支払い期限：${next}\n■ お振込先：〇〇銀行 〇〇支店 普通 0000000 モノクリエイト\n\n維持費には、サーバー・ドメインの維持、軽微な修正、稼働監視が含まれます。\nご不明点はLINEまたはお電話でお気軽にどうぞ。\n\nmono.create\n0166-00-0000`;
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('振込案内をコピーしました','ok')).catch(()=>{prompt('コピーしてご利用ください:',txt);});
+}
+
+// ═══ 営業用サイト管理(チーム共有・制作したHP一覧) ═══
+const SALES_SITE_STATUSES=['未公開','公開中','成約','削除'];
+function rSalesSites(){
+  if(!S.salesSites)S.salesSites=[];
+  const all=S.salesSites.filter(l=>!l.deleted);
+  const published=all.filter(l=>l.status==='公開中').length;
+  const won=all.filter(l=>l.status==='成約').length;
+  const summary=`<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px">
+    <span class="sl-summary-chip" style="background:var(--card2);border-color:var(--border)">総数 <strong style="color:var(--text)">${all.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(37,99,235,.25);color:var(--blue)">公開中 <strong>${published}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(5,150,105,.25);color:var(--green)">成約 <strong>${won}</strong></span>
+  </div>`;
+  const rows=all.length===0?`<div class="empty"><div class="empty-icon">🌐</div><div class="empty-title">営業用サイトがまだありません</div><div style="font-size:12px;color:var(--t3);margin-top:4px">「＋追加」から登録してください</div></div>`
+    :all.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(l=>{
+    const stBtns=SALES_SITE_STATUSES.map(s=>`<button class="sl-status-btn" style="opacity:${l.status===s?1:.4};border-color:var(--border)" onclick="salesSiteSetStatus('${l.id}','${s}')">${s}</button>`).join('');
+    return`<div class="sl-row">
+      <div style="flex:1;min-width:0">
+        <div class="sl-name">${esc(l.name||'')}</div>
+        <div class="sl-meta">
+          ${l.url?`<a href="${esc(l.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:11px">🌐 サイトを開く</a>`:''}
+          ${l.leadName?`<span style="font-size:11px;color:var(--t2)">見込み客: ${esc(l.leadName)}</span>`:''}
+        </div>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">業種:</span>
+          <input type="text" class="sl-inline-input" placeholder="業種" value="${esc(l.genre||'')}" onchange="salesSiteUpdate('${l.id}','genre',this.value)" style="width:130px">
+          <input type="url" class="sl-inline-input" placeholder="サイトURL" value="${esc(l.url||'')}" onchange="salesSiteUpdate('${l.id}','url',this.value)" style="width:220px">
+          <input type="text" class="sl-inline-input" placeholder="見込み客名(任意)" value="${esc(l.leadName||'')}" onchange="salesSiteUpdate('${l.id}','leadName',this.value)" style="width:150px">
+          <input type="text" class="sl-inline-input" placeholder="メモ…" value="${esc(l.note||'')}" onchange="salesSiteUpdate('${l.id}','note',this.value)" style="flex:1;min-width:120px;max-width:260px">
+        </div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">状態:</span>${stBtns}
+        </div>
+      </div>
+      <div style="flex-shrink:0"><button class="tact del" onclick="salesSiteDelete('${l.id}')" title="削除">🗑</button></div>
+    </div>`;
+  }).join('');
+  return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="font-size:18px;font-weight:800;margin:0">🌐 営業用サイト</h2>
+      <button class="btn btn-p" onclick="salesSiteAdd()">＋追加</button></div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px">制作した営業用HPの一覧です。公開状況・紐づく見込み客を管理します。</div>
+    ${summary}${rows}`;
+}
+function salesSiteAdd(){
+  if(!S.salesSites)S.salesSites=[];
+  const name=prompt('店名を入力:'); if(!name)return;
+  S.salesSites.push({id:uid(),name:name.trim(),url:'',genre:'',leadName:'',status:'未公開',note:'',createdAt:new Date().toISOString()});
+  save();render();
+}
+function salesSiteUpdate(id,field,value){
+  const l=(S.salesSites||[]).find(x=>x.id===id); if(!l)return;
+  l[field]=value; save();render();
+}
+function salesSiteSetStatus(id,status){
+  const l=(S.salesSites||[]).find(x=>x.id===id); if(!l)return;
+  l.status=status; save();render();
+}
+function salesSiteDelete(id){
+  const l=(S.salesSites||[]).find(x=>x.id===id); if(!l)return;
+  if(!confirm(`「${l.name}」を営業用サイト一覧から削除しますか？`))return;
+  l.deleted=true; save();render();
+}
+
+// ═══ テンプレ保管(チーム共有・デザインテンプレの引き出しライブラリ) ═══
+function rTemplates(){
+  if(!S.templates)S.templates=[];
+  const all=S.templates.filter(l=>!l.deleted);
+  const genreCount=new Set(all.map(l=>l.genre||'').filter(Boolean)).size;
+  const summary=`<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px">
+    <span class="sl-summary-chip" style="background:var(--card2);border-color:var(--border)">総数 <strong style="color:var(--text)">${all.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(109,40,217,.25);color:var(--purple)">業種数 <strong>${genreCount}</strong></span>
+  </div>`;
+  const rows=all.length===0?`<div class="empty"><div class="empty-icon">🗂</div><div class="empty-title">テンプレがまだありません</div><div style="font-size:12px;color:var(--t3);margin-top:4px">「＋追加」から登録してください</div></div>`
+    :all.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(l=>{
+    return`<div class="sl-row">
+      <div style="flex:1;min-width:0">
+        <div class="sl-name">${esc(l.name||'')}</div>
+        <div class="sl-meta">
+          ${l.url?`<a href="${esc(l.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:11px">🌐 テンプレを開く</a>`:''}
+        </div>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">業種:</span>
+          <input type="text" class="sl-inline-input" placeholder="業種" value="${esc(l.genre||'')}" onchange="templateUpdate('${l.id}','genre',this.value)" style="width:130px">
+          <input type="url" class="sl-inline-input" placeholder="テンプレURL" value="${esc(l.url||'')}" onchange="templateUpdate('${l.id}','url',this.value)" style="width:220px">
+          <input type="text" class="sl-inline-input" placeholder="デザイン系統" value="${esc(l.style||'')}" onchange="templateUpdate('${l.id}','style',this.value)" style="width:150px">
+          <input type="text" class="sl-inline-input" placeholder="メモ…" value="${esc(l.note||'')}" onchange="templateUpdate('${l.id}','note',this.value)" style="flex:1;min-width:120px;max-width:260px">
+        </div>
+      </div>
+      <div style="flex-shrink:0"><button class="tact del" onclick="templateDelete('${l.id}')" title="削除">🗑</button></div>
+    </div>`;
+  }).join('');
+  return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="font-size:18px;font-weight:800;margin:0">🗂 テンプレ保管</h2>
+      <button class="btn btn-p" onclick="templateAdd()">＋追加</button></div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px">デザインテンプレの引き出しライブラリです。業種・系統別に整理して次の制作に使い回します。</div>
+    ${summary}${rows}`;
+}
+function templateAdd(){
+  if(!S.templates)S.templates=[];
+  const name=prompt('テンプレ名を入力:'); if(!name)return;
+  S.templates.push({id:uid(),name:name.trim(),url:'',genre:'',style:'',note:'',createdAt:new Date().toISOString()});
+  save();render();
+}
+function templateUpdate(id,field,value){
+  const l=(S.templates||[]).find(x=>x.id===id); if(!l)return;
+  l[field]=value; save();render();
+}
+function templateDelete(id){
+  const l=(S.templates||[]).find(x=>x.id===id); if(!l)return;
+  if(!confirm(`「${l.name}」をテンプレ保管から削除しますか？`))return;
+  l.deleted=true; save();render();
 }
 
 function rSalesLeads(){
@@ -10443,6 +10678,16 @@ function rSalesLeads(){
     <button class="fbtn${_slFilterContact==='both'?' act':''}" onclick="_slFilterContact='both';_slPage=0;render()">📷+✉️ 両方有 ${bothCount}</button>
   </div>`;
 
+  // ─── 担当者フィルタ(誰が営業をかけたか) ───
+  const assigneeCounts={};
+  SL_ASSIGNEES.forEach(a=>{assigneeCounts[a]=all.filter(l=>l.assignee===a).length;});
+  const unassignedCount=all.filter(l=>!l.assignee).length;
+  const assigneeFilterHtml=`<div class="filter-bar" style="margin-bottom:8px">
+    <button class="fbtn${_slFilterAssignee==='all'?' act':''}" onclick="_slFilterAssignee='all';_slPage=0;render()">担当すべて</button>
+    ${SL_ASSIGNEES.map(a=>`<button class="fbtn${_slFilterAssignee===a?' act':''}" onclick="_slFilterAssignee='${a}';_slPage=0;render()">${a} ${assigneeCounts[a]}</button>`).join('')}
+    <button class="fbtn${_slFilterAssignee==='未割当'?' act':''}" onclick="_slFilterAssignee='未割当';_slPage=0;render()">未割当 ${unassignedCount}</button>
+  </div>`;
+
   const searchHtml=`<div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
     <input type="search" placeholder="店名・住所で検索…" value="${esc(_slSearch)}" oninput="_slSearch=this.value;_slPage=0;render()" style="max-width:280px">
     <span style="font-size:12px;color:var(--t2)">${filtered.length}件</span>
@@ -10458,6 +10703,9 @@ function rSalesLeads(){
       const apprBtns=SL_APPROACHES.map(a=>
         `<button class="sl-appr-btn${l.approach===a?' act':''}" onclick="slSetApproach('${sid}','${a}')">${a}</button>`
       ).join('');
+      const assigneeBtns=SL_ASSIGNEES.map(a=>
+        `<button class="sl-appr-btn${l.assignee===a?' act':''}" onclick="slSetAssignee('${sid}','${a}')">${a}</button>`
+      ).join('');
       return`<div class="sl-row">
         <div style="flex:1;min-width:0">
           <div class="sl-name">${esc(l.name||'')}</div>
@@ -10471,6 +10719,10 @@ function rSalesLeads(){
           ${l.address?`<div style="font-size:11px;color:var(--t3);margin-top:2px">${esc(l.address)}</div>`:''}
           <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
             <span style="font-size:11px;color:var(--t2)">営業方法:</span>${apprBtns}
+          </div>
+          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+            <span style="font-size:11px;color:var(--t2)">担当:</span>${assigneeBtns}
+            ${l.assignee?`<span style="font-size:10px;color:var(--t3)">(${esc(l.assignee)}が対応)</span>`:'<span style="font-size:10px;color:var(--t3)">未割当</span>'}
           </div>
           <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
             <input type="text" class="sl-inline-input" placeholder="📷 Instagram URL/@id" value="${esc(l.instagram||'')}" onchange="slUpdate('${sid}','instagram',this.value)" style="width:180px">
@@ -10526,6 +10778,7 @@ function rSalesLeads(){
   ${genreFilterHtml}
   ${regionFilterHtml}
   ${contactFilterHtml}
+  ${assigneeFilterHtml}
   ${searchHtml}
   ${rowsHtml}
   ${filtered.length>SL_PAGE_SIZE?pagerHtml:''}`;
@@ -10551,6 +10804,14 @@ function slSetApproach(id,approach){
   const l=(S.salesLeads||[]).find(x=>x.id===id);
   if(!l)return;
   l.approach=(l.approach===approach)?'':approach;  // 同じボタン再クリックで解除
+  save();
+  render();
+}
+
+function slSetAssignee(id,name){
+  const l=(S.salesLeads||[]).find(x=>x.id===id);
+  if(!l)return;
+  l.assignee=(l.assignee===name)?'':name;  // 同じボタン再クリックで未割当に戻す
   save();
   render();
 }
@@ -10676,7 +10937,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260709-03';
+const APP_VERSION='20260710-01';
 
 render();
 function forceAppUpdate(){
