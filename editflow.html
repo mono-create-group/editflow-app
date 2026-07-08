@@ -10308,6 +10308,7 @@ function initReminders(){
 // ===営業リスト===
 const SL_STATUSES=['未接触','HP作成済','電話済','アポ','商談','成約','失注'];
 const SL_APPROACHES=['電話','メール','InstagramDM','LINE','訪問'];  // 営業方法(記録用)
+const SL_ASSIGNEES=['会長','佐々木','アオイ'];  // 営業担当者(誰が営業をかけたか)
 function slIgUrl(v){
   v=(v||'').trim();
   if(!v)return '#';
@@ -10321,6 +10322,7 @@ let _slFilterStatus='all';
 let _slFilterGenre='all';
 let _slFilterRegion='all';
 let _slFilterContact='all';  // all / ig / email / both
+let _slFilterAssignee='all';  // all / 会長 / 佐々木 / アオイ / 未割当
 let _slSearch='';
 const SL_PAGE_SIZE=100;
 const SL_GOAL_MONTH=10; // 今月の成約目標件数
@@ -10347,6 +10349,10 @@ function slFilteredLeads(){
     if(_slFilterContact==='ig'&&!hasIG)return false;
     if(_slFilterContact==='email'&&!hasEmail)return false;
     if(_slFilterContact==='both'&&!(hasIG&&hasEmail))return false;
+    if(_slFilterAssignee!=='all'){
+      if(_slFilterAssignee==='未割当'){if(l.assignee)return false;}
+      else if(l.assignee!==_slFilterAssignee)return false;
+    }
     if(q&&!(l.name||'').toLowerCase().includes(q)&&!(l.address||'').toLowerCase().includes(q))return false;
     return true;
   });
@@ -10443,6 +10449,16 @@ function rSalesLeads(){
     <button class="fbtn${_slFilterContact==='both'?' act':''}" onclick="_slFilterContact='both';_slPage=0;render()">📷+✉️ 両方有 ${bothCount}</button>
   </div>`;
 
+  // ─── 担当者フィルタ(誰が営業をかけたか) ───
+  const assigneeCounts={};
+  SL_ASSIGNEES.forEach(a=>{assigneeCounts[a]=all.filter(l=>l.assignee===a).length;});
+  const unassignedCount=all.filter(l=>!l.assignee).length;
+  const assigneeFilterHtml=`<div class="filter-bar" style="margin-bottom:8px">
+    <button class="fbtn${_slFilterAssignee==='all'?' act':''}" onclick="_slFilterAssignee='all';_slPage=0;render()">担当すべて</button>
+    ${SL_ASSIGNEES.map(a=>`<button class="fbtn${_slFilterAssignee===a?' act':''}" onclick="_slFilterAssignee='${a}';_slPage=0;render()">${a} ${assigneeCounts[a]}</button>`).join('')}
+    <button class="fbtn${_slFilterAssignee==='未割当'?' act':''}" onclick="_slFilterAssignee='未割当';_slPage=0;render()">未割当 ${unassignedCount}</button>
+  </div>`;
+
   const searchHtml=`<div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
     <input type="search" placeholder="店名・住所で検索…" value="${esc(_slSearch)}" oninput="_slSearch=this.value;_slPage=0;render()" style="max-width:280px">
     <span style="font-size:12px;color:var(--t2)">${filtered.length}件</span>
@@ -10458,6 +10474,9 @@ function rSalesLeads(){
       const apprBtns=SL_APPROACHES.map(a=>
         `<button class="sl-appr-btn${l.approach===a?' act':''}" onclick="slSetApproach('${sid}','${a}')">${a}</button>`
       ).join('');
+      const assigneeBtns=SL_ASSIGNEES.map(a=>
+        `<button class="sl-appr-btn${l.assignee===a?' act':''}" onclick="slSetAssignee('${sid}','${a}')">${a}</button>`
+      ).join('');
       return`<div class="sl-row">
         <div style="flex:1;min-width:0">
           <div class="sl-name">${esc(l.name||'')}</div>
@@ -10471,6 +10490,10 @@ function rSalesLeads(){
           ${l.address?`<div style="font-size:11px;color:var(--t3);margin-top:2px">${esc(l.address)}</div>`:''}
           <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
             <span style="font-size:11px;color:var(--t2)">営業方法:</span>${apprBtns}
+          </div>
+          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+            <span style="font-size:11px;color:var(--t2)">担当:</span>${assigneeBtns}
+            ${l.assignee?`<span style="font-size:10px;color:var(--t3)">(${esc(l.assignee)}が対応)</span>`:'<span style="font-size:10px;color:var(--t3)">未割当</span>'}
           </div>
           <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
             <input type="text" class="sl-inline-input" placeholder="📷 Instagram URL/@id" value="${esc(l.instagram||'')}" onchange="slUpdate('${sid}','instagram',this.value)" style="width:180px">
@@ -10526,6 +10549,7 @@ function rSalesLeads(){
   ${genreFilterHtml}
   ${regionFilterHtml}
   ${contactFilterHtml}
+  ${assigneeFilterHtml}
   ${searchHtml}
   ${rowsHtml}
   ${filtered.length>SL_PAGE_SIZE?pagerHtml:''}`;
@@ -10551,6 +10575,14 @@ function slSetApproach(id,approach){
   const l=(S.salesLeads||[]).find(x=>x.id===id);
   if(!l)return;
   l.approach=(l.approach===approach)?'':approach;  // 同じボタン再クリックで解除
+  save();
+  render();
+}
+
+function slSetAssignee(id,name){
+  const l=(S.salesLeads||[]).find(x=>x.id===id);
+  if(!l)return;
+  l.assignee=(l.assignee===name)?'':name;  // 同じボタン再クリックで未割当に戻す
   save();
   render();
 }
@@ -10676,7 +10708,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260706-04';
+const APP_VERSION='20260709-01';
 
 render();
 function forceAppUpdate(){
