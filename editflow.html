@@ -866,8 +866,12 @@ function fbSave(){
 }
 
 // 個人ドキュメント(users/{uid})も肥大時はLZ圧縮する(Firestore 1MiB制限対策)
+// チームデータ(TEAM_KEYS + bizBoard)は shared/team が唯一の真実。個人docには保存しない
+// (二重管理で、アカウント切替時に個人docの古い/空のチームデータが共有取り込み分を上書きする事故を防ぐ)
 function _packState(){
-  const json=JSON.stringify(S);
+  const EXCL={bizBoard:1};TEAM_KEYS.forEach(k=>EXCL[k]=1);
+  const personal={};for(const k in S){if(!EXCL[k])personal[k]=S[k];}
+  const json=JSON.stringify(personal);
   if(window.LZString&&json.length>500000){
     try{return 'LZ:'+LZString.compressToBase64(json);}catch(_){return json;}
   }
@@ -881,8 +885,12 @@ function _applyCloudData(json){
   }
   const cloud=JSON.parse(json);
   const def=defState();
+  // チームデータは shared/team が唯一の真実。個人docで上書きせず現在のメモリ内容を保持する。
+  const keepTeam={};TEAM_KEYS.forEach(k=>keepTeam[k]=S[k]);const keepBiz=S.bizBoard;
   S=migrate(Object.assign(def,cloud));
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
+  if(keepBiz!==undefined)S.bizBoard=keepBiz;
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -10668,7 +10676,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260706-03';
+const APP_VERSION='20260706-04';
 
 render();
 function forceAppUpdate(){
