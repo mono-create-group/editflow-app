@@ -826,6 +826,7 @@ const BUILTIN_VIEWS=[
   {id:'bizunits',label:'事業部ボード',icon:'🏬'},
   {id:'minutes',label:'議事録',icon:'📝'},
   {id:'salesleads',label:'営業リスト',icon:'📞'},
+  {id:'hpfee',label:'維持費',icon:'💴'},
 ];
 
 const DB_OLD='ef_v4';
@@ -890,7 +891,7 @@ function _applyCloudData(json){
   S=migrate(Object.assign(def,cloud));
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -950,7 +951,7 @@ function fbSetupRealtimeSync(){
 // チームデータのみ shared/team に相乗りさせ、全員で同じ案件を見られるようにする。
 // Firestoreルールが共有アクセスを許可していれば自動で有効化。許可されない場合は
 // permission-denied を検知して自動で個人モードへフォールバック（現状維持・無害）。
-const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads'];
+const TEAM_KEYS=['jobs','clients','workers','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees'];
 let TEAM_SHARE_OK=null;      // null=未判定 / true=共有有効 / false=個人モード
 let _teamUnsub=null;
 window._teamSnap=window._teamSnap||{};
@@ -1708,7 +1709,7 @@ let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
   tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[],
-  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[], salesLeads:[],
+  checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[], salesLeads:[], hpFees:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
   goalReviews:{},
@@ -2406,7 +2407,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -10358,6 +10359,104 @@ function slFilteredLeads(){
   });
 }
 
+// ═══ HP維持費管理(年間¥10,000の徴収システム) ═══
+const HP_FEE=10000;               // 年間維持費(円)
+const HP_FEE_STATUSES=['未請求','請求済','入金済'];
+function hpFeeNext(l){             // 次回請求日=契約日の次の記念日(>=今日)
+  if(!l.contractDate)return '';
+  const c=new Date(l.contractDate); if(isNaN(c))return '';
+  const now=new Date(); now.setHours(0,0,0,0);
+  const next=new Date(c);
+  next.setFullYear(now.getFullYear());
+  if(next<now)next.setFullYear(now.getFullYear()+1);
+  return next.toISOString().slice(0,10);
+}
+function hpFeeDue(l){             // 請求すべきか(次回請求日30日以内 or 過ぎ、かつ入金済でない)
+  const n=hpFeeNext(l); if(!n)return false;
+  if(l.status==='入金済')return false;
+  const days=(new Date(n)-new Date())/86400000;
+  return days<=30;
+}
+function rHpFee(){
+  if(!S.hpFees)S.hpFees=[];
+  const all=S.hpFees.filter(l=>!l.deleted);
+  const dueList=all.filter(hpFeeDue);
+  const unpaid=all.filter(l=>l.status==='請求済');
+  const annual=all.length*HP_FEE;
+  const summary=`<div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px">
+    <span class="sl-summary-chip" style="background:var(--card2);border-color:var(--border)">顧客 <strong style="color:var(--text)">${all.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(180,83,9,.25);color:var(--amber)">要請求 <strong>${dueList.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(220,38,38,.25);color:var(--red)">未回収(請求済) <strong>${unpaid.length}</strong></span>
+    <span class="sl-summary-chip" style="border:1.5px solid rgba(5,150,105,.25);color:var(--green)">年間維持費 <strong>¥${annual.toLocaleString()}</strong></span>
+  </div>`;
+  const rows=all.length===0?`<div class="empty"><div class="empty-icon">💴</div><div class="empty-title">HP顧客がまだありません</div><div style="font-size:12px;color:var(--t3);margin-top:4px">「＋顧客を追加」から登録してください</div></div>`
+    :all.slice().sort((a,b)=>(hpFeeNext(a)||'9999').localeCompare(hpFeeNext(b)||'9999')).map(l=>{
+    const next=hpFeeNext(l);
+    const due=hpFeeDue(l);
+    const stBtns=HP_FEE_STATUSES.map(s=>`<button class="sl-status-btn" style="opacity:${l.status===s?1:.4};border-color:var(--border)" onclick="hpFeeSetStatus('${l.id}','${s}')">${s}</button>`).join('');
+    return`<div class="sl-row" style="${due?'border-color:rgba(180,83,9,.5);background:var(--adim)':''}">
+      <div style="flex:1;min-width:0">
+        <div class="sl-name">${esc(l.name||'')} ${due?'<span style="font-size:10px;color:var(--amber);font-weight:700">● 要請求</span>':''}</div>
+        <div class="sl-meta">
+          ${l.url?`<a href="${esc(l.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:11px">🌐 HP</a>`:''}
+          <span style="font-size:11px;color:var(--t2)">年間維持費 ¥${HP_FEE.toLocaleString()}</span>
+          ${next?`<span style="font-size:11px;color:${due?'var(--amber)':'var(--t2)'}">次回請求: ${next}</span>`:''}
+          ${l.lastPaidAt?`<span style="font-size:11px;color:var(--green)">最終入金: ${esc(l.lastPaidAt)}</span>`:''}
+        </div>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">契約日:</span>
+          <input type="date" class="sl-inline-input" value="${esc(l.contractDate||'')}" onchange="hpFeeUpdate('${l.id}','contractDate',this.value)" style="width:130px">
+          <input type="url" class="sl-inline-input" placeholder="HP URL" value="${esc(l.url||'')}" onchange="hpFeeUpdate('${l.id}','url',this.value)" style="width:200px">
+          <input type="text" class="sl-inline-input" placeholder="メモ…" value="${esc(l.note||'')}" onchange="hpFeeUpdate('${l.id}','note',this.value)" style="flex:1;min-width:120px;max-width:260px">
+        </div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">請求状態:</span>${stBtns}
+          <button class="btn btn-g btn-xs" onclick="hpFeeCopyInvoice('${l.id}')">振込案内をコピー</button>
+          ${l.status==='入金済'?`<button class="btn btn-g btn-xs" onclick="hpFeeNextCycle('${l.id}')">翌年分へ繰越</button>`:''}
+        </div>
+      </div>
+      <div style="flex-shrink:0"><button class="tact del" onclick="hpFeeDelete('${l.id}')" title="削除">🗑</button></div>
+    </div>`;
+  }).join('');
+  return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <h2 style="font-size:18px;font-weight:800;margin:0">💴 HP維持費管理</h2>
+      <button class="btn btn-p" onclick="hpFeeAdd()">＋顧客を追加</button></div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px">HP納品後の年間維持費(¥${HP_FEE.toLocaleString()}/年)の請求・入金を管理します。次回請求日が近い顧客はオレンジで表示されます。</div>
+    ${summary}${rows}`;
+}
+function hpFeeAdd(){
+  if(!S.hpFees)S.hpFees=[];
+  const name=prompt('顧客名(店名)を入力:'); if(!name)return;
+  const cd=(prompt('契約日/納品日(YYYY-MM-DD・省略可):')||'').trim();
+  S.hpFees.push({id:uid(),name:name.trim(),contractDate:cd,url:'',status:'未請求',note:'',createdAt:new Date().toISOString()});
+  save();render();
+}
+function hpFeeUpdate(id,field,value){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  l[field]=value; save();render();
+}
+function hpFeeSetStatus(id,status){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  l.status=status;
+  if(status==='入金済')l.lastPaidAt=new Date().toISOString().slice(0,10);
+  save();render();
+}
+function hpFeeNextCycle(id){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  l.status='未請求'; save();render();
+}
+function hpFeeDelete(id){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  if(!confirm(`「${l.name}」を維持費管理から削除しますか？`))return;
+  l.deleted=true; save();render();
+}
+function hpFeeCopyInvoice(id){
+  const l=(S.hpFees||[]).find(x=>x.id===id); if(!l)return;
+  const next=hpFeeNext(l)||'（契約日を入力してください）';
+  const txt=`${l.name} 御中\n\nいつもお世話になっております。mono.create（旭川）です。\nホームページの年間維持費のご案内です。\n\n■ 年間維持費：¥${HP_FEE.toLocaleString()}（税込）\n■ お支払い期限：${next}\n■ お振込先：〇〇銀行 〇〇支店 普通 0000000 モノクリエイト\n\n維持費には、サーバー・ドメインの維持、軽微な修正、稼働監視が含まれます。\nご不明点はLINEまたはお電話でお気軽にどうぞ。\n\nmono.create\n0166-00-0000`;
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('振込案内をコピーしました','ok')).catch(()=>{prompt('コピーしてご利用ください:',txt);});
+}
+
 function rSalesLeads(){
   if(!S.salesLeads)S.salesLeads=[];
   const all=S.salesLeads.filter(l=>!l.deleted);
@@ -10708,7 +10807,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260709-01';
+const APP_VERSION='20260709-02';
 
 render();
 function forceAppUpdate(){
