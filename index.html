@@ -918,6 +918,8 @@ function fbSetupRealtimeSync(){
     localStorage.setItem(DB,JSON.stringify(S));
     if(typeof render==='function')render();
   }
+  // FB_USER確定後に理想スケジュール移行を再評価（会長アカウントはこの時点でfsが確定・クラウドへも同期される）
+  S=migrate(S);
   let _firstLoad=true;
   _fbUnsubscribe=fbDb.collection('users').doc(FB_USER.uid).onSnapshot(doc=>{
     if(!doc.exists||!doc.data()?.json){
@@ -1813,13 +1815,17 @@ function migrate(d){
     });
     d.settings._workerIdsMigrated=true;
   }
-  // migrate: 会長の生活OSに基づく理想タイムスケジュールへ更新（未編集=旧デフォルトの人のみ上書き・一度だけ・カスタム済みは温存）
+  // migrate: 会長の生活OSに基づく理想タイムスケジュールへ更新（一度だけ）
+  //  - 会長アカウント(mono.create.group)は、サインイン時にクラウド側を確実に上書きして同期（本人だけ・佐々木ら他アカウントは対象外）
+  //  - それ以外は「未編集=旧デフォルトの人」だけ上書き（自分でカスタムした人の予定は温存）
   if(!d.settings._fsIdealSeedV1){
     const sig=a=>JSON.stringify((a||[]).map(f=>[f.s,f.e,f.t]));
-    if(!d.fs||d.fs.length===0||sig(d.fs)===sig(LEGACY_FS)){
+    let _email='';try{_email=((typeof FB_USER!=='undefined'&&FB_USER&&FB_USER.email)||'').toLowerCase();}catch(_){}
+    const isChairman=_email==='mono.create.group@gmail.com';
+    if(isChairman||!d.fs||d.fs.length===0||sig(d.fs)===sig(LEGACY_FS)){
       d.fs=JSON.parse(JSON.stringify(DEFAULT_FS));
+      d.settings._fsIdealSeedV1=true; // 適用できた時だけフラグを立てる（会長が未サインインで先にloadされても、次のサインイン時に再評価される）
     }
-    d.settings._fsIdealSeedV1=true;
   }
   return d;
 }
@@ -10991,7 +10997,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260710-03';
+const APP_VERSION='20260710-04';
 
 render();
 function forceAppUpdate(){
