@@ -10513,7 +10513,7 @@ function rSalesSites(){
   }).join('');
   return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
       <h2 style="font-size:18px;font-weight:800;margin:0">🌐 営業用サイト</h2>
-      <button class="btn btn-p" onclick="salesSiteAdd()">＋追加</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-g" onclick="salesSiteImport10()">7/9生成の10件を一括登録</button><button class="btn btn-p" onclick="salesSiteAdd()">＋追加</button></div></div>
     <div style="font-size:12px;color:var(--t2);margin-bottom:12px">制作した営業用HPの一覧です。公開状況・紐づく見込み客を管理します。</div>
     ${summary}${rows}`;
 }
@@ -10522,6 +10522,34 @@ function salesSiteAdd(){
   const name=prompt('店名を入力:'); if(!name)return;
   S.salesSites.push({id:uid(),name:name.trim(),url:'',genre:'',leadName:'',status:'未公開',note:'',createdAt:new Date().toISOString()});
   save();render();
+}
+// 2026-07-09 夜間自動生成した営業サイト10件を一括登録し、該当見込み客をHP作成済にする(冪等)
+function salesSiteImport10(){
+  if(!S.salesSites)S.salesSites=[];
+  const base='https://mono-create-group.github.io/lp/sample-hp/preview/';
+  const seed=[
+    {name:'めしや なまら',genre:'ラーメン',slug:'meshiya-namara'},
+    {name:'湯けむり大衆酒場 こま弦工房',genre:'居酒屋',slug:'komaito-koubou'},
+    {name:'喫茶シンカイ',genre:'カフェ',slug:'kissa-shinkai'},
+    {name:'Salon de feel 豊岡店',genre:'美容室',slug:'salon-de-feel-toyooka'},
+    {name:'整体院ながたルート40旭町店',genre:'整体',slug:'nagata-route40-asahimachi'},
+    {name:'㈲山中車輌工業所',genre:'車屋',slug:'yamanaka-sharyou'},
+    {name:'パワースポットネイルサロン ECRIN-エクラン-',genre:'ネイル',slug:'ecrin-nail'},
+    {name:'たかがき歯科',genre:'歯科',slug:'takagaki-dental'},
+    {name:'㈱森屋工務店',genre:'工務店',slug:'moriya-koumuten'},
+    {name:"Men's Three Nines Salon",genre:'エステ',slug:'mens-three-nines'}
+  ];
+  let added=0,updated=0;
+  seed.forEach(x=>{
+    if(!S.salesSites.some(s=>!s.deleted&&s.name===x.name)){
+      S.salesSites.push({id:uid(),name:x.name,url:base+x.slug+'/',genre:x.genre,leadName:x.name,status:'公開中',note:'2026-07-09 自動生成のたたき台',createdAt:new Date().toISOString()});
+      added++;
+    }
+    const lead=(S.salesLeads||[]).find(l=>!l.deleted&&l.name===x.name);
+    if(lead&&lead.status!=='HP作成済'&&lead.status!=='成約'){lead.status='HP作成済';updated++;}
+  });
+  save();render();
+  toast(`営業サイト${added}件を登録・見込み客${updated}件をHP作成済に更新`,'ok');
 }
 function salesSiteUpdate(id,field,value){
   const l=(S.salesSites||[]).find(x=>x.id===id); if(!l)return;
@@ -10937,7 +10965,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260710-01';
+const APP_VERSION='20260710-02';
 
 render();
 function forceAppUpdate(){
