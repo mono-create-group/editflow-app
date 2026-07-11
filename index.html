@@ -10387,6 +10387,12 @@ function slIgLink(v){
   if(h)return `<a href="https://www.instagram.com/${h}/" target="_blank" rel="noopener" style="color:#c13584;font-size:11px">📷 @${esc(h)}</a>`;
   return `<span style="color:var(--t3);font-size:11px">📷 ${esc((v||'').trim())}</span>`;
 }
+function slIgOpenBtn(v){
+  // input欄の隣に置く「開く」ボタン。リンク化できる値の時だけ表示。
+  const h=slIgHandle(v);
+  if(!h)return '';
+  return `<a href="https://www.instagram.com/${h}/" target="_blank" rel="noopener" class="tact" style="text-decoration:none;font-size:11px;color:#c13584" title="Instagramプロフィールを開く">📷 開く</a>`;
+}
 const SL_STATUS_NEXT={'未接触':'電話済','電話済':'アポ','アポ':'商談','商談':'成約','HP作成済':'電話済','成約':'成約','失注':'失注'};
 const SL_REGIONS=['旭川','札幌','その他'];
 let _slPage=0;
@@ -10807,6 +10813,7 @@ function rSalesLeads(){
           </div>
           <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
             <input type="text" class="sl-inline-input" placeholder="📷 Instagram URL/@id" value="${esc(l.instagram||'')}" onchange="slUpdate('${sid}','instagram',this.value)" style="width:180px">
+            ${slIgOpenBtn(l.instagram)}
             <input type="email" class="sl-inline-input" placeholder="✉️ メールアドレス" value="${esc(l.email||'')}" onchange="slUpdate('${sid}','email',this.value)" style="width:180px">
           </div>
           <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
@@ -11018,7 +11025,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260711-01';
+const APP_VERSION='20260711-02';
 
 render();
 function forceAppUpdate(){
