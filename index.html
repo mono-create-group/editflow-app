@@ -10360,11 +10360,32 @@ function initReminders(){
 const SL_STATUSES=['未接触','HP作成済','電話済','アポ','商談','成約','失注'];
 const SL_APPROACHES=['電話','メール','InstagramDM','LINE','訪問'];  // 営業方法(記録用)
 const SL_ASSIGNEES=['会長','佐々木','アオイ'];  // 営業担当者(誰が営業をかけたか)
-function slIgUrl(v){
+function slIgHandle(v){
+  // Instagram値からハンドルを抽出。フルURL/@付き/素ハンドルいずれにも対応。
+  // 抽出できなければnullを返す(呼び出し側でプレーン表示にフォールバック)。
   v=(v||'').trim();
-  if(!v)return '#';
-  if(/^https?:\/\//i.test(v))return v;
-  return 'https://instagram.com/'+v.replace(/^@/,'');
+  if(!v)return null;
+  let h=v;
+  if(/^https?:\/\//i.test(v)){
+    try{
+      const u=new URL(v);
+      if(!/(^|\.)instagram\.com$/i.test(u.hostname))return null;
+      h=u.pathname.replace(/^\/+/,'').split('/')[0]||'';
+    }catch(e){return null;}
+  }
+  h=h.replace(/^@/,'').split('?')[0].split('/')[0].trim();
+  if(!h||!/^[A-Za-z0-9._]{1,30}$/.test(h))return null;
+  return h;
+}
+function slIgUrl(v){
+  const h=slIgHandle(v);
+  return h?('https://www.instagram.com/'+h+'/'):'#';
+}
+function slIgLink(v){
+  // 一覧/詳細共通: リンク化できれば📷 @handleのタップ可能リンク、できなければ元値のプレーン表示。
+  const h=slIgHandle(v);
+  if(h)return `<a href="https://www.instagram.com/${h}/" target="_blank" rel="noopener" style="color:#c13584;font-size:11px">📷 @${esc(h)}</a>`;
+  return `<span style="color:var(--t3);font-size:11px">📷 ${esc((v||'').trim())}</span>`;
 }
 const SL_STATUS_NEXT={'未接触':'電話済','電話済':'アポ','アポ':'商談','商談':'成約','HP作成済':'電話済','成約':'成約','失注':'失注'};
 const SL_REGIONS=['旭川','札幌','その他'];
@@ -10772,7 +10793,7 @@ function rSalesLeads(){
           <div class="sl-meta">
             ${l.genre?`<span class="badge bk">${esc(l.genre)}</span>`:''}
             ${l.phone?`<a href="tel:${esc(l.phone)}" style="color:var(--blue);font-size:11px">📞 ${esc(l.phone)}</a>`:''}
-            ${l.instagram&&l.instagram.trim()?`<a href="${esc(slIgUrl(l.instagram))}" target="_blank" rel="noopener" style="color:#c13584;font-size:11px">📷 Instagram</a>`:''}
+            ${l.instagram&&l.instagram.trim()?slIgLink(l.instagram):''}
             ${l.email&&l.email.trim()?`<a href="mailto:${esc(l.email)}" style="color:var(--green);font-size:11px">✉️ ${esc(l.email)}</a>`:''}
             <span style="font-size:11px;color:var(--t3)">HP: ${esc(l.hp||'未確認')}</span>
           </div>
@@ -10997,7 +11018,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260710-04';
+const APP_VERSION='20260711-01';
 
 render();
 function forceAppUpdate(){
