@@ -863,7 +863,7 @@ function fbSave(){
     fbDb.collection('users').doc(FB_USER.uid).set({
       json:_packState(),
       ts:firebase.firestore.FieldValue.serverTimestamp()
-    }).catch(e=>console.error('Firestore save error:',e));
+    },{merge:true}).catch(e=>console.error('Firestore save error:',e));
     _teamSave();
   },2000);
 }
@@ -11053,7 +11053,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260713-01';
+const APP_VERSION='20260713-02';
 
 render();
 function forceAppUpdate(){
