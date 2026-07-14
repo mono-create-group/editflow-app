@@ -206,6 +206,7 @@ a{color:inherit;text-decoration:none}
 .mday-task{font-size:10px;margin-top:2px;padding:1px 4px;border-radius:4px;background:var(--pdim);color:var(--purple);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;font-weight:500}
 .mday-task.over{background:var(--rdim);color:var(--red)}
 .mday-task.done-t{opacity:.4;text-decoration:line-through}
+.mday-time{font-weight:700;opacity:.75;margin-right:3px;font-variant-numeric:tabular-nums}
 .mday-more{font-size:10px;color:var(--t3);margin-top:2px;padding-left:2px}
 .wtask.drag-over{border:1.5px dashed var(--purple);background:var(--pdim)}
 .fs-drop-zone.fs-drag-over{outline:2px dashed var(--purple);outline-offset:-2px;background:var(--pdim)!important}
@@ -4172,12 +4173,15 @@ function rTasksMonthly(){
     if(!d)return`<div class="mday empty"></div>`;
     const tasks=tasksForDate(d);
     const gcEvs=gcalEventsForDate(d);
-    const combined=[...gcEvs.map(e=>({_g:true,title:e.summary||'(無題)'})),...tasks.map(t=>({_g:false,done:t.done,over:!t.done&&t.dueDate<today(),title:t.title}))];
+    const combined=[
+      ...gcEvs.map(e=>({_g:true,time:e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'',title:e.summary||'(無題)'})),
+      ...tasks.map(t=>({_g:false,done:t.done,over:!t.done&&t.dueDate<today(),time:t.startTime||'',title:t.title}))
+    ].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
     return`<div class="mday ${d===today()?'today-day':''}" onclick="openDayModal('${d}')">
       <div class="mday-num">${+d.slice(8)}</div>
       ${combined.slice(0,3).map(item=>item._g
-        ?`<div class="mday-task" style="border-left:2px solid var(--blue)">📅 ${esc(item.title)}</div>`
-        :`<div class="mday-task ${item.over?'over':item.done?'done-t':''}">${esc(item.title)}</div>`
+        ?`<div class="mday-task" style="border-left:2px solid var(--blue)">${item.time?`<span class="mday-time">${item.time}</span>`:''}📅 ${esc(item.title)}</div>`
+        :`<div class="mday-task ${item.over?'over':item.done?'done-t':''}">${item.time?`<span class="mday-time">${item.time}</span>`:''}${esc(item.title)}</div>`
       ).join('')}
       ${combined.length>3?`<div class="mday-more">+${combined.length-3}</div>`:''}
     </div>`;}).join('')}
@@ -11056,7 +11060,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260713-03';
+const APP_VERSION='20260714-01';
 
 render();
 function forceAppUpdate(){
