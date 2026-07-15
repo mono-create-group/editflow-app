@@ -3780,6 +3780,13 @@ function rFixedScheduleList(compact=false,droppable=false,date,timeline=false){
       if(!t.fsBlockId&&hasStart&&sm!==null&&t.startTime){const tm=tMin(t.startTime);return tm>=sm&&tm<em;}
       return false;
     }):[];
+    // このブロック時間帯に時刻が入る家事（スケジュールの指定時刻へ配置）
+    const blockChores=droppable&&hasStart&&sm!==null?choresForDate(td).filter(c=>{if(!c.time)return false;const tm=tMin(c.time);return tm>=sm&&tm<em;}):[];
+    const rBlockChore=c=>{const cdone=(c.completedDates||[]).includes(td);return`<div class="task-item" style="border-left:2px solid var(--teal,#0d9488);margin:2px 0;padding:6px 10px;box-shadow:none;flex-shrink:0">
+  <div class="chk ${cdone?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleChoreDone('${c.id}','${td}')"></div>
+  <div class="task-body" style="min-width:0"><div class="task-ttl ${cdone?'done':''}" style="font-size:12px">${c.time?`<span style="font-weight:700;color:var(--teal,#0d9488);margin-right:6px;font-variant-numeric:tabular-nums;font-size:11px">${c.time}</span>`:''}🧹 ${esc(c.name)}</div></div>
+  <div class="task-acts" style="opacity:1;gap:2px"><button class="tact" style="padding:2px 5px;font-size:11px" onclick="V='chores';render()" title="家事ページで編集">✏️</button></div>
+</div>`;};
     // タスクカード生成ヘルパー
     const rBlockTask=t=>`<div class="task-item" id="ti-${t.id}"
   draggable="true" ondragstart="taskDragStart(event,'${t.id}')" ondragend="taskDragEnd(event)"
@@ -3846,7 +3853,8 @@ function rFixedScheduleList(compact=false,droppable=false,date,timeline=false){
   </div>
   ${!compact&&hasStart&&f.e?rFs30MinTicks(sm,em,nowM,isNow,f.c):''}
   ${hasParts&&!compact?`<div style="margin:8px 0 2px 28px;padding-top:6px;border-top:1px solid ${f.c}18">${subList}</div>`:''}
-  ${!hasParts&&plainTasks?`<div style="margin:4px 0 0 28px">${plainTasks}</div>`:''}`;
+  ${!hasParts&&plainTasks?`<div style="margin:4px 0 0 28px">${plainTasks}</div>`:''}
+  ${blockChores.length?`<div style="margin:4px 0 0 28px">${blockChores.map(rBlockChore).join('')}</div>`:''}`;
     const blockBaseStyle=`border-left:3px solid ${f.c};${isNow?'background:'+f.c+'0e':'background:var(--card)'};transition:background .15s;flex-direction:column;align-items:stretch;gap:0;padding:11px 14px`;
     return`<div class="task-item fs-drop-zone" ${dropAttrs} style="${blockBaseStyle}">${bodyInner}</div>`;
   });
@@ -4366,9 +4374,12 @@ function rTasksSchedule(){
   const d=schedDate(SD);
   const dateLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
   const dayHabits=habitsForDate(d).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
-  const dayChores=choresForDate(d);
   const isToday=SD===0,isTomorrow=SD===1,isYesterday=SD===-1;
   const hasFs=S.fs&&S.fs.length>0;
+  // 時刻付きでタイムラインのブロックに配置される家事は下の一覧から除外（重複防止）
+  const fsRanges=hasFs?(S.fs||[]).filter(f=>f.s&&f.s!=='-1'&&f.s!==''&&f.e).map(f=>[tMin(f.s),tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e)]):[];
+  const inFsBlock=t=>fsRanges.some(([s,e])=>s!=null&&e!=null&&e>s&&t>=s&&t<e);
+  const dayChores=choresForDate(d).filter(c=>!hasFs||!c.time||!inFsBlock(tMin(c.time)));
   const dayWord=isToday?'今日':isTomorrow?'明日':isYesterday?'昨日':'';
   return`
 <div class="fs-tl-daynav">
@@ -11356,7 +11367,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-06';
+const APP_VERSION='20260715-07';
 
 render();
 function forceAppUpdate(){
