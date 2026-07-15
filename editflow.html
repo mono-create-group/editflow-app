@@ -1790,6 +1790,14 @@ function migrate(d){
   if(!Array.isArray(d.chores))d.chores=[];
   if(Array.isArray(d.customEx))d.customEx=d.customEx.map(x=>typeof x==='string'?{name:x}:x);
   (d.workouts||[]).forEach(w=>{if(Array.isArray(w.exercises))w.exercises=w.exercises.map(e=>typeof e==='string'?{name:e}:e);});
+  // 記録を workout.entries に一本化: 旧クイック選択(exercises)を記録へ移行して空にする
+  (d.workouts||[]).forEach(w=>{
+    if(Array.isArray(w.exercises)&&w.exercises.length){
+      if(!Array.isArray(w.entries))w.entries=[];
+      w.exercises.forEach(e=>{const o=typeof e==='string'?{name:e}:e;if(o&&o.name&&!w.entries.some(x=>x.name===o.name))w.entries.push({id:uid(),name:o.name,sets:o.sets||null,reps:o.reps||null,weight:null,note:null});});
+      w.exercises=[];
+    }
+  });
   // migrate v10→v11: 指定ワーカーをトライアルに設定、誤採用ログ削除
   if(!d.settings._workerTrialMigrated2){
     const trialWorkerNames=['矢田部','菅野','鈴木','松下'];
@@ -5929,54 +5937,45 @@ function getWorkout(date){
   if(!w){w={date,exercises:[]};S.workouts.push(w);save();}
   return w;
 }
+// クイック選択タップ＝「種目を追加して記録」へ記録を追加/削除（記録は workout.entries に一本化）
 function toggleExercise(ex){
   const w=getWorkout(today());
-  if(!Array.isArray(w.exercises))w.exercises=[];
-  const i=w.exercises.findIndex(e=>exName(e)===ex);
-  if(i>=0)w.exercises.splice(i,1);
-  else{const m=exMeta(ex);w.exercises.push({name:ex,sets:m.sets||null,reps:m.reps||null});}
+  if(!Array.isArray(w.entries))w.entries=[];
+  const i=w.entries.findIndex(e=>e.name===ex);
+  if(i>=0)w.entries.splice(i,1);
+  else{const m=exMeta(ex);w.entries.push({id:uid(),name:ex,sets:m.sets||null,reps:m.reps||null,weight:null,note:null});}
   save();render();
 }
-// セットメニューをワンタップでまとめて追加（既に選択済みの種目はスキップ）
+// セットメニューをワンタップでまとめて記録に追加（既に記録済みの種目はスキップ）
 function applyExSet(setId){
   const s=(S.customExSets||[]).find(x=>x.id===setId);if(!s)return;
-  const w=getWorkout(today());if(!Array.isArray(w.exercises))w.exercises=[];
+  const w=getWorkout(today());if(!Array.isArray(w.entries))w.entries=[];
   let added=0;
   (s.items||[]).forEach(nm=>{
-    if(!w.exercises.some(e=>exName(e)===nm)){const m=exMeta(nm);w.exercises.push({name:nm,sets:m.sets||null,reps:m.reps||null});added++;}
+    if(!w.entries.some(e=>e.name===nm)){const m=exMeta(nm);w.entries.push({id:uid(),name:nm,sets:m.sets||null,reps:m.reps||null,weight:null,note:null});added++;}
   });
   save();render();toast(`${s.name}: ${added>0?added+'種目を追加':'追加済み'}`);
 }
-// フィットネス画面で選択中種目の回数/セット数をその場で変更（再描画せずフォーカス維持）
-function setExField(name,field,val){
-  const w=getWorkout(today());
-  const e=(w.exercises||[]).find(e=>exName(e)===name);if(!e||typeof e!=='object')return;
-  if(field==='sets')e.sets=parseInt(val)||null;else e.reps=(val||'').trim()||null;
-  save();
-}
-// クイック選択＋選択中種目の編集行（rHabitsSchedule/rFitnessTraining 共通）
+// クイック選択（rHabitsSchedule/rFitnessTraining 共通）。タップで上の「記録」に反映。回数/セット数の変更は記録側の✏️で行う
 function rQuickSelect(workout){
-  const exList=(workout.exercises||[]).map(e=>typeof e==='string'?{name:e}:e);
+  const names=(workout.entries||[]).map(e=>e.name);
   const sets=S.customExSets||[];
   return`
-  ${sets.length?`<div style="font-size:12px;color:var(--t2);margin-bottom:6px">セットメニュー（ワンタップでまとめて追加）</div>
+  ${sets.length?`<div style="font-size:12px;color:var(--t2);margin-bottom:6px">セットメニュー（ワンタップでまとめて記録）</div>
   <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px">
     ${sets.map(s=>`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:700;cursor:pointer;background:var(--pdim);color:var(--purple);border:1px solid var(--purple)" onclick="applyExSet('${s.id}')">＋ ${esc(s.name)} <span style="opacity:.7;font-weight:500">(${(s.items||[]).length})</span></div>`).join('')}
   </div>`:''}
-  <div style="font-size:12px;color:var(--t2);margin-bottom:8px">クイック選択（タップでトグル）</div>
+  <div style="font-size:12px;color:var(--t2);margin-bottom:8px">クイック選択（タップで記録に追加）</div>
   <div style="display:flex;flex-wrap:wrap;gap:7px">
-    ${allEx().map(ex=>{const done=exList.some(e=>e.name===ex);return`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:${done?'var(--purple)':'var(--card2)'};color:${done?'#fff':'var(--t2)'};border:1px solid ${done?'var(--purple)':'var(--border)'}" onclick="toggleExercise('${esc(ex)}')">${done?'✓ ':''}${esc(ex)}</div>`;}).join('')}
-  </div>
-  ${exList.length?`<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">
-    ${exList.map(e=>{const m=exMeta(e.name);return`<div style="display:flex;align-items:center;gap:7px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:6px 9px">
-      <span style="flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.name)}</span>
-      ${m.video?`<a href="${esc(m.video)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:15px;text-decoration:none;flex-shrink:0" title="参考動画">▶</a>`:''}
-      <input type="number" min="1" value="${e.sets||''}" placeholder="—" onchange="setExField('${esc(e.name)}','sets',this.value)" style="width:46px;font-size:12px;padding:3px 4px;text-align:center;flex-shrink:0">
-      <span style="font-size:11px;color:var(--t3);flex-shrink:0">セット</span>
-      <input value="${esc(e.reps||'')}" placeholder="回数" onchange="setExField('${esc(e.name)}','reps',this.value)" style="width:64px;font-size:12px;padding:3px 6px;text-align:center;flex-shrink:0">
-      <button class="tact del" onclick="toggleExercise('${esc(e.name)}')" title="外す" style="flex-shrink:0">✕</button>
-    </div>`;}).join('')}
-  </div>`:''}`;
+    ${allEx().map(ex=>{const done=names.includes(ex);return`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:${done?'var(--purple)':'var(--card2)'};color:${done?'#fff':'var(--t2)'};border:1px solid ${done?'var(--purple)':'var(--border)'}" onclick="toggleExercise('${esc(ex)}')">${done?'✓ ':''}${esc(ex)}</div>`;}).join('')}
+  </div>`;
+}
+// 種目追加モーダルでプリセット/カスタム種目チップをタップ → 名前＋基本セット/回数を補完
+function weFillPreset(name){
+  const el=document.getElementById('we-name');if(el)el.value=name;
+  const m=exMeta(name);
+  const s=document.getElementById('we-sets');if(s&&!s.value&&m.sets)s.value=m.sets;
+  const r=document.getElementById('we-reps');if(r&&!r.value&&m.reps)r.value=m.reps;
 }
 function openWorkoutEntryModal(id){
   const td=today();
@@ -5986,7 +5985,7 @@ function openWorkoutEntryModal(id){
 <div class="fg"><div class="fl">種目名 *</div>
   <input id="we-name" value="${esc(e?.name||'')}" placeholder="例: ベンチプレス">
   <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
-    ${['ベンチプレス','スクワット','デッドリフト','懸垂','ショルダープレス','ダンベルカール','トライセプス','ランニング','プランク','腹筋'].map(s=>`<span style="padding:3px 9px;background:var(--border);border-radius:100px;cursor:pointer;font-size:11px" onclick="document.getElementById('we-name').value='${s}'">${s}</span>`).join('')}
+    ${allEx().map(s=>`<span style="padding:3px 9px;background:var(--border);border-radius:100px;cursor:pointer;font-size:11px" onclick="weFillPreset('${esc(s)}')">${esc(s)}</span>`).join('')}
   </div>
 </div>
 <div class="frow">
@@ -6058,14 +6057,16 @@ ${secTitle('💪 今日の筋トレメニュー')}
   </div>
   ${(workout.entries||[]).length?`
   <div style="display:flex;flex-direction:column;gap:1px">
-    ${(workout.entries||[]).map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+    ${(workout.entries||[]).map(e=>{const _v=e.video||exMeta(e.name).video;return`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
       <span style="flex:1;font-weight:500;font-size:13px">${esc(e.name)}</span>
+      ${_v?`<a href="${esc(_v)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:15px;text-decoration:none" title="参考動画">▶</a>`:''}
       ${e.sets?`<span class="badge bk">${e.sets}セット</span>`:''}
-      ${e.reps?`<span class="badge bb">${e.reps}回</span>`:''}
+      ${e.reps?`<span class="badge bb">${esc(e.reps)}</span>`:''}
       ${e.weight?`<span class="badge ba">${e.weight}kg</span>`:''}
       ${e.note?`<span style="font-size:11px;color:var(--t2)">${esc(e.note)}</span>`:''}
+      <button class="tact" onclick="openWorkoutEntryModal('${e.id}')">✏️</button>
       <button class="tact del" onclick="delWorkoutEntry('${e.id}')">🗑</button>
-    </div>`).join('')}
+    </div>`;}).join('')}
   </div>
   <div style="margin-top:10px;font-size:12px;color:var(--green);font-weight:600">合計 ${(workout.entries||[]).length}種目</div>`
   :`<div style="color:var(--t3);font-size:12px;text-align:center;padding:12px 0">まだ記録がありません</div>`}
@@ -7384,15 +7385,16 @@ function rFitnessTraining(){
     <div style="font-size:12px;color:var(--t2)">種目を追加して記録しましょう</div>
     <button class="btn btn-p btn-sm" onclick="openWorkoutEntryModal()">＋ 種目追加</button>
   </div>
-  ${(workout.entries||[]).length?`<div style="display:flex;flex-direction:column;gap:1px">${(workout.entries||[]).map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+  ${(workout.entries||[]).length?`<div style="display:flex;flex-direction:column;gap:1px">${(workout.entries||[]).map(e=>{const _v=e.video||exMeta(e.name).video;return`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
     <span style="flex:1;font-weight:500;font-size:13px">${esc(e.name)}</span>
+    ${_v?`<a href="${esc(_v)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:15px;text-decoration:none" title="参考動画">▶</a>`:''}
     ${e.sets?`<span class="badge bk">${e.sets}セット</span>`:''}
-    ${e.reps?`<span class="badge bb">${e.reps}</span>`:''}
+    ${e.reps?`<span class="badge bb">${esc(e.reps)}</span>`:''}
     ${e.weight?`<span class="badge ba">${e.weight}kg</span>`:''}
     ${e.note?`<span style="font-size:11px;color:var(--t2)">${esc(e.note)}</span>`:''}
     <button class="tact" onclick="openWorkoutEntryModal('${e.id}')">✏️</button>
     <button class="tact del" onclick="delWorkoutEntry('${e.id}')">🗑</button>
-  </div>`).join('')}</div><div style="font-size:12px;color:var(--green);font-weight:600;margin-top:8px">合計 ${(workout.entries||[]).length}種目</div>`
+  </div>`;}).join('')}</div><div style="font-size:12px;color:var(--green);font-weight:600;margin-top:8px">合計 ${(workout.entries||[]).length}種目</div>`
   :`<div style="color:var(--t3);font-size:12px;text-align:center;padding:12px 0">まだ記録がありません</div>`}
 </div>
 <div class="card" style="margin-bottom:16px">
@@ -11354,7 +11356,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-05';
+const APP_VERSION='20260715-06';
 
 render();
 function forceAppUpdate(){
