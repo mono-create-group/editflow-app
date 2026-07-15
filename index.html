@@ -4161,7 +4161,9 @@ function toggleRoutineSub(id,date,idx){
   const r=(S.choreRoutines||[]).find(r=>r.id===id);if(!r)return;
   if(!r.done)r.done={};if(!Array.isArray(r.done[date]))r.done[date]=[];
   const i=r.done[date].indexOf(idx);
-  if(i>=0)r.done[date].splice(i,1);else r.done[date].push(idx);
+  let nowDone;
+  if(i>=0){r.done[date].splice(i,1);nowDone=false;}else{r.done[date].push(idx);nowDone=true;}
+  playCheckSound(nowDone);
   save();render();
 }
 function toggleRoutineActive(id){
@@ -4272,7 +4274,9 @@ function toggleChoreDone(id,date){
   const c=(S.chores||[]).find(c=>c.id===id);if(!c)return;
   if(!c.completedDates)c.completedDates=[];
   const i=c.completedDates.indexOf(date);
-  if(i>=0)c.completedDates.splice(i,1);else{c.completedDates.push(date);toast('✅ 家事を記録しました');}
+  let nowDone;
+  if(i>=0){c.completedDates.splice(i,1);nowDone=false;}else{c.completedDates.push(date);nowDone=true;toast('✅ 家事を記録しました');}
+  playCheckSound(nowDone);
   save();render();
 }
 function toggleChoreActive(id){
@@ -11524,7 +11528,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-09';
+const APP_VERSION='20260715-10';
 
 render();
 function forceAppUpdate(){
