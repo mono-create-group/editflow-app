@@ -898,7 +898,7 @@ function _applyCloudData(json){
   S=migrate(Object.assign(def,cloud));
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','choreRoutines','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -1773,6 +1773,7 @@ function defState(){return{
   customEx:[],
   customExSets:[],
   chores:[],
+  choreRoutines:[],
   navConfig:null,
   customPages:[],
   divisions:[],
@@ -1788,6 +1789,7 @@ function migrate(d){
   // migrate: カスタム筋トレ種目を{name,video,sets,reps}へ・選択中種目をオブジェクト化・セットメニュー初期化
   if(!Array.isArray(d.customExSets))d.customExSets=[];
   if(!Array.isArray(d.chores))d.chores=[];
+  if(!Array.isArray(d.choreRoutines))d.choreRoutines=[];
   if(Array.isArray(d.customEx))d.customEx=d.customEx.map(x=>typeof x==='string'?{name:x}:x);
   (d.workouts||[]).forEach(w=>{if(Array.isArray(w.exercises))w.exercises=w.exercises.map(e=>typeof e==='string'?{name:e}:e);});
   // 記録を workout.entries に一本化: 旧クイック選択(exercises)を記録へ移行して空にする
@@ -3598,6 +3600,7 @@ ${gcalToday.map(e=>rGcalEventItem(e)).join('')}
 ${todays.length?todays.map(t=>rTaskItem(t,isDraggable)).join(''):(gcalToday.length?'':`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">今日のタスクはありません 🎉</div>`)}
 ${todayHabits.length?`${secTitle(`🔥 今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
 ${(()=>{const tc=choresForDate(td);return tc.length?`${secTitle(`🧹 今日の家事 (${tc.filter(c=>(c.completedDates||[]).includes(td)).length}/${tc.length}件)`)}${tc.map(c=>rChoreInTaskView(c,td,true)).join('')}`:'';})()}
+${(()=>{const tr=routinesForDate(td);return tr.length?`${secTitle(`🔁 家事ルーティン (${tr.length}件)`)}${tr.map(r=>rRoutineInTaskView(r,td,true)).join('')}`:'';})()}
 ${no.length?`${secTitle('📦 期限なし')}${no.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
 </div>
 ${done.length?`${secTitle(`✅ 今日完了 (${done.length}件)`)}${done.map(t=>rTaskItem(t)).join('')}`:''}`;
@@ -4115,20 +4118,123 @@ function choreFreqLabel(c){
   return '';
 }
 // 指定日に予定されている家事を返す（active のみ）
-function choresForDate(date){
+// 頻度定義(freq/days/dom/mon/day/date)がその日に該当するか（家事・ルーティン共通）
+function dueOnDate(c,date){
   const dt=new Date(date+'T00:00:00');
   const dow=dt.getDay(),dom=dt.getDate(),mon=dt.getMonth()+1;
-  return (S.chores||[]).filter(c=>{
-    if(c.deleted||c.active===false)return false;
-    switch(c.freq){
-      case 'daily':return true;
-      case 'weekly':return (c.days&&c.days.length)?c.days.includes(dow):true;
-      case 'monthly':return (c.dom||1)===dom;
-      case 'yearly':return (c.mon||1)===mon&&(c.day||1)===dom;
-      case 'once':return c.date===date;
-      default:return false;
-    }
-  }).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+  switch(c.freq){
+    case 'daily':return true;
+    case 'weekly':return (c.days&&c.days.length)?c.days.includes(dow):true;
+    case 'monthly':return (c.dom||1)===dom;
+    case 'yearly':return (c.mon||1)===mon&&(c.day||1)===dom;
+    case 'once':return c.date===date;
+    default:return false;
+  }
+}
+function choresForDate(date){
+  return (S.chores||[]).filter(c=>!c.deleted&&c.active!==false&&dueOnDate(c,date))
+    .sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+}
+// ===== 家事ルーティン（いくつかの家事をまとめ、ルーティン自体の頻度・時刻でスケジュール表示） =====
+function routinesForDate(date){
+  return (S.choreRoutines||[]).filter(r=>!r.deleted&&r.active!==false&&dueOnDate(r,date))
+    .sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+}
+function routineDoneList(r,date){return (r.done&&Array.isArray(r.done[date]))?r.done[date]:[];}
+function toggleRoutineSub(id,date,idx){
+  const r=(S.choreRoutines||[]).find(r=>r.id===id);if(!r)return;
+  if(!r.done)r.done={};if(!Array.isArray(r.done[date]))r.done[date]=[];
+  const i=r.done[date].indexOf(idx);
+  if(i>=0)r.done[date].splice(i,1);else r.done[date].push(idx);
+  save();render();
+}
+function toggleRoutineActive(id){
+  const r=(S.choreRoutines||[]).find(r=>r.id===id);if(!r)return;
+  r.active=r.active===false;save();render();
+  toast(r.active===false?'スケジュール反映をOFFにしました':'📅 スケジュールに反映します');
+}
+function delRoutine(id){
+  if(!confirm('このルーティンを削除しますか？'))return;
+  S.choreRoutines=(S.choreRoutines||[]).filter(r=>r.id!==id);save();render();
+}
+// ルーティンをスケジュール内でチェックリスト表示
+function rRoutineInTaskView(r,date,interactive){
+  const doneIdx=routineDoneList(r,date);
+  const total=(r.items||[]).length;
+  const allDone=total>0&&doneIdx.length>=total;
+  return`<div class="task-item" style="border-left:3px solid var(--teal,#0d9488);flex-direction:column;align-items:stretch;gap:0;padding:9px 12px">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:16px;flex-shrink:0">🧹</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:700;${allDone?'color:var(--t3);text-decoration:line-through':''}">${esc(r.name)} <span style="color:var(--t2);font-weight:500;font-size:11px">${doneIdx.length}/${total}</span></div>
+      <div class="task-meta">${r.time?`<span class="badge bb">🕐 ${r.time}</span>`:''}<span class="badge bk">🔁 ${esc(choreFreqLabel(r))}</span></div>
+    </div>
+  </div>
+  <div style="margin:6px 0 0 24px;display:flex;flex-direction:column;gap:2px">
+    ${(r.items||[]).map((it,idx)=>{const dn=doneIdx.includes(idx);return`<div style="display:flex;align-items:center;gap:8px;padding:3px 0">
+      ${interactive?`<div class="fs-sub-chk ${dn?'done':''}" onclick="toggleRoutineSub('${r.id}','${date}',${idx})"></div>`:`<span style="color:var(--t3);font-size:12px">・</span>`}
+      <span style="font-size:13px;${dn?'text-decoration:line-through;color:var(--t3)':''}">${esc(it)}</span>
+    </div>`;}).join('')}
+  </div>
+</div>`;
+}
+function routineFreqUI(freq){
+  ['weekly','monthly','yearly','once'].forEach(f=>{const el=document.getElementById('rt-f-'+f);if(el)el.style.display=(f===freq)?'block':'none';});
+}
+function openRoutineModal(id){
+  const r=id?(S.choreRoutines||[]).find(x=>x.id===id):null;
+  const freq=r?.freq||'weekly';
+  const selDays=new Set(r?.days||[]);
+  const sel=new Set(r?.items||[]);
+  const opts=[...new Set([...(S.chores||[]).filter(c=>!c.deleted).map(c=>c.name),...CHORE_PRESETS])];
+  openModal(`<div class="mhdr"><div class="mtitle">${r?'ルーティンを編集':'家事ルーティンを作成'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  <div class="fg"><div class="fl">ルーティン名 *</div><input id="rt-name" value="${esc(r?.name||'')}" placeholder="例: 朝の家事"></div>
+  <div class="fg"><div class="fl">まとめる家事（複数選択）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${opts.map(o=>`<label style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:100px;border:1px solid var(--border);font-size:12px;cursor:pointer"><input type="checkbox" class="rt-item" value="${esc(o)}" ${sel.has(o)?'checked':''} style="accent-color:var(--purple)">${esc(o)}</label>`).join('')}</div>
+    <input id="rt-extra" placeholder="その他をカンマ区切りで追加（任意）" style="margin-top:8px">
+  </div>
+  <div class="fg"><div class="fl">頻度</div>
+    <select id="rt-freq" onchange="routineFreqUI(this.value)">${CHORE_FREQS.map(([v,l])=>`<option value="${v}" ${freq===v?'selected':''}>${l}</option>`).join('')}</select>
+  </div>
+  <div id="rt-f-weekly" style="display:${freq==='weekly'?'block':'none'}"><div class="fg"><div class="fl">曜日（複数可）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${DAYS.map((d,i)=>`<label style="display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border-radius:100px;border:1px solid var(--border);font-size:12px;cursor:pointer"><input type="checkbox" class="rt-day" value="${i}" ${selDays.has(i)?'checked':''} style="accent-color:var(--purple)">${d}</label>`).join('')}</div>
+  </div></div>
+  <div id="rt-f-monthly" style="display:${freq==='monthly'?'block':'none'}"><div class="fg"><div class="fl">毎月何日</div><input type="number" id="rt-dom" min="1" max="31" value="${r?.dom||1}"></div></div>
+  <div id="rt-f-yearly" style="display:${freq==='yearly'?'block':'none'}"><div class="frow">
+    <div class="fg"><div class="fl">月</div><input type="number" id="rt-mon" min="1" max="12" value="${r?.mon||1}"></div>
+    <div class="fg"><div class="fl">日</div><input type="number" id="rt-yday" min="1" max="31" value="${r?.day||1}"></div>
+  </div></div>
+  <div id="rt-f-once" style="display:${freq==='once'?'block':'none'}"><div class="fg"><div class="fl">日付</div><input type="date" id="rt-date" value="${r?.date||today()}"></div></div>
+  <div class="fg"><div class="fl">時刻（任意）</div><input type="time" id="rt-time" value="${r?.time||''}"></div>
+  <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0 2px;cursor:pointer"><input type="checkbox" id="rt-active" ${r?.active===false?'':'checked'} style="accent-color:var(--purple);width:15px;height:15px">スケジュールに反映する</label>
+  <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button>${r?`<button class="btn btn-red" onclick="delRoutine('${r.id}')">削除</button>`:''}<button class="btn btn-p" onclick="saveRoutine('${id||''}')">保存</button></div>`);
+  document.getElementById('rt-name')?.focus();
+}
+function saveRoutine(id){
+  const name=document.getElementById('rt-name')?.value.trim();
+  if(!name){toast('ルーティン名を入力してください','err');return;}
+  let items=[...document.querySelectorAll('.rt-item:checked')].map(c=>c.value);
+  const extra=(document.getElementById('rt-extra')?.value||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean);
+  items=[...new Set([...items,...extra])];
+  if(!items.length){toast('まとめる家事を1つ以上選んでください','err');return;}
+  const freq=document.getElementById('rt-freq')?.value||'weekly';
+  const days=[...document.querySelectorAll('.rt-day:checked')].map(c=>parseInt(c.value));
+  if(freq==='weekly'&&!days.length){toast('曜日を1つ以上選んでください','err');return;}
+  const obj={
+    id:id||uid(),name,items,freq,
+    days:freq==='weekly'?days:[],
+    dom:freq==='monthly'?(parseInt(document.getElementById('rt-dom')?.value)||1):null,
+    mon:freq==='yearly'?(parseInt(document.getElementById('rt-mon')?.value)||1):null,
+    day:freq==='yearly'?(parseInt(document.getElementById('rt-yday')?.value)||1):null,
+    date:freq==='once'?(document.getElementById('rt-date')?.value||today()):null,
+    time:document.getElementById('rt-time')?.value||null,
+    active:!!document.getElementById('rt-active')?.checked,
+  };
+  const ex=(S.choreRoutines||[]).find(x=>x.id===id);obj.done=ex?.done||{};
+  if(!Array.isArray(S.choreRoutines))S.choreRoutines=[];
+  if(id){const i=S.choreRoutines.findIndex(x=>x.id===id);if(i>=0)S.choreRoutines[i]=obj;else S.choreRoutines.push(obj);}
+  else S.choreRoutines.push(obj);
+  save();closeModal();render();toast(`${name} を保存しました`);
 }
 // 家事をタスク/スケジュールビュー内で表示（interactive=trueでその日チェック可）
 function rChoreInTaskView(c,date,interactive){
@@ -4216,17 +4322,36 @@ function saveChore(id){
 }
 function rChores(){
   const chores=(S.chores||[]).filter(c=>!c.deleted);
+  const routines=(S.choreRoutines||[]).filter(r=>!r.deleted);
   const td=today();
   const todayChores=choresForDate(td);
+  const todayRoutines=routinesForDate(td);
   const groups=CHORE_FREQS.map(([v,l])=>[v,l,chores.filter(c=>c.freq===v)]).filter(([,,arr])=>arr.length);
   return`${secTitle('🧹 家事')}
-<div style="font-size:12px;color:var(--t2);margin-bottom:12px">曜日ごと・月1・年1などで家事を登録すると、スケジュールに自動で反映されます（曜日固定で毎週組み込み）。</div>
+<div style="font-size:12px;color:var(--t2);margin-bottom:12px">曜日ごと・月1・年1などで家事を登録すると、スケジュールに自動で反映されます（曜日固定で毎週組み込み）。ルーティンで複数の家事をまとめて管理できます。</div>
 <div class="card" style="margin-bottom:14px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <div style="font-size:13px;font-weight:700">今日の家事 <span style="color:var(--t2);font-weight:500">(${todayChores.filter(c=>(c.completedDates||[]).includes(td)).length}/${todayChores.length})</span></div>
     <button class="btn btn-p btn-sm" onclick="openChoreModal()">＋ 家事を追加</button>
   </div>
-  ${todayChores.length?todayChores.map(c=>rChoreInTaskView(c,td,true)).join(''):`<div style="color:var(--t3);font-size:12px;text-align:center;padding:10px 0">今日予定の家事はありません</div>`}
+  ${todayRoutines.map(r=>rRoutineInTaskView(r,td,true)).join('')}
+  ${todayChores.length?todayChores.map(c=>rChoreInTaskView(c,td,true)).join(''):(todayRoutines.length?'':`<div style="color:var(--t3);font-size:12px;text-align:center;padding:10px 0">今日予定の家事はありません</div>`)}
+</div>
+${secTitle('🔁 家事ルーティン')}
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;color:var(--t2)">いくつかの家事をまとめて、頻度・時刻でスケジュールに反映</div>
+    <button class="btn btn-p btn-sm" onclick="openRoutineModal()">＋ ルーティン作成</button>
+  </div>
+  ${routines.length?`<div style="display:flex;flex-direction:column;gap:6px">${routines.map(r=>`<div style="display:flex;align-items:center;gap:9px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;${r.active===false?'opacity:.55':''}">
+    <button onclick="toggleRoutineActive('${r.id}')" title="スケジュール反映の切替" style="border:none;background:none;cursor:pointer;font-size:18px;flex-shrink:0;padding:0">${r.active===false?'⚪':'🟢'}</button>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:700;color:var(--teal,#0d9488);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)} <span style="color:var(--t2);font-weight:500;font-size:11px">${(r.items||[]).length}件</span></div>
+      <div style="font-size:11px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(choreFreqLabel(r))}${r.time?` ・ 🕐 ${r.time}`:''} ・ ${(r.items||[]).map(esc).join(' / ')}</div>
+    </div>
+    <button class="tact" onclick="openRoutineModal('${r.id}')">✏️</button>
+    <button class="tact del" onclick="delRoutine('${r.id}')">🗑</button>
+  </div>`).join('')}</div>`:`<div style="color:var(--t3);font-size:12px;text-align:center;padding:10px 0">ルーティンなし。「＋ ルーティン作成」でまとめて登録できます。</div>`}
 </div>
 <div class="card" style="margin-bottom:14px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:8px">クイック追加（タップで登録）</div>
@@ -4313,10 +4438,12 @@ ${days.map((d,i)=>{
   const tasks=tasksForDate(d);
   const gcEvs=gcalEventsForDate(d).sort((a,b)=>(a.start?.dateTime||'00:00')>(b.start?.dateTime||'00:00')?1:-1);
   const wChores=choresForDate(d);
+  const wRoutines=routinesForDate(d);
   const isToday=d===today();
   return`<div class="wday-col ${isToday?'today-col':''}" ondragover="event.preventDefault()" ondrop="wdayDrop(event,'${d}')">
     <div class="wday-hdr">${names[i]}</div>
     <div class="wday-date">${+d.slice(8)}</div>
+    ${wRoutines.map(r=>{const dn=routineDoneList(r,d).length>=(r.items||[]).length&&(r.items||[]).length>0;return`<div class="wtask" onclick="V='chores';render()" style="background:var(--bdim);border-left:2px solid var(--teal,#0d9488);cursor:pointer;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${dn?'opacity:.5;text-decoration:line-through':''}" title="${esc(r.name)}">🔁 ${r.time?r.time+' ':''}${esc(r.name)} (${(r.items||[]).length})</div>`;}).join('')}
     ${wChores.map(c=>`<div class="wtask" onclick="toggleChoreDone('${c.id}','${d}')" style="background:var(--bdim);border-left:2px solid var(--teal,#0d9488);cursor:pointer;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${(c.completedDates||[]).includes(d)?'opacity:.5;text-decoration:line-through':''}" title="${esc(c.name)}">🧹 ${c.time?c.time+' ':''}${esc(c.name)}</div>`).join('')}
     ${gcEvs.map(e=>{
       const t=e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'';
@@ -4351,8 +4478,10 @@ function rTasksMonthly(){
     const tasks=tasksForDate(d);
     const gcEvs=gcalEventsForDate(d);
     const dChores=choresForDate(d);
+    const dRoutines=routinesForDate(d);
     const combined=[
       ...gcEvs.map(e=>({_g:true,time:e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'',title:e.summary||'(無題)'})),
+      ...dRoutines.map(r=>({_r:true,done:routineDoneList(r,d).length>=(r.items||[]).length&&(r.items||[]).length>0,time:r.time||'',title:r.name})),
       ...dChores.map(c=>({_c:true,done:(c.completedDates||[]).includes(d),time:c.time||'',title:c.name})),
       ...tasks.map(t=>({_g:false,done:t.done,over:!t.done&&t.dueDate<today(),time:t.startTime||'',title:t.title}))
     ].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
@@ -4360,6 +4489,8 @@ function rTasksMonthly(){
       <div class="mday-num">${+d.slice(8)}</div>
       ${combined.slice(0,3).map(item=>item._g
         ?`<div class="mday-task" style="border-left:2px solid var(--blue)">${item.time?`<span class="mday-time">${item.time}</span>`:''}📅 ${esc(item.title)}</div>`
+        :item._r
+        ?`<div class="mday-task ${item.done?'done-t':''}" style="border-left:2px solid var(--teal,#0d9488)">${item.time?`<span class="mday-time">${item.time}</span>`:''}🔁 ${esc(item.title)}</div>`
         :item._c
         ?`<div class="mday-task ${item.done?'done-t':''}" style="border-left:2px solid var(--teal,#0d9488)">${item.time?`<span class="mday-time">${item.time}</span>`:''}🧹 ${esc(item.title)}</div>`
         :`<div class="mday-task ${item.over?'over':item.done?'done-t':''}">${item.time?`<span class="mday-time">${item.time}</span>`:''}${esc(item.title)}</div>`
@@ -4380,6 +4511,7 @@ function rTasksSchedule(){
   const fsRanges=hasFs?(S.fs||[]).filter(f=>f.s&&f.s!=='-1'&&f.s!==''&&f.e).map(f=>[tMin(f.s),tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e)]):[];
   const inFsBlock=t=>fsRanges.some(([s,e])=>s!=null&&e!=null&&e>s&&t>=s&&t<e);
   const dayChores=choresForDate(d).filter(c=>!hasFs||!c.time||!inFsBlock(tMin(c.time)));
+  const dayRoutines=routinesForDate(d);
   const dayWord=isToday?'今日':isTomorrow?'明日':isYesterday?'昨日':'';
   return`
 <div class="fs-tl-daynav">
@@ -4398,7 +4530,8 @@ function rTasksSchedule(){
 </div>
 ${hasFs?rFsDashPanel(d):`<div class="card card-sm" style="color:var(--t2);text-align:center">固定スケジュールが未設定です。<button class="btn btn-g btn-xs" style="margin-left:8px" onclick="V='habits';HV='schedule';render()">設定する →</button></div>`}
 ${dayHabits.length?`${secTitle(`🔥 習慣 (${dayHabits.length}件)`)}${dayHabits.map(h=>rHabitInTaskView(h,d,isToday)).join('')}`:''}
-${dayChores.length?`${secTitle(`🧹 家事 (${dayChores.filter(c=>(c.completedDates||[]).includes(d)).length}/${dayChores.length}件)`)}${dayChores.map(c=>rChoreInTaskView(c,d,true)).join('')}`:''}`;
+${dayChores.length?`${secTitle(`🧹 家事 (${dayChores.filter(c=>(c.completedDates||[]).includes(d)).length}/${dayChores.length}件)`)}${dayChores.map(c=>rChoreInTaskView(c,d,true)).join('')}`:''}
+${dayRoutines.length?`${secTitle(`🔁 家事ルーティン (${dayRoutines.length}件)`)}${dayRoutines.map(r=>rRoutineInTaskView(r,d,true)).join('')}`:''}`;
 }
 
 function openDayModal(d){
@@ -11367,7 +11500,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-07';
+const APP_VERSION='20260715-08';
 
 render();
 function forceAppUpdate(){
