@@ -4132,13 +4132,29 @@ function dueOnDate(c,date){
   }
 }
 function choresForDate(date){
+  // 時刻順（同時刻は家事ページの並び順＝配列順を維持する安定ソート）
   return (S.chores||[]).filter(c=>!c.deleted&&c.active!==false&&dueOnDate(c,date))
-    .sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+    .sort((a,b)=>(a.time||'23:59').localeCompare(b.time||'23:59'));
 }
 // ===== 家事ルーティン（いくつかの家事をまとめ、ルーティン自体の頻度・時刻でスケジュール表示） =====
 function routinesForDate(date){
   return (S.choreRoutines||[]).filter(r=>!r.deleted&&r.active!==false&&dueOnDate(r,date))
-    .sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+    .sort((a,b)=>(a.time||'23:59').localeCompare(b.time||'23:59'));
+}
+// 家事/ルーティンの並び順変更（配列順＝スケジュールの同時刻内の表示順）
+function moveChore(id,dir){
+  const arr=S.chores||[];const live=arr.filter(c=>!c.deleted);
+  const c=live.find(x=>x.id===id);if(!c)return;
+  const tgt=live[live.indexOf(c)+dir];if(!tgt)return;
+  const ai=arr.indexOf(c),bi=arr.indexOf(tgt);arr[ai]=tgt;arr[bi]=c;
+  save();render();
+}
+function moveRoutine(id,dir){
+  const arr=S.choreRoutines||[];const live=arr.filter(r=>!r.deleted);
+  const r=live.find(x=>x.id===id);if(!r)return;
+  const tgt=live[live.indexOf(r)+dir];if(!tgt)return;
+  const ai=arr.indexOf(r),bi=arr.indexOf(tgt);arr[ai]=tgt;arr[bi]=r;
+  save();render();
 }
 function routineDoneList(r,date){return (r.done&&Array.isArray(r.done[date]))?r.done[date]:[];}
 function toggleRoutineSub(id,date,idx){
@@ -4326,7 +4342,6 @@ function rChores(){
   const td=today();
   const todayChores=choresForDate(td);
   const todayRoutines=routinesForDate(td);
-  const groups=CHORE_FREQS.map(([v,l])=>[v,l,chores.filter(c=>c.freq===v)]).filter(([,,arr])=>arr.length);
   return`${secTitle('🧹 家事')}
 <div style="font-size:12px;color:var(--t2);margin-bottom:12px">曜日ごと・月1・年1などで家事を登録すると、スケジュールに自動で反映されます（曜日固定で毎週組み込み）。ルーティンで複数の家事をまとめて管理できます。</div>
 <div class="card" style="margin-bottom:14px">
@@ -4343,7 +4358,11 @@ ${secTitle('🔁 家事ルーティン')}
     <div style="font-size:12px;color:var(--t2)">いくつかの家事をまとめて、頻度・時刻でスケジュールに反映</div>
     <button class="btn btn-p btn-sm" onclick="openRoutineModal()">＋ ルーティン作成</button>
   </div>
-  ${routines.length?`<div style="display:flex;flex-direction:column;gap:6px">${routines.map(r=>`<div style="display:flex;align-items:center;gap:9px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;${r.active===false?'opacity:.55':''}">
+  ${routines.length?`<div style="display:flex;flex-direction:column;gap:6px">${routines.map((r,i)=>`<div style="display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;${r.active===false?'opacity:.55':''}">
+    <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+      <button onclick="moveRoutine('${r.id}',-1)" ${i===0?'disabled':''} title="上へ" style="border:none;background:none;cursor:${i===0?'default':'pointer'};font-size:11px;line-height:1;color:${i===0?'var(--t3)':'var(--t2)'};padding:1px 3px">▲</button>
+      <button onclick="moveRoutine('${r.id}',1)" ${i===routines.length-1?'disabled':''} title="下へ" style="border:none;background:none;cursor:${i===routines.length-1?'default':'pointer'};font-size:11px;line-height:1;color:${i===routines.length-1?'var(--t3)':'var(--t2)'};padding:1px 3px">▼</button>
+    </div>
     <button onclick="toggleRoutineActive('${r.id}')" title="スケジュール反映の切替" style="border:none;background:none;cursor:pointer;font-size:18px;flex-shrink:0;padding:0">${r.active===false?'⚪':'🟢'}</button>
     <div style="flex:1;min-width:0">
       <div style="font-size:13px;font-weight:700;color:var(--teal,#0d9488);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)} <span style="color:var(--t2);font-weight:500;font-size:11px">${(r.items||[]).length}件</span></div>
@@ -4359,9 +4378,14 @@ ${secTitle('🔁 家事ルーティン')}
     ${CHORE_PRESETS.map(p=>`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;background:var(--card2);color:var(--t2);border:1px solid var(--border)" onclick="openChoreModal(null,'${p}')">＋ ${p}</div>`).join('')}
   </div>
 </div>
-${groups.length?groups.map(([v,l,arr])=>`${secTitle(`${l}（${arr.length}件）`)}
-<div class="card" style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px">
-  ${arr.map(c=>`<div style="display:flex;align-items:center;gap:9px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;${c.active===false?'opacity:.55':''}">
+${secTitle(`📋 登録済みの家事（${chores.length}件）`)}
+<div style="font-size:11px;color:var(--t2);margin:-4px 0 8px">▲▼ で並び順を変更できます。この順番が、スケジュールの同じ時刻内での表示順になります。</div>
+<div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:6px">
+  ${chores.length?chores.map((c,i)=>`<div style="display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;${c.active===false?'opacity:.55':''}">
+    <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+      <button onclick="moveChore('${c.id}',-1)" ${i===0?'disabled':''} title="上へ" style="border:none;background:none;cursor:${i===0?'default':'pointer'};font-size:11px;line-height:1;color:${i===0?'var(--t3)':'var(--t2)'};padding:1px 3px">▲</button>
+      <button onclick="moveChore('${c.id}',1)" ${i===chores.length-1?'disabled':''} title="下へ" style="border:none;background:none;cursor:${i===chores.length-1?'default':'pointer'};font-size:11px;line-height:1;color:${i===chores.length-1?'var(--t3)':'var(--t2)'};padding:1px 3px">▼</button>
+    </div>
     <button onclick="toggleChoreActive('${c.id}')" title="スケジュール反映の切替" style="border:none;background:none;cursor:pointer;font-size:18px;flex-shrink:0;padding:0">${c.active===false?'⚪':'🟢'}</button>
     <div style="flex:1;min-width:0">
       <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
@@ -4369,8 +4393,8 @@ ${groups.length?groups.map(([v,l,arr])=>`${secTitle(`${l}（${arr.length}件）`
     </div>
     <button class="tact" onclick="openChoreModal('${c.id}')">✏️</button>
     <button class="tact del" onclick="delChore('${c.id}')">🗑</button>
-  </div>`).join('')}
-</div>`).join(''):`<div class="card" style="color:var(--t3);font-size:12px;text-align:center;padding:16px">まだ家事が登録されていません。「＋ 家事を追加」またはクイック追加から登録してください。</div>`}`;
+  </div>`).join(''):`<div style="color:var(--t3);font-size:12px;text-align:center;padding:16px">まだ家事が登録されていません。「＋ 家事を追加」またはクイック追加から登録してください。</div>`}
+</div>`;
 }
 
 function rGcalEventItem(e){
@@ -11500,7 +11524,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-08';
+const APP_VERSION='20260715-09';
 
 render();
 function forceAppUpdate(){
