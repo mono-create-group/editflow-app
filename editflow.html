@@ -894,7 +894,7 @@ function _applyCloudData(json){
   S=migrate(Object.assign(def,cloud));
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','customExSets','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -1767,6 +1767,7 @@ function defState(){return{
   settings:{workMin:25,breakMin:5,target:0,identity:'',gcalClientId:'',gcalConnected:false,gymCommit:false,weeklyWorkoutTarget:3,sheetsId:'1SxcKhu4b_GI45Ziep8lIulwtlyDEXgCThoikRY5oHDs',sheetsTab:'',morningLockEnabled:true,eveningLockEnabled:true,kpiLockEnabled:false,timeScheduleLockEnabled:false,goalLockEnabled:true,draftLockEnabled:true},
   frogId:null,
   customEx:[],
+  customExSets:[],
   navConfig:null,
   customPages:[],
   divisions:[],
@@ -1779,6 +1780,10 @@ function migrate(d){
   // migrate ef_v4 → ef_v5
   const old=localStorage.getItem(DB_OLD);
   if(old&&!localStorage.getItem(DB)){try{const o=JSON.parse(old);Object.assign(d,o);localStorage.setItem(DB,JSON.stringify(d));localStorage.removeItem(DB_OLD);}catch{}}
+  // migrate: カスタム筋トレ種目を{name,video,sets,reps}へ・選択中種目をオブジェクト化・セットメニュー初期化
+  if(!Array.isArray(d.customExSets))d.customExSets=[];
+  if(Array.isArray(d.customEx))d.customEx=d.customEx.map(x=>typeof x==='string'?{name:x}:x);
+  (d.workouts||[]).forEach(w=>{if(Array.isArray(w.exercises))w.exercises=w.exercises.map(e=>typeof e==='string'?{name:e}:e);});
   // migrate v10→v11: 指定ワーカーをトライアルに設定、誤採用ログ削除
   if(!d.settings._workerTrialMigrated2){
     const trialWorkerNames=['矢田部','菅野','鈴木','松下'];
@@ -1911,7 +1916,9 @@ window.addEventListener('beforeunload',()=>{
   try{localStorage.setItem(DB,JSON.stringify(S));}catch(e){}
 });
 // ─────────────────────────────────────────────────────────────────────
-function allEx(){return [...(S.customEx||[]),'プッシュアップ','ワイドプッシュアップ','スクワット','ジャンプスクワット','ランジ','プランク','サイドプランク','クランチ','レッグレイズ','バーピー','マウンテンクライマー','ヒップリフト','ジャンピングジャック','ランニング'];}
+function exName(x){return typeof x==='string'?x:((x&&x.name)||'');}
+function exMeta(name){const c=(S.customEx||[]).find(x=>exName(x)===name);return (c&&typeof c==='object')?c:{};}
+function allEx(){return [...(S.customEx||[]).map(exName).filter(Boolean),'プッシュアップ','ワイドプッシュアップ','スクワット','ジャンプスクワット','ランジ','プランク','サイドプランク','クランチ','レッグレイズ','バーピー','マウンテンクライマー','ヒップリフト','ジャンピングジャック','ランニング'];}
 
 // ===UTILS===
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
@@ -5764,9 +5771,52 @@ function getWorkout(date){
 }
 function toggleExercise(ex){
   const w=getWorkout(today());
-  const i=w.exercises.indexOf(ex);
-  if(i>=0)w.exercises.splice(i,1);else w.exercises.push(ex);
+  if(!Array.isArray(w.exercises))w.exercises=[];
+  const i=w.exercises.findIndex(e=>exName(e)===ex);
+  if(i>=0)w.exercises.splice(i,1);
+  else{const m=exMeta(ex);w.exercises.push({name:ex,sets:m.sets||null,reps:m.reps||null});}
   save();render();
+}
+// セットメニューをワンタップでまとめて追加（既に選択済みの種目はスキップ）
+function applyExSet(setId){
+  const s=(S.customExSets||[]).find(x=>x.id===setId);if(!s)return;
+  const w=getWorkout(today());if(!Array.isArray(w.exercises))w.exercises=[];
+  let added=0;
+  (s.items||[]).forEach(nm=>{
+    if(!w.exercises.some(e=>exName(e)===nm)){const m=exMeta(nm);w.exercises.push({name:nm,sets:m.sets||null,reps:m.reps||null});added++;}
+  });
+  save();render();toast(`${s.name}: ${added>0?added+'種目を追加':'追加済み'}`);
+}
+// フィットネス画面で選択中種目の回数/セット数をその場で変更（再描画せずフォーカス維持）
+function setExField(name,field,val){
+  const w=getWorkout(today());
+  const e=(w.exercises||[]).find(e=>exName(e)===name);if(!e||typeof e!=='object')return;
+  if(field==='sets')e.sets=parseInt(val)||null;else e.reps=(val||'').trim()||null;
+  save();
+}
+// クイック選択＋選択中種目の編集行（rHabitsSchedule/rFitnessTraining 共通）
+function rQuickSelect(workout){
+  const exList=(workout.exercises||[]).map(e=>typeof e==='string'?{name:e}:e);
+  const sets=S.customExSets||[];
+  return`
+  ${sets.length?`<div style="font-size:12px;color:var(--t2);margin-bottom:6px">セットメニュー（ワンタップでまとめて追加）</div>
+  <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px">
+    ${sets.map(s=>`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:700;cursor:pointer;background:var(--pdim);color:var(--purple);border:1px solid var(--purple)" onclick="applyExSet('${s.id}')">＋ ${esc(s.name)} <span style="opacity:.7;font-weight:500">(${(s.items||[]).length})</span></div>`).join('')}
+  </div>`:''}
+  <div style="font-size:12px;color:var(--t2);margin-bottom:8px">クイック選択（タップでトグル）</div>
+  <div style="display:flex;flex-wrap:wrap;gap:7px">
+    ${allEx().map(ex=>{const done=exList.some(e=>e.name===ex);return`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:${done?'var(--purple)':'var(--card2)'};color:${done?'#fff':'var(--t2)'};border:1px solid ${done?'var(--purple)':'var(--border)'}" onclick="toggleExercise('${esc(ex)}')">${done?'✓ ':''}${esc(ex)}</div>`;}).join('')}
+  </div>
+  ${exList.length?`<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">
+    ${exList.map(e=>{const m=exMeta(e.name);return`<div style="display:flex;align-items:center;gap:7px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:6px 9px">
+      <span style="flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.name)}</span>
+      ${m.video?`<a href="${esc(m.video)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:15px;text-decoration:none;flex-shrink:0" title="参考動画">▶</a>`:''}
+      <input type="number" min="1" value="${e.sets||''}" placeholder="—" onchange="setExField('${esc(e.name)}','sets',this.value)" style="width:46px;font-size:12px;padding:3px 4px;text-align:center;flex-shrink:0">
+      <span style="font-size:11px;color:var(--t3);flex-shrink:0">セット</span>
+      <input value="${esc(e.reps||'')}" placeholder="回数" onchange="setExField('${esc(e.name)}','reps',this.value)" style="width:64px;font-size:12px;padding:3px 6px;text-align:center;flex-shrink:0">
+      <button class="tact del" onclick="toggleExercise('${esc(e.name)}')" title="外す" style="flex-shrink:0">✕</button>
+    </div>`;}).join('')}
+  </div>`:''}`;
 }
 function openWorkoutEntryModal(id){
   const td=today();
@@ -5861,16 +5911,7 @@ ${secTitle('💪 今日の筋トレメニュー')}
   :`<div style="color:var(--t3);font-size:12px;text-align:center;padding:12px 0">まだ記録がありません</div>`}
 </div>
 <div class="card" style="margin-bottom:0">
-  <div style="font-size:12px;color:var(--t2);margin-bottom:8px">クイック選択（タップでトグル）</div>
-  <div style="display:flex;flex-wrap:wrap;gap:7px">
-    ${allEx().map(ex=>{
-      const done=workout.exercises.includes(ex);
-      return`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
-        background:${done?'var(--purple)':'var(--card2)'};color:${done?'#fff':'var(--t2)'};border:1px solid ${done?'var(--purple)':'var(--border)'}"
-        onclick="toggleExercise('${esc(ex)}')">${done?'✓ ':''}${esc(ex)}</div>`;
-    }).join('')}
-  </div>
-  ${workout.exercises.length?`<div style="margin-top:10px;font-size:12px;color:var(--green);font-weight:600">✅ ${workout.exercises.join(' · ')}</div>`:''}
+  ${rQuickSelect(workout)}
 </div>`;
 }
 // ===GOALS===
@@ -7171,7 +7212,7 @@ function rFitnessTraining(){
     return`<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px">
       <div style="font-size:12px;font-weight:700;margin-bottom:4px">${dLabel}</div>
       ${(w.entries||[]).map(e=>`<div style="font-size:11px;color:var(--t2);padding:2px 0">${esc(e.name)}${e.sets?` ${e.sets}セット`:''}${e.reps?` ${e.reps}回`:''}${e.weight?` ${e.weight}kg`:''}</div>`).join('')}
-      ${(w.exercises||[]).map(ex=>`<div style="font-size:11px;color:var(--t2);padding:2px 0">✓ ${esc(ex)}</div>`).join('')}
+      ${(w.exercises||[]).map(ex=>`<div style="font-size:11px;color:var(--t2);padding:2px 0">✓ ${esc(exName(ex))}${ex&&ex.sets?` ${ex.sets}セット`:''}${ex&&ex.reps?` ${esc(ex.reps)}`:''}</div>`).join('')}
     </div>`;}).join('');
   const todayRest=workout.isRest&&!todayDone;
   return`${secTitle('💪 今日の筋トレ記録 '+(todayDone?'<span class="badge bg">✓ 完了</span>':todayRest?'<span class="badge br">❌ 休み</span>':'<span class="badge br">未記録</span>'))}
@@ -7195,11 +7236,7 @@ function rFitnessTraining(){
   :`<div style="color:var(--t3);font-size:12px;text-align:center;padding:12px 0">まだ記録がありません</div>`}
 </div>
 <div class="card" style="margin-bottom:16px">
-  <div style="font-size:12px;color:var(--t2);margin-bottom:8px">クイック選択（タップでトグル）</div>
-  <div style="display:flex;flex-wrap:wrap;gap:7px">
-    ${allEx().map(ex=>{const done=(workout.exercises||[]).includes(ex);return`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:${done?'var(--purple)':'var(--card2)'};color:${done?'#fff':'var(--t2)'};border:1px solid ${done?'var(--purple)':'var(--border)'}" onclick="toggleExercise('${esc(ex)}')">${done?'✓ ':''}${esc(ex)}</div>`;}).join('')}
-  </div>
-  ${(workout.exercises||[]).length?`<div style="margin-top:10px;font-size:12px;color:var(--green);font-weight:600">✅ ${workout.exercises.join(' · ')}</div>`:''}
+  ${rQuickSelect(workout)}
 </div>
 ${pastHtml?`${secTitle('📅 過去の記録')}<div>${pastHtml}</div>`:''}`;
 }
@@ -8084,15 +8121,40 @@ ${secTitle('👤 担当者管理')}
 
 ${secTitle('💪 カスタム筋トレメニュー')}
 <div class="card" style="margin-bottom:16px">
-  <div style="font-size:12px;color:var(--t2);margin-bottom:10px">習慣トラッカーの筋トレメニューに追加されます</div>
-  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-    ${(S.customEx||[]).map((ex,i)=>`<div class="worker-chip">${esc(ex)}<button style="border:none;background:none;color:var(--red);cursor:pointer;font-size:11px;margin-left:4px" onclick="S.customEx.splice(${i},1);save();render()">✕</button></div>`).join('')}
+  <div style="font-size:12px;color:var(--t2);margin-bottom:10px">種目名・参考動画・基本の回数/セット数を登録できます（フィットネスのクイック選択に表示）</div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+    ${(S.customEx||[]).map(x=>{const m=typeof x==='object'?x:{name:x};return`<div style="display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:6px 10px">
+      <span style="flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.name)}</span>
+      ${m.sets||m.reps?`<span style="font-size:11px;color:var(--t2);white-space:nowrap">${m.sets?m.sets+'セット':''}${m.sets&&m.reps?' × ':''}${m.reps?esc(m.reps):''}</span>`:''}
+      ${m.video?`<a href="${esc(m.video)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:14px;text-decoration:none" title="参考動画">▶</a>`:''}
+      <button class="tact" onclick="openCustomExModal('${esc(m.name)}')">✏️</button>
+      <button class="tact del" onclick="delCustomEx('${esc(m.name)}')">🗑</button>
+    </div>`;}).join('')}
     ${!(S.customEx||[]).length?'<span style="color:var(--t3);font-size:12px">カスタムメニューなし</span>':''}
   </div>
-  <div style="display:flex;gap:8px">
-    <input id="new-ex-name" placeholder="メニュー名を入力" style="flex:1">
-    <button class="btn btn-p btn-sm" onclick="addCustomEx()">追加</button>
+  <div class="frow" style="margin-bottom:8px">
+    <div class="fg"><div class="fl">種目名 *</div><input id="new-ex-name" placeholder="例: アブローラー"></div>
+    <div class="fg"><div class="fl">参考動画URL</div><input id="new-ex-video" placeholder="https://youtu.be/..."></div>
   </div>
+  <div class="frow" style="margin-bottom:10px">
+    <div class="fg"><div class="fl">基本セット数</div><input type="number" id="new-ex-sets" min="1" placeholder="例: 3"></div>
+    <div class="fg"><div class="fl">基本回数</div><input id="new-ex-reps" placeholder="例: 15回"></div>
+  </div>
+  <button class="btn btn-p btn-sm" onclick="addCustomEx()">＋ 種目を追加</button>
+</div>
+
+${secTitle('🔁 セットメニュー（ワンタップまとめ追加）')}
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:12px;color:var(--t2);margin-bottom:10px">腹筋メニュー・腕立てメニューなど、いつもの種目をまとめて登録。フィットネス画面でワンタップ追加できます。</div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+    ${(S.customExSets||[]).map(s=>`<div style="display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:6px 10px">
+      <span style="font-size:13px;font-weight:700;color:var(--purple);white-space:nowrap">${esc(s.name)}</span>
+      <span style="flex:1;min-width:0;font-size:11px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(s.items||[]).map(esc).join(' · ')}</span>
+      <button class="tact" onclick="openExSetModal('${s.id}')">✏️</button>
+    </div>`).join('')}
+    ${!(S.customExSets||[]).length?'<span style="color:var(--t3);font-size:12px">セットメニューなし</span>':''}
+  </div>
+  <button class="btn btn-p btn-sm" onclick="openExSetModal()">＋ セットメニューを作成</button>
 </div>
 
 ${secTitle('📅 固定タイムスケジュール（再掲）')}
@@ -8426,11 +8488,67 @@ function backfillGoalsData(){
 }
 function addCustomEx(){
   const n=document.getElementById('new-ex-name')?.value.trim();
-  if(!n){toast('メニュー名を入力してください','err');return;}
-  if(!S.customEx)S.customEx=[];
-  if(S.customEx.includes(n)){toast('すでに登録されています','err');return;}
-  S.customEx.push(n);save();render();toast(`${n} を追加しました`);
+  if(!n){toast('種目名を入力してください','err');return;}
+  if(!Array.isArray(S.customEx))S.customEx=[];
+  if(S.customEx.some(x=>exName(x)===n)){toast('すでに登録されています','err');return;}
+  const video=document.getElementById('new-ex-video')?.value.trim()||'';
+  const sets=parseInt(document.getElementById('new-ex-sets')?.value)||null;
+  const reps=document.getElementById('new-ex-reps')?.value.trim()||null;
+  S.customEx.push({name:n,video,sets,reps});
+  save();render();toast(`${n} を追加しました`);
 }
+function delCustomEx(name){
+  if(!Array.isArray(S.customEx))return;
+  S.customEx=S.customEx.filter(x=>exName(x)!==name);save();render();
+}
+function openCustomExModal(name){
+  const c=(S.customEx||[]).find(x=>exName(x)===name);if(!c)return;
+  const m=typeof c==='object'?c:{name:c};
+  openModal(`<div class="mhdr"><div class="mtitle">種目を編集</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  <div class="fg"><div class="fl">種目名 *</div><input id="cx-name" value="${esc(m.name)}"></div>
+  <div class="fg"><div class="fl">参考動画URL</div><input id="cx-video" value="${esc(m.video||'')}" placeholder="https://youtu.be/..."></div>
+  <div class="frow">
+    <div class="fg"><div class="fl">基本セット数</div><input type="number" id="cx-sets" value="${m.sets||''}" min="1"></div>
+    <div class="fg"><div class="fl">基本回数</div><input id="cx-reps" value="${esc(m.reps||'')}" placeholder="例: 10回"></div>
+  </div>
+  <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="saveCustomEx('${esc(m.name)}')">保存</button></div>`);
+  document.getElementById('cx-name')?.focus();
+}
+function saveCustomEx(orig){
+  const name=document.getElementById('cx-name')?.value.trim();if(!name){toast('種目名を入力してください','err');return;}
+  const i=(S.customEx||[]).findIndex(x=>exName(x)===orig);if(i<0)return;
+  if(name!==orig&&S.customEx.some(x=>exName(x)===name)){toast('同名の種目が既にあります','err');return;}
+  S.customEx[i]={name,video:document.getElementById('cx-video')?.value.trim()||'',sets:parseInt(document.getElementById('cx-sets')?.value)||null,reps:document.getElementById('cx-reps')?.value.trim()||null};
+  // 名前変更時は選択中ワークアウト・セットメニュー内の参照も更新
+  if(name!==orig){
+    (S.workouts||[]).forEach(w=>(w.exercises||[]).forEach(e=>{if(typeof e==='object'&&e.name===orig)e.name=name;}));
+    (S.customExSets||[]).forEach(s=>{s.items=(s.items||[]).map(x=>x===orig?name:x);});
+  }
+  save();closeModal();render();toast('保存しました');
+}
+function openExSetModal(id){
+  const s=id?(S.customExSets||[]).find(x=>x.id===id):null;
+  const sel=new Set(s?.items||[]);
+  openModal(`<div class="mhdr"><div class="mtitle">${s?'セットメニュー編集':'セットメニュー追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  <div class="fg"><div class="fl">メニュー名 *</div><input id="xs-name" value="${esc(s?.name||'')}" placeholder="例: 腹筋メニュー"></div>
+  <div class="fg"><div class="fl">種目を選択（複数可）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${allEx().map(ex=>`<label style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:100px;border:1px solid var(--border);font-size:12px;cursor:pointer"><input type="checkbox" class="xs-item" value="${esc(ex)}" ${sel.has(ex)?'checked':''} style="accent-color:var(--purple)">${esc(ex)}</label>`).join('')}
+    </div>
+  </div>
+  <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button>${s?`<button class="btn btn-red" onclick="delExSet('${s.id}')">削除</button>`:''}<button class="btn btn-p" onclick="saveExSet('${id||''}')">保存</button></div>`);
+  document.getElementById('xs-name')?.focus();
+}
+function saveExSet(id){
+  const name=document.getElementById('xs-name')?.value.trim();if(!name){toast('メニュー名を入力してください','err');return;}
+  const items=[...document.querySelectorAll('.xs-item:checked')].map(c=>c.value);
+  if(!items.length){toast('種目を1つ以上選択してください','err');return;}
+  if(!Array.isArray(S.customExSets))S.customExSets=[];
+  if(id){const s=S.customExSets.find(x=>x.id===id);if(s){s.name=name;s.items=items;}}
+  else S.customExSets.push({id:uid(),name,items});
+  save();closeModal();render();toast('セットメニューを保存しました');
+}
+function delExSet(id){S.customExSets=(S.customExSets||[]).filter(x=>x.id!==id);save();closeModal();render();toast('削除しました');}
 function savePomoSettings(){
   S.settings.workMin=parseInt(document.getElementById('set-work').value)||25;
   S.settings.breakMin=parseInt(document.getElementById('set-break').value)||5;
@@ -11076,7 +11194,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-02';
+const APP_VERSION='20260715-03';
 
 render();
 function forceAppUpdate(){
