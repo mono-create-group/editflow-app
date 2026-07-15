@@ -818,6 +818,7 @@ const BUILTIN_VIEWS=[
   {id:'docs',label:'ドキュメント',icon:'📁'},
   {id:'workers',label:'ワーカー管理',icon:'👥'},
   {id:'habits',label:'習慣トラッカー',icon:'🔥'},
+  {id:'chores',label:'家事',icon:'🧹'},
   {id:'goals',label:'目標・KPI管理',icon:'🎯'},
   {id:'journal',label:'ジャーナル',icon:'📔'},
   {id:'memo',label:'ブレインダンプ',icon:'🧠'},
@@ -894,7 +895,7 @@ function _applyCloudData(json){
   S=migrate(Object.assign(def,cloud));
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','customExSets','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -1768,6 +1769,7 @@ function defState(){return{
   frogId:null,
   customEx:[],
   customExSets:[],
+  chores:[],
   navConfig:null,
   customPages:[],
   divisions:[],
@@ -1782,6 +1784,7 @@ function migrate(d){
   if(old&&!localStorage.getItem(DB)){try{const o=JSON.parse(old);Object.assign(d,o);localStorage.setItem(DB,JSON.stringify(d));localStorage.removeItem(DB_OLD);}catch{}}
   // migrate: カスタム筋トレ種目を{name,video,sets,reps}へ・選択中種目をオブジェクト化・セットメニュー初期化
   if(!Array.isArray(d.customExSets))d.customExSets=[];
+  if(!Array.isArray(d.chores))d.chores=[];
   if(Array.isArray(d.customEx))d.customEx=d.customEx.map(x=>typeof x==='string'?{name:x}:x);
   (d.workouts||[]).forEach(w=>{if(Array.isArray(w.exercises))w.exercises=w.exercises.map(e=>typeof e==='string'?{name:e}:e);});
   // migrate v10→v11: 指定ワーカーをトライアルに設定、誤採用ログ削除
@@ -2496,7 +2499,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
+    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,chores:rChores,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -3583,6 +3586,7 @@ ${secTitle(`📋 今日のタスク (${totalCount}件)`)}<button class="btn btn-
 ${gcalToday.map(e=>rGcalEventItem(e)).join('')}
 ${todays.length?todays.map(t=>rTaskItem(t,isDraggable)).join(''):(gcalToday.length?'':`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">今日のタスクはありません 🎉</div>`)}
 ${todayHabits.length?`${secTitle(`🔥 今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
+${(()=>{const tc=choresForDate(td);return tc.length?`${secTitle(`🧹 今日の家事 (${tc.filter(c=>(c.completedDates||[]).includes(td)).length}/${tc.length}件)`)}${tc.map(c=>rChoreInTaskView(c,td,true)).join('')}`:'';})()}
 ${no.length?`${secTitle('📦 期限なし')}${no.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
 </div>
 ${done.length?`${secTitle(`✅ 今日完了 (${done.length}件)`)}${done.map(t=>rTaskItem(t)).join('')}`:''}`;
@@ -4080,6 +4084,151 @@ function rHabitInTaskView(h,date,interactive){
 </div>`;
 }
 
+// ===== 家事（曜日/月1/年1などで定期的にスケジュール自動反映） =====
+const CHORE_FREQS=[['daily','毎日'],['weekly','曜日ごと'],['monthly','月1回'],['yearly','年1回'],['once','1回だけ']];
+const CHORE_PRESETS=['掃除機がけ','床拭き','洗濯','洗濯物干し','皿洗い','ゴミ出し','風呂掃除','トイレ掃除','洗面台掃除','窓拭き','換気扇掃除','排水溝掃除','エアコン掃除','冷蔵庫整理','シーツ交換','買い出し'];
+function choreFreqLabel(c){
+  if(c.freq==='daily')return '毎日';
+  if(c.freq==='weekly')return (c.days&&c.days.length)?c.days.slice().sort().map(d=>DAYS[d]).join('・'):'毎週';
+  if(c.freq==='monthly')return `毎月${c.dom||1}日`;
+  if(c.freq==='yearly')return `毎年${c.mon||1}月${c.day||1}日`;
+  if(c.freq==='once')return c.date||'日付未設定';
+  return '';
+}
+// 指定日に予定されている家事を返す（active のみ）
+function choresForDate(date){
+  const dt=new Date(date+'T00:00:00');
+  const dow=dt.getDay(),dom=dt.getDate(),mon=dt.getMonth()+1;
+  return (S.chores||[]).filter(c=>{
+    if(c.deleted||c.active===false)return false;
+    switch(c.freq){
+      case 'daily':return true;
+      case 'weekly':return (c.days&&c.days.length)?c.days.includes(dow):true;
+      case 'monthly':return (c.dom||1)===dom;
+      case 'yearly':return (c.mon||1)===mon&&(c.day||1)===dom;
+      case 'once':return c.date===date;
+      default:return false;
+    }
+  }).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+}
+// 家事をタスク/スケジュールビュー内で表示（interactive=trueでその日チェック可）
+function rChoreInTaskView(c,date,interactive){
+  const done=(c.completedDates||[]).includes(date);
+  return`<div class="task-item ${done?'done-item':''}" style="border-left:3px solid var(--teal,#0d9488)">
+  ${interactive
+    ?`<div class="chk ${done?'done':''}" onclick="toggleChoreDone('${c.id}','${date}')"></div>`
+    :`<span style="font-size:18px;flex-shrink:0">🧹</span>`}
+  <div class="task-body">
+    <div class="task-ttl ${done?'done':''}">${done?'✓ ':''}${esc(c.name)}</div>
+    <div class="task-meta">
+      ${c.time?`<span class="badge bb">🕐 ${c.time}</span>`:''}
+      <span class="badge bk">🧹 ${esc(choreFreqLabel(c))}</span>
+    </div>
+  </div>
+</div>`;
+}
+function toggleChoreDone(id,date){
+  const c=(S.chores||[]).find(c=>c.id===id);if(!c)return;
+  if(!c.completedDates)c.completedDates=[];
+  const i=c.completedDates.indexOf(date);
+  if(i>=0)c.completedDates.splice(i,1);else{c.completedDates.push(date);toast('✅ 家事を記録しました');}
+  save();render();
+}
+function toggleChoreActive(id){
+  const c=(S.chores||[]).find(c=>c.id===id);if(!c)return;
+  c.active=c.active===false;save();render();
+  toast(c.active===false?'スケジュール反映をOFFにしました':'📅 スケジュールに反映します');
+}
+function delChore(id){
+  if(!confirm('この家事を削除しますか？'))return;
+  S.chores=(S.chores||[]).filter(c=>c.id!==id);save();render();
+}
+function choreFreqUI(freq){
+  ['weekly','monthly','yearly','once'].forEach(f=>{const el=document.getElementById('chore-f-'+f);if(el)el.style.display=(f===freq)?'block':'none';});
+}
+function openChoreModal(id,presetName){
+  const c=id?(S.chores||[]).find(c=>c.id===id):null;
+  const freq=c?.freq||'weekly';
+  const selDays=new Set(c?.days||[]);
+  openModal(`<div class="mhdr"><div class="mtitle">${c?'家事を編集':'家事を追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  <div class="fg"><div class="fl">家事名 *</div>
+    <input id="chore-name" value="${esc(c?.name||presetName||'')}" placeholder="例: 風呂掃除">
+    ${!c?`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${CHORE_PRESETS.map(p=>`<span style="padding:3px 9px;background:var(--border);border-radius:100px;cursor:pointer;font-size:11px" onclick="document.getElementById('chore-name').value='${p}'">${p}</span>`).join('')}</div>`:''}
+  </div>
+  <div class="fg"><div class="fl">頻度</div>
+    <select id="chore-freq" onchange="choreFreqUI(this.value)">${CHORE_FREQS.map(([v,l])=>`<option value="${v}" ${freq===v?'selected':''}>${l}</option>`).join('')}</select>
+  </div>
+  <div id="chore-f-weekly" style="display:${freq==='weekly'?'block':'none'}"><div class="fg"><div class="fl">曜日（複数可）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${DAYS.map((d,i)=>`<label style="display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border-radius:100px;border:1px solid var(--border);font-size:12px;cursor:pointer"><input type="checkbox" class="chore-day" value="${i}" ${selDays.has(i)?'checked':''} style="accent-color:var(--purple)">${d}</label>`).join('')}</div>
+  </div></div>
+  <div id="chore-f-monthly" style="display:${freq==='monthly'?'block':'none'}"><div class="fg"><div class="fl">毎月何日</div><input type="number" id="chore-dom" min="1" max="31" value="${c?.dom||1}"></div></div>
+  <div id="chore-f-yearly" style="display:${freq==='yearly'?'block':'none'}"><div class="frow">
+    <div class="fg"><div class="fl">月</div><input type="number" id="chore-mon" min="1" max="12" value="${c?.mon||1}"></div>
+    <div class="fg"><div class="fl">日</div><input type="number" id="chore-day" min="1" max="31" value="${c?.day||1}"></div>
+  </div></div>
+  <div id="chore-f-once" style="display:${freq==='once'?'block':'none'}"><div class="fg"><div class="fl">日付</div><input type="date" id="chore-date" value="${c?.date||today()}"></div></div>
+  <div class="fg"><div class="fl">時刻（任意）</div><input type="time" id="chore-time" value="${c?.time||''}"></div>
+  <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0 2px;cursor:pointer"><input type="checkbox" id="chore-active" ${c?.active===false?'':'checked'} style="accent-color:var(--purple);width:15px;height:15px">スケジュールに反映する</label>
+  <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button>${c?`<button class="btn btn-red" onclick="delChore('${c.id}')">削除</button>`:''}<button class="btn btn-p" onclick="saveChore('${id||''}')">保存</button></div>`);
+  document.getElementById('chore-name')?.focus();
+}
+function saveChore(id){
+  const name=document.getElementById('chore-name')?.value.trim();
+  if(!name){toast('家事名を入力してください','err');return;}
+  const freq=document.getElementById('chore-freq')?.value||'weekly';
+  const days=[...document.querySelectorAll('.chore-day:checked')].map(c=>parseInt(c.value));
+  const obj={
+    id:id||uid(),name,freq,
+    days:freq==='weekly'?days:[],
+    dom:freq==='monthly'?(parseInt(document.getElementById('chore-dom')?.value)||1):null,
+    mon:freq==='yearly'?(parseInt(document.getElementById('chore-mon')?.value)||1):null,
+    day:freq==='yearly'?(parseInt(document.getElementById('chore-day')?.value)||1):null,
+    date:freq==='once'?(document.getElementById('chore-date')?.value||today()):null,
+    time:document.getElementById('chore-time')?.value||null,
+    active:!!document.getElementById('chore-active')?.checked,
+  };
+  if(freq==='weekly'&&!days.length){toast('曜日を1つ以上選んでください','err');return;}
+  if(!Array.isArray(S.chores))S.chores=[];
+  const ex=S.chores.find(c=>c.id===id);
+  obj.completedDates=ex?.completedDates||[];
+  if(id){const i=S.chores.findIndex(c=>c.id===id);if(i>=0)S.chores[i]=obj;else S.chores.push(obj);}
+  else S.chores.push(obj);
+  save();closeModal();render();toast(`${name} を保存しました`);
+}
+function rChores(){
+  const chores=(S.chores||[]).filter(c=>!c.deleted);
+  const td=today();
+  const todayChores=choresForDate(td);
+  const groups=CHORE_FREQS.map(([v,l])=>[v,l,chores.filter(c=>c.freq===v)]).filter(([,,arr])=>arr.length);
+  return`${secTitle('🧹 家事')}
+<div style="font-size:12px;color:var(--t2);margin-bottom:12px">曜日ごと・月1・年1などで家事を登録すると、スケジュールに自動で反映されます（曜日固定で毎週組み込み）。</div>
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:13px;font-weight:700">今日の家事 <span style="color:var(--t2);font-weight:500">(${todayChores.filter(c=>(c.completedDates||[]).includes(td)).length}/${todayChores.length})</span></div>
+    <button class="btn btn-p btn-sm" onclick="openChoreModal()">＋ 家事を追加</button>
+  </div>
+  ${todayChores.length?todayChores.map(c=>rChoreInTaskView(c,td,true)).join(''):`<div style="color:var(--t3);font-size:12px;text-align:center;padding:10px 0">今日予定の家事はありません</div>`}
+</div>
+<div class="card" style="margin-bottom:14px">
+  <div style="font-size:12px;color:var(--t2);margin-bottom:8px">クイック追加（タップで登録）</div>
+  <div style="display:flex;flex-wrap:wrap;gap:7px">
+    ${CHORE_PRESETS.map(p=>`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;background:var(--card2);color:var(--t2);border:1px solid var(--border)" onclick="openChoreModal(null,'${p}')">＋ ${p}</div>`).join('')}
+  </div>
+</div>
+${groups.length?groups.map(([v,l,arr])=>`${secTitle(`${l}（${arr.length}件）`)}
+<div class="card" style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px">
+  ${arr.map(c=>`<div style="display:flex;align-items:center;gap:9px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;${c.active===false?'opacity:.55':''}">
+    <button onclick="toggleChoreActive('${c.id}')" title="スケジュール反映の切替" style="border:none;background:none;cursor:pointer;font-size:18px;flex-shrink:0;padding:0">${c.active===false?'⚪':'🟢'}</button>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
+      <div style="font-size:11px;color:var(--t2)">${esc(choreFreqLabel(c))}${c.time?` ・ 🕐 ${c.time}`:''}</div>
+    </div>
+    <button class="tact" onclick="openChoreModal('${c.id}')">✏️</button>
+    <button class="tact del" onclick="delChore('${c.id}')">🗑</button>
+  </div>`).join('')}
+</div>`).join(''):`<div class="card" style="color:var(--t3);font-size:12px;text-align:center;padding:16px">まだ家事が登録されていません。「＋ 家事を追加」またはクイック追加から登録してください。</div>`}`;
+}
+
 function rGcalEventItem(e){
   const startDt=e.start?.dateTime;
   const endDt=e.end?.dateTime;
@@ -4144,10 +4293,12 @@ function rTasksWeekly(){
 ${days.map((d,i)=>{
   const tasks=tasksForDate(d);
   const gcEvs=gcalEventsForDate(d).sort((a,b)=>(a.start?.dateTime||'00:00')>(b.start?.dateTime||'00:00')?1:-1);
+  const wChores=choresForDate(d);
   const isToday=d===today();
   return`<div class="wday-col ${isToday?'today-col':''}" ondragover="event.preventDefault()" ondrop="wdayDrop(event,'${d}')">
     <div class="wday-hdr">${names[i]}</div>
     <div class="wday-date">${+d.slice(8)}</div>
+    ${wChores.map(c=>`<div class="wtask" onclick="toggleChoreDone('${c.id}','${d}')" style="background:var(--bdim);border-left:2px solid var(--teal,#0d9488);cursor:pointer;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${(c.completedDates||[]).includes(d)?'opacity:.5;text-decoration:line-through':''}" title="${esc(c.name)}">🧹 ${c.time?c.time+' ':''}${esc(c.name)}</div>`).join('')}
     ${gcEvs.map(e=>{
       const t=e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'';
       return`<div class="wtask" style="background:var(--bdim);border-left:2px solid var(--blue);cursor:default;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.summary||'')}">📅 ${t?t+' ':''}${esc(e.summary||'(無題)')}</div>`;
@@ -4180,14 +4331,18 @@ function rTasksMonthly(){
     if(!d)return`<div class="mday empty"></div>`;
     const tasks=tasksForDate(d);
     const gcEvs=gcalEventsForDate(d);
+    const dChores=choresForDate(d);
     const combined=[
       ...gcEvs.map(e=>({_g:true,time:e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'',title:e.summary||'(無題)'})),
+      ...dChores.map(c=>({_c:true,done:(c.completedDates||[]).includes(d),time:c.time||'',title:c.name})),
       ...tasks.map(t=>({_g:false,done:t.done,over:!t.done&&t.dueDate<today(),time:t.startTime||'',title:t.title}))
     ].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
     return`<div class="mday ${d===today()?'today-day':''}" onclick="openDayModal('${d}')">
       <div class="mday-num">${+d.slice(8)}</div>
       ${combined.slice(0,3).map(item=>item._g
         ?`<div class="mday-task" style="border-left:2px solid var(--blue)">${item.time?`<span class="mday-time">${item.time}</span>`:''}📅 ${esc(item.title)}</div>`
+        :item._c
+        ?`<div class="mday-task ${item.done?'done-t':''}" style="border-left:2px solid var(--teal,#0d9488)">${item.time?`<span class="mday-time">${item.time}</span>`:''}🧹 ${esc(item.title)}</div>`
         :`<div class="mday-task ${item.over?'over':item.done?'done-t':''}">${item.time?`<span class="mday-time">${item.time}</span>`:''}${esc(item.title)}</div>`
       ).join('')}
       ${combined.length>3?`<div class="mday-more">+${combined.length-3}</div>`:''}
@@ -4200,6 +4355,7 @@ function rTasksSchedule(){
   const d=schedDate(SD);
   const dateLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
   const dayHabits=habitsForDate(d).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+  const dayChores=choresForDate(d);
   const isToday=SD===0,isTomorrow=SD===1,isYesterday=SD===-1;
   const hasFs=S.fs&&S.fs.length>0;
   const dayWord=isToday?'今日':isTomorrow?'明日':isYesterday?'昨日':'';
@@ -4219,7 +4375,8 @@ function rTasksSchedule(){
   </div>
 </div>
 ${hasFs?rFsDashPanel(d):`<div class="card card-sm" style="color:var(--t2);text-align:center">固定スケジュールが未設定です。<button class="btn btn-g btn-xs" style="margin-left:8px" onclick="V='habits';HV='schedule';render()">設定する →</button></div>`}
-${dayHabits.length?`${secTitle(`🔥 習慣 (${dayHabits.length}件)`)}${dayHabits.map(h=>rHabitInTaskView(h,d,isToday)).join('')}`:''}`;
+${dayHabits.length?`${secTitle(`🔥 習慣 (${dayHabits.length}件)`)}${dayHabits.map(h=>rHabitInTaskView(h,d,isToday)).join('')}`:''}
+${dayChores.length?`${secTitle(`🧹 家事 (${dayChores.filter(c=>(c.completedDates||[]).includes(d)).length}/${dayChores.length}件)`)}${dayChores.map(c=>rChoreInTaskView(c,d,true)).join('')}`:''}`;
 }
 
 function openDayModal(d){
@@ -11194,7 +11351,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-03';
+const APP_VERSION='20260715-04';
 
 render();
 function forceAppUpdate(){
