@@ -538,6 +538,17 @@ a{color:inherit;text-decoration:none}
   }
   #mob-nav{display:flex}
   #mob-hamburger{display:flex}
+  /* 横並びセグメント: 画面幅を超えたら潰さず単体で横スクロール */
+  .sub-tabs{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .sub-tabs::-webkit-scrollbar{display:none}
+  .stab{white-space:nowrap;flex-shrink:0}
+  /* 固定スケジュール編集行: 入力とボタンを折り返す */
+  .sched-edit-item{flex-wrap:wrap}
+  /* 事業部ボードの行: 右側の金額/操作ブロックを折り返す */
+  .bu-row{flex-wrap:wrap}
+  /* モーダルの左右余白を詰めて画面内に確実に収める */
+  .overlay{padding:12px}
+  .modal{padding:18px}
 }
 #mob-nav{
   display:none;position:fixed;bottom:0;left:0;right:0;
@@ -3185,7 +3196,7 @@ ${units.map(u=>{
   </div>
   ${!(u.sales||[]).length?`<div style="font-size:11.5px;color:var(--t3);margin-bottom:10px">まだ成約記録がありません</div>`:
   (u.sales||[]).slice(0,8).map(sl=>`
-    <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--card2);font-size:12px;align-items:center">
+    <div class="bu-row" style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--card2);font-size:12px;align-items:center">
       <div style="min-width:0"><b>${esc(sl.client)}</b> ${sl.product?esc(sl.product):''} <span style="color:var(--t3)">${esc(sl.date)} / ${esc(sl.rep||(sl.repType==='sasaki'?'佐々木':'-'))}</span></div>
       <div style="white-space:nowrap">¥${(sl.amount||0).toLocaleString()}
         <span style="color:var(--t3);font-size:10.5px">報酬:佐々木¥${(sl.commSasaki||0).toLocaleString()}${sl.commStaff?`+ｽﾀｯﾌ¥${sl.commStaff.toLocaleString()}`:''}</span>
@@ -3202,7 +3213,7 @@ ${units.map(u=>{
   </div>
   ${!(u.recruits||[]).length?`<div style="font-size:11.5px;color:var(--t3);margin-bottom:10px">まだ採用記録がありません</div>`:
   (u.recruits||[]).slice(0,10).map(r=>`
-    <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--card2);font-size:12px;align-items:center">
+    <div class="bu-row" style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--card2);font-size:12px;align-items:center">
       <div style="min-width:0"><b>${esc(r.name)}</b> <span style="color:var(--t3)">${esc(r.role||'')} / ${esc(r.date)}${r.rep?` / 獲得:${esc(r.rep)}`:''}</span>
         ${r.hiredDate?`<div style="color:var(--green);font-size:10.5px;font-weight:700">採用(${esc(r.hiredDate)}) 報酬: 佐々木¥${(r.commSasaki||0).toLocaleString()}${r.commStaff?` + ｽﾀｯﾌ¥${r.commStaff.toLocaleString()}`:''}</div>`:''}
         ${r.note?`<div style="color:var(--t3);font-size:10.5px">${esc(r.note)}</div>`:''}</div>
@@ -11528,7 +11539,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-10';
+const APP_VERSION='20260715-11';
 
 render();
 function forceAppUpdate(){
