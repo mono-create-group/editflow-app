@@ -3767,7 +3767,7 @@ function rFixedScheduleList(compact=false,droppable=false,date,timeline=false){
   style="border-left:2px solid ${f.c};margin:2px 0;padding:6px 10px;cursor:grab;box-shadow:none;flex-shrink:0">
   <div class="chk ${t.done?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleDone('${t.id}')"></div>
   <div class="task-body" style="min-width:0">
-    <div class="task-ttl ${t.done?'done':''}" style="font-size:12px">${esc(t.title)}</div>
+    <div class="task-ttl ${t.done?'done':''}" style="font-size:12px">${t.startTime?`<span style="font-weight:700;color:${f.c};margin-right:6px;font-variant-numeric:tabular-nums;font-size:11px">${t.startTime}</span>`:''}${esc(t.title)}</div>
   </div>
   <div class="task-acts" style="opacity:1;gap:2px">
     <button class="tact" style="padding:2px 5px;font-size:11px" onclick="openTaskModal('${t.id}')">✏️</button>
@@ -11076,7 +11076,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-01';
+const APP_VERSION='20260715-02';
 
 render();
 function forceAppUpdate(){
