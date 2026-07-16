@@ -355,8 +355,13 @@ a{color:inherit;text-decoration:none}
 .habit-item{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:9px}
 .habit-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .habit-name{font-weight:600;font-size:14px}
-.streak-badge{font-size:13px;font-weight:700;color:var(--amber);display:flex;align-items:center;gap:3px}
+.streak-badge{font-size:13px;font-weight:700;color:var(--amber);display:flex;align-items:center;gap:3px;white-space:nowrap}
 .streak-risk{font-size:11px;color:var(--red);font-weight:700;background:var(--rdim);padding:2px 7px;border-radius:100px}
+.habit-level{font-size:11px;font-weight:800;padding:2px 9px;border-radius:100px;border:1.5px solid;display:inline-flex;align-items:center;gap:3px;line-height:1.45;white-space:nowrap}
+.habit-level-mini{font-size:10px;font-weight:800;padding:1px 7px;border-radius:100px;border:1.2px solid;display:inline-flex;align-items:center;line-height:1.4;white-space:nowrap}
+.habit-xpbar{position:relative;height:7px;border-radius:100px;background:var(--card2);border:1px solid var(--border);overflow:hidden;margin-top:9px}
+.habit-xpbar-fill{position:absolute;left:0;top:0;bottom:0;border-radius:100px;transition:width .4s ease;min-width:2px}
+.habit-xp-label{font-size:10px;color:var(--t3);margin-top:4px;font-weight:600}
 .habit-week{display:flex;gap:4px}
 .hday{width:34px;height:34px;border-radius:8px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--t3);cursor:pointer;transition:all .15s;flex-direction:column;flex-shrink:0}
 .hday:hover{border-color:var(--purple)}
@@ -2042,6 +2047,54 @@ function isStreakRisk(h){
   if(cd.includes(td))return false;
   const yd=new Date(td);yd.setDate(yd.getDate()-1);
   return cd.includes(yd.toLocalYmd())&&calcStreak(cd)>=2;
+}
+// ===== 習慣レベル制度（履歴から都度算出・保存フィールドは追加しない） =====
+// 過去最長の連続達成日数
+function longestStreak(dates){
+  if(!dates||!dates.length)return 0;
+  const s=[...new Set(dates)].sort();let best=1,cur=1;
+  for(let i=1;i<s.length;i++){
+    const prev=new Date(s[i-1]+'T00:00');prev.setDate(prev.getDate()+1);
+    if(prev.toLocalYmd()===s[i]){cur++;if(cur>best)best=cur;}else cur=1;
+  }
+  return best;
+}
+// 累積XP: 達成+15 / 未達（サボり・✗）-18。今日の未達は減点しない（罰>報酬で緊張感を維持）
+function habitXp(h){
+  const comp=new Set(h.completedDates||[]);
+  const all=[...(h.completedDates||[]),...(h.failedDates||[])].sort();
+  if(!all.length)return 0;
+  const dow=(h.daysOfWeek&&h.daysOfWeek.length)?new Set(h.daysOfWeek):null; // null=毎日
+  let xp=0;const start=new Date(all[0]+'T00:00'),end=new Date(today()+'T00:00'); // 昨日まで
+  for(let d=new Date(start);d<end;d.setDate(d.getDate()+1)){
+    if(dow&&!dow.has(d.getDay()))continue; // 予定日でない
+    const ymd=d.toLocalYmd();
+    if(comp.has(ymd))xp+=15;else xp-=18;
+  }
+  if(comp.has(today()))xp+=15; // 今日の達成は加点
+  return Math.max(0,xp);
+}
+// XP→レベル。必要XP曲線 T(L)=20*L*(L-1): 0,40,120,240,400...
+function levelFromXp(xp){
+  let L=1;while(20*(L+1)*L<=xp)L++;
+  const cur=20*L*(L-1),next=20*(L+1)*L;
+  return{level:L,curBase:cur,nextAt:next,into:xp-cur,span:next-cur,pct:Math.min(100,Math.round((xp-cur)/(next-cur)*100))};
+}
+function habitTitle(L){return L>=20?'伝説':L>=15?'名人':L>=10?'達人':L>=7?'上級':L>=5?'中級':L>=3?'初級':'見習い';}
+// レベル帯ごとの色（既存CSS変数を段階的に使用）
+function habitLevelStyle(L){
+  if(L>=20)return{c:'#b8860b',bg:'rgba(184,134,11,.13)'};       // 伝説=ゴールド
+  if(L>=15)return{c:'var(--pink)',bg:'var(--pkdim)'};           // 名人
+  if(L>=10)return{c:'var(--purple)',bg:'var(--pdim)'};          // 達人
+  if(L>=7)return{c:'var(--amber)',bg:'var(--adim)'};            // 上級
+  if(L>=5)return{c:'var(--blue)',bg:'var(--bdim)'};             // 中級
+  if(L>=3)return{c:'var(--green)',bg:'var(--gdim)'};            // 初級
+  return{c:'var(--t3)',bg:'rgba(148,163,184,.14)'};             // 見習い
+}
+// 習慣1件のレベル情報を一括算出
+function habitLevel(h){
+  const xp=habitXp(h),lv=levelFromXp(xp);
+  return Object.assign({},lv,{xp,title:habitTitle(lv.level),remain:Math.max(0,lv.nextAt-xp)});
 }
 function getProcInsight(){
   const all=S.tasks.filter(t=>t.procCount>0);
@@ -4101,6 +4154,7 @@ function rHabitInTaskView(h,date,interactive){
   const done=(h.completedDates||[]).includes(date);
   const fail=(h.failedDates||[]).includes(date);
   const streak=calcStreak(h.completedDates||[]);
+  const lv=habitLevel(h);const st=habitLevelStyle(lv.level);
   const stateClass=done||fail?'done-item':'';
   return`<div class="task-item ${stateClass}" style="border-left:3px solid var(--amber)">
   ${interactive
@@ -4109,6 +4163,7 @@ function rHabitInTaskView(h,date,interactive){
   <div class="task-body">
     <div class="task-ttl ${done?'done':''}">${done?'✓ ':fail?'✕ ':''}${esc(h.title)}</div>
     <div class="task-meta">
+      <span class="habit-level-mini" style="color:${st.c};border-color:${st.c};background:${st.bg}">Lv.${lv.level}</span>
       ${h.time?`<span class="badge bb">🕐 ${h.time}</span>`:''}
       ${streak>0?`<span class="badge ba">🔥 ${streak}日</span>`:''}
       ${h.description?`<span class="badge bk">${esc(h.description)}</span>`:''}
@@ -6082,6 +6137,9 @@ ${habits.map(h=>{
   const comp=h.completedDates||[];
   const failDates=h.failedDates||[];
   const streak=calcStreak(comp);
+  const best=longestStreak(comp);
+  const lv=habitLevel(h);
+  const st=habitLevelStyle(lv.level);
   const doneToday=comp.includes(td);
   const failToday=failDates.includes(td);
   const risk=isStreakRisk(h);
@@ -6091,17 +6149,20 @@ ${habits.map(h=>{
     <div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <div class="habit-name">${esc(h.title)}</div>
+        <span class="habit-level" style="color:${st.c};border-color:${st.c};background:${st.bg}">Lv.${lv.level} ${lv.title}</span>
         ${doneToday?'<span class="badge bg">✓ 今日完了</span>':failToday?'<span class="badge" style="background:var(--rdim);color:var(--red)">✕ できなかった</span>':''}
         ${risk?'<span class="streak-risk">⚠️ 今日やらないと途切れる</span>':''}
       </div>
       ${h.description?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(h.description)}</div>`:''}
     </div>
     <div style="display:flex;align-items:center;gap:10px">
-      <div class="streak-badge">🔥 ${streak}日</div>
+      <div class="streak-badge">🔥 ${streak}日 · 最長 ${best}日</div>
       <button class="tact" onclick="openHabitModal('${h.id}')">✏️</button>
       <button class="tact del" onclick="delHabit('${h.id}')">🗑</button>
     </div>
   </div>
+  <div class="habit-xpbar"><div class="habit-xpbar-fill" style="width:${lv.pct}%;background:${st.c}"></div></div>
+  <div class="habit-xp-label">${lv.xp} XP ・ あと ${lv.remain} XP で Lv.${lv.level+1} ${habitTitle(lv.level+1)}</div>
   <div class="habit-meta">
     ${h.time?`<span>🕐 ${h.time}</span>`:''}
     <span>📅 ${daysLabel}</span>
@@ -9955,6 +10016,7 @@ function toggleHabit(id,date){
   const h=S.habits.find(h=>h.id===id);if(!h)return;
   if(!h.completedDates)h.completedDates=[];
   if(!h.failedDates)h.failedDates=[];
+  const beforeLv=habitLevel(h).level;
   const done=h.completedDates.includes(date);
   const fail=h.failedDates.includes(date);
   if(!done&&!fail){
@@ -9971,6 +10033,10 @@ function toggleHabit(id,date){
     // ✗→なし
     h.failedDates=h.failedDates.filter(d=>d!==date);
   }
+  // レベル変化フィードバック（既存の連続達成toastは残しつつ上書き通知）
+  const afterLv=habitLevel(h).level;
+  if(afterLv>beforeLv)toast(`🎉 レベルアップ！Lv.${afterLv} ${habitTitle(afterLv)}`);
+  else if(afterLv<beforeLv)toast('レベルダウン… また積み上げよう','warn');
   save();render();
 }
 function delHabit(id){const h=S.habits.find(h=>h.id===id);if(h)h.deleted=true;save();closeModal();render();toast('習慣を削除しました');}
@@ -11539,7 +11605,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-11';
+const APP_VERSION='20260715-12';
 
 render();
 function forceAppUpdate(){
