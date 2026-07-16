@@ -3925,7 +3925,17 @@ function rFixedScheduleList(compact=false,droppable=false,date,timeline=false){
     const blockBaseStyle=`border-left:3px solid ${f.c};${isNow?'background:'+f.c+'0e':'background:var(--card)'};transition:background .15s;flex-direction:column;align-items:stretch;gap:0;padding:11px 14px`;
     return`<div class="task-item fs-drop-zone" ${dropAttrs} style="${blockBaseStyle}">${bodyInner}</div>`;
   });
-  return blocksHtml.join('');
+  // 時刻の入らない家事（曜日/月次指定などで時刻未設定）は時間ブロックへ置けないため上部にまとめて表示。
+  // droppable=false(ダッシュボード等)ではブロックに家事が出ないので、時刻付きも含め当日の家事を全部ここで見せる。
+  const unslotted=choresForDate(td).filter(c=>!droppable||!c.time);
+  const choresTop=unslotted.length?`<div class="task-item" style="border-left:3px solid var(--teal,#0d9488);flex-direction:column;align-items:stretch;gap:5px;padding:10px 14px;margin-bottom:7px">
+    <div style="font-size:11px;color:var(--t2);font-weight:700">🧹 今日の家事${droppable?'（時間指定なし）':''}</div>
+    ${unslotted.map(c=>{const cdone=(c.completedDates||[]).includes(td);return`<div style="display:flex;align-items:center;gap:8px">
+      <div class="chk ${cdone?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleChoreDone('${c.id}','${td}')"></div>
+      <span style="font-size:13px;${cdone?'text-decoration:line-through;color:var(--t3)':''}">${c.time?`<span style="font-weight:700;color:var(--teal,#0d9488);margin-right:5px;font-size:11px;font-variant-numeric:tabular-nums">${c.time}</span>`:''}🧹 ${esc(c.name)}</span>
+    </div>`;}).join('')}
+  </div>`:'';
+  return choresTop+blocksHtml.join('');
 }
 
 // ===== タイムライン表示（会長指示2026-07-05: 帯+浮きカード方式） =====
@@ -4190,7 +4200,7 @@ function dueOnDate(c,date){
   const dow=dt.getDay(),dom=dt.getDate(),mon=dt.getMonth()+1;
   switch(c.freq){
     case 'daily':return true;
-    case 'weekly':return (c.days&&c.days.length)?c.days.includes(dow):true;
+    case 'weekly':return (c.days&&c.days.length)?c.days.map(Number).includes(dow):true;
     case 'monthly':return (c.dom||1)===dom;
     case 'yearly':return (c.mon||1)===mon&&(c.day||1)===dom;
     case 'once':return c.date===date;
@@ -4360,7 +4370,7 @@ function choreFreqUI(freq){
 function openChoreModal(id,presetName){
   const c=id?(S.chores||[]).find(c=>c.id===id):null;
   const freq=c?.freq||'weekly';
-  const selDays=new Set(c?.days||[]);
+  const selDays=new Set((c?.days||[]).map(Number));
   openModal(`<div class="mhdr"><div class="mtitle">${c?'家事を編集':'家事を追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
   <div class="fg"><div class="fl">家事名 *</div>
     <input id="chore-name" value="${esc(c?.name||presetName||'')}" placeholder="例: 風呂掃除">
@@ -4604,7 +4614,9 @@ function rTasksSchedule(){
   // 時刻付きでタイムラインのブロックに配置される家事は下の一覧から除外（重複防止）
   const fsRanges=hasFs?(S.fs||[]).filter(f=>f.s&&f.s!=='-1'&&f.s!==''&&f.e).map(f=>[tMin(f.s),tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e)]):[];
   const inFsBlock=t=>fsRanges.some(([s,e])=>s!=null&&e!=null&&e>s&&t>=s&&t<e);
-  const dayChores=choresForDate(d).filter(c=>!hasFs||!c.time||!inFsBlock(tMin(c.time)));
+  // 時間指定なしの家事は固定スケジュール上部(rFixedScheduleList)にまとめて表示するので、ここでは重複させない。
+  // 固定スケジュールが無い時のみ、この一覧で当日の家事を全部見せる。
+  const dayChores=choresForDate(d).filter(c=>!hasFs||(c.time&&!inFsBlock(tMin(c.time))));
   const dayRoutines=routinesForDate(d);
   const dayWord=isToday?'今日':isTomorrow?'明日':isYesterday?'昨日':'';
   return`
@@ -11605,7 +11617,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260715-12';
+const APP_VERSION='20260715-13';
 
 render();
 function forceAppUpdate(){
