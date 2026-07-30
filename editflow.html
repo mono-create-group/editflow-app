@@ -1797,6 +1797,8 @@ function defState(){return{
   bizBoard:{done:{},extra:[]},
   bizUnits:[],
   teamMeetings:[],
+  fsSchedules:[],
+  activeFsScheduleId:null,
 };}
 function migrate(d){
   // migrate ef_v4 → ef_v5
@@ -1896,13 +1898,31 @@ function migrate(d){
     }
     d.settings._fsIdealSeedV1=true; // 評価済みフラグ(次回以降このブロックに入らない=カスタム維持)
   }
+  // migrate: 既存の固定スケジュールを非破壊で「メインスケジュール」として複数管理へ移行
+  // S.fs は既存機能との互換用に、選択中スケジュールの blocks と同じ配列を参照させる。
+  if(!Array.isArray(d.fsSchedules)||d.fsSchedules.length===0){
+    d.fsSchedules=[{id:'fs-main',name:'メインスケジュール',blocks:Array.isArray(d.fs)?d.fs:[]}];
+    d.activeFsScheduleId='fs-main';
+  }
+  d.fsSchedules=d.fsSchedules.filter(x=>x&&x.id&&Array.isArray(x.blocks)).map((x,i)=>({
+    id:x.id,
+    name:(x.name||`スケジュール ${i+1}`).trim()||`スケジュール ${i+1}`,
+    blocks:x.blocks
+  }));
+  if(d.fsSchedules.length===0){
+    d.fsSchedules=[{id:'fs-main',name:'メインスケジュール',blocks:Array.isArray(d.fs)?d.fs:[]}];
+  }
+  let activeSchedule=d.fsSchedules.find(x=>x.id===d.activeFsScheduleId);
+  if(!activeSchedule){activeSchedule=d.fsSchedules[0];d.activeFsScheduleId=activeSchedule.id;}
+  d.fs=activeSchedule.blocks;
   return d;
 }
-function load(){try{const d=Object.assign(defState(),JSON.parse(localStorage.getItem(DB))||{});return migrate(d);}catch{return defState();}}
+function load(){try{const d=Object.assign(defState(),JSON.parse(localStorage.getItem(DB))||{});return migrate(d);}catch{return migrate(defState());}}
 // ─── パフォーマンス最適化 ───────────────────────────────────────────
 // localStorageへの書き込みをRAFでバッチ化（同フレーム内の複数save()を1回に集約）
 let _lsPending=false;
 function save(){
+  syncActiveFsSchedule();
   S._savedAt=Date.now();
   fbSave();
   scheduleSheetSync();
@@ -8478,6 +8498,18 @@ ${secTitle('💪 筋トレコミットメント')}
 ${secTitle('📅 固定タイムスケジュール')}
 <div class="card">
   <div style="font-size:12px;color:var(--t2);margin-bottom:12px">タスク管理のスケジュール表示に使われる固定の時間割です</div>
+  <div style="display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:12px;margin-bottom:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">
+    <label style="display:flex;flex-direction:column;gap:5px;min-width:220px;flex:1">
+      <span style="font-size:11px;font-weight:700;color:var(--t2)">使用するスケジュール</span>
+      <select aria-label="使用する固定スケジュール" style="width:100%;min-height:40px" onchange="fsSwitchSchedule(this.value)">
+        ${(S.fsSchedules||[]).map(x=>`<option value="${esc(x.id)}" ${x.id===S.activeFsScheduleId?'selected':''}>${esc(x.name)}</option>`).join('')}
+      </select>
+    </label>
+    <button class="btn btn-g btn-sm" onclick="fsOpenScheduleModal('new')">＋ 新規</button>
+    <button class="btn btn-g btn-sm" onclick="fsOpenScheduleModal('duplicate')">複製</button>
+    <button class="btn btn-g btn-sm" onclick="fsOpenScheduleModal('rename')">名称変更</button>
+    <button class="btn btn-g btn-sm" ${(S.fsSchedules||[]).length<=1?'disabled':''} onclick="fsDeleteSchedule()" style="${(S.fsSchedules||[]).length<=1?'opacity:.45;cursor:not-allowed':''}">削除</button>
+  </div>
   <div id="fs-list">
     ${S.fs.map((f,i)=>`<div class="sched-edit-item">
       <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
@@ -8500,7 +8532,7 @@ ${secTitle('📅 固定タイムスケジュール')}
   <div style="display:flex;gap:8px;margin-top:10px">
     <button class="btn btn-g btn-sm" onclick="S.fs.push({id:uid(),s:'',e:'',t:'',c:'#7c3aed',icon:''});save();render()">＋ 追加</button>
     <button class="btn btn-p btn-sm" onclick="saveFS()">保存</button>
-    <button class="btn btn-g btn-sm" onclick="if(confirm('デフォルトに戻しますか？')){S.fs=JSON.parse(JSON.stringify(DEFAULT_FS));save();render();}">リセット</button>
+    <button class="btn btn-g btn-sm" onclick="fsResetSchedule()">リセット</button>
   </div>
 </div>
 
@@ -8976,6 +9008,67 @@ function saveTarget(){S.settings.target=parseInt(document.getElementById('set-ta
 function saveSheetsId(){const v=document.getElementById('set-sheets-id')?.value.trim();if(!v){toast('スプレッドシートIDを入力してください','err');return;}S.settings.sheetsId=v;S.settings.sheetsTab=(document.getElementById('set-sheets-tab')?.value||'').trim();save();toast('📊 スプレッドシート設定を保存しました');}
 function saveIdentity(){S.settings.identity=document.getElementById('set-identity').value.trim();save();toast('アイデンティティを保存しました');}
 function saveFS(){save();toast('スケジュールを保存しました');}
+function fsActiveSchedule(){
+  if(!Array.isArray(S.fsSchedules))S.fsSchedules=[];
+  return S.fsSchedules.find(x=>x.id===S.activeFsScheduleId)||S.fsSchedules[0]||null;
+}
+function syncActiveFsSchedule(){
+  const active=fsActiveSchedule();
+  if(active)active.blocks=S.fs;
+}
+function fsCloneBlocks(blocks){
+  return JSON.parse(JSON.stringify(blocks||[])).map(block=>({...block,id:uid()}));
+}
+function fsSwitchSchedule(id){
+  if(id===S.activeFsScheduleId)return;
+  syncActiveFsSchedule();
+  const next=(S.fsSchedules||[]).find(x=>x.id===id);
+  if(!next)return;
+  S.activeFsScheduleId=next.id;
+  S.fs=next.blocks;
+  save();render();toast(`「${next.name}」に切り替えました`);
+}
+function fsOpenScheduleModal(mode){
+  const active=fsActiveSchedule();
+  const initial=mode==='duplicate'&&active?`${active.name}のコピー`:mode==='rename'&&active?active.name:`スケジュール ${(S.fsSchedules||[]).length+1}`;
+  const title=mode==='rename'?'スケジュール名を変更':mode==='duplicate'?'スケジュールを複製':'新しいスケジュール';
+  openModal(`<div class="mhdr"><div class="mtitle">${title}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+    <div class="fg"><div class="fl">スケジュール名</div><input id="fs-schedule-name" value="${esc(initial)}" maxlength="40" onkeydown="if(event.key==='Enter')fsSubmitScheduleModal('${mode}')"></div>
+    ${mode==='new'?`<div style="font-size:12px;color:var(--t2)">空のスケジュールを作成します。現在の内容を元にする場合は「複製」を使用してください。</div>`:''}
+    <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="fsSubmitScheduleModal('${mode}')">${mode==='rename'?'変更':'作成'}</button></div>`);
+  setTimeout(()=>{const input=document.getElementById('fs-schedule-name');input?.focus();input?.select();},0);
+}
+function fsSubmitScheduleModal(mode){
+  const clean=(document.getElementById('fs-schedule-name')?.value||'').trim();
+  if(!clean){toast('スケジュール名を入力してください','err');return;}
+  const active=fsActiveSchedule();
+  if(mode==='rename'){
+    if(!active)return;
+    active.name=clean;save();closeModal();render();toast('名称を変更しました');return;
+  }
+  syncActiveFsSchedule();
+  const created={id:uid(),name:clean,blocks:mode==='duplicate'?fsCloneBlocks(S.fs):[]};
+  S.fsSchedules.push(created);
+  S.activeFsScheduleId=created.id;
+  S.fs=created.blocks;
+  save();closeModal();render();toast(`「${clean}」を作成しました`);
+}
+function fsDeleteSchedule(){
+  if((S.fsSchedules||[]).length<=1){toast('最後のスケジュールは削除できません','err');return;}
+  const active=fsActiveSchedule();if(!active)return;
+  if(!confirm(`「${active.name}」を削除しますか？`))return;
+  S.fsSchedules=S.fsSchedules.filter(x=>x.id!==active.id);
+  const next=S.fsSchedules[0];
+  S.activeFsScheduleId=next.id;
+  S.fs=next.blocks;
+  save();render();toast('スケジュールを削除しました');
+}
+function fsResetSchedule(){
+  const active=fsActiveSchedule();
+  if(!confirm(`「${active?.name||'現在のスケジュール'}」をデフォルトに戻しますか？`))return;
+  S.fs=fsCloneBlocks(DEFAULT_FS);
+  save();render();toast('デフォルトに戻しました');
+}
 function fsMove(i,dir){
   const j=i+dir;
   if(j<0||j>=S.fs.length)return;
@@ -11616,7 +11709,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260727-01';
+const APP_VERSION='20260731-01';
 
 render();
 function forceAppUpdate(){
