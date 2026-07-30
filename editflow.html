@@ -1901,16 +1901,26 @@ function migrate(d){
   // migrate: 既存の固定スケジュールを非破壊で「メインスケジュール」として複数管理へ移行
   // S.fs は既存機能との互換用に、選択中スケジュールの blocks と同じ配列を参照させる。
   if(!Array.isArray(d.fsSchedules)||d.fsSchedules.length===0){
-    d.fsSchedules=[{id:'fs-main',name:'メインスケジュール',blocks:Array.isArray(d.fs)?d.fs:[]}];
+    d.fsSchedules=[{id:'fs-main',name:'メインスケジュール',mode:'weekly',weekdays:[0,1,2,3,4,5,6],isFallback:true,createdAt:0,blocks:Array.isArray(d.fs)?d.fs:[]}];
     d.activeFsScheduleId='fs-main';
   }
-  d.fsSchedules=d.fsSchedules.filter(x=>x&&x.id&&Array.isArray(x.blocks)).map((x,i)=>({
-    id:x.id,
-    name:(x.name||`スケジュール ${i+1}`).trim()||`スケジュール ${i+1}`,
-    blocks:x.blocks
-  }));
+  d.fsSchedules=d.fsSchedules.filter(x=>x&&x.id&&Array.isArray(x.blocks)).map((x,i)=>{
+    const legacyMain=x.id==='fs-main'||i===0;
+    const mode=['weekly','date','manual'].includes(x.mode)?x.mode:(legacyMain?'weekly':'manual');
+    return{
+      ...x,
+      id:x.id,
+      name:(x.name||`スケジュール ${i+1}`).trim()||`スケジュール ${i+1}`,
+      mode,
+      weekdays:mode==='weekly'?(Array.isArray(x.weekdays)?x.weekdays:[0,1,2,3,4,5,6]):[],
+      date:mode==='date'?(x.date||''):null,
+      isFallback:x.isFallback===true||legacyMain,
+      createdAt:x.createdAt||0,
+      blocks:x.blocks
+    };
+  });
   if(d.fsSchedules.length===0){
-    d.fsSchedules=[{id:'fs-main',name:'メインスケジュール',blocks:Array.isArray(d.fs)?d.fs:[]}];
+    d.fsSchedules=[{id:'fs-main',name:'メインスケジュール',mode:'weekly',weekdays:[0,1,2,3,4,5,6],isFallback:true,createdAt:0,blocks:Array.isArray(d.fs)?d.fs:[]}];
   }
   let activeSchedule=d.fsSchedules.find(x=>x.id===d.activeFsScheduleId);
   if(!activeSchedule){activeSchedule=d.fsSchedules[0];d.activeFsScheduleId=activeSchedule.id;}
@@ -3826,11 +3836,11 @@ function rFs30MinTicks(sm,em,nowM,isNow,color){
 }
 // 固定タイムスケジュールをリスト表示（compact=trueで説明文省略、dateで対象日指定、timeline=trueで時間軸タイムライン表示）
 function rFixedScheduleList(compact=false,droppable=false,date,timeline=false){
-  const fs=S.fs||DEFAULT_FS;
-  if(!fs.length)return'';
   const now=new Date();
   const nowM=now.getHours()*60+now.getMinutes();
   const td=date||today();
+  const fs=fsBlocksForDate(td);
+  if(!fs.length)return'';
   // 今日以外は「進行中」表示をしない
   const isTargetToday=!date||date===today();
   // タイムライン表示（会長指示2026-07-05: 帯+浮きカード方式）は専用関数へ分岐
@@ -4630,9 +4640,10 @@ function rTasksSchedule(){
   const dateLabel=new Date(d+'T00:00:00').toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
   const dayHabits=habitsForDate(d).sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
   const isToday=SD===0,isTomorrow=SD===1,isYesterday=SD===-1;
-  const hasFs=S.fs&&S.fs.length>0;
+  const dateFs=fsBlocksForDate(d);
+  const hasFs=dateFs.length>0;
   // 時刻付きでタイムラインのブロックに配置される家事は下の一覧から除外（重複防止）
-  const fsRanges=hasFs?(S.fs||[]).filter(f=>f.s&&f.s!=='-1'&&f.s!==''&&f.e).map(f=>[tMin(f.s),tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e)]):[];
+  const fsRanges=hasFs?dateFs.filter(f=>f.s&&f.s!=='-1'&&f.s!==''&&f.e).map(f=>[tMin(f.s),tMin(f.e==='24:00'||f.e==='-1'?'24:00':f.e)]):[];
   const inFsBlock=t=>fsRanges.some(([s,e])=>s!=null&&e!=null&&e>s&&t>=s&&t<e);
   // 時間指定なしの家事は固定スケジュール上部(rFixedScheduleList)にまとめて表示するので、ここでは重複させない。
   // 固定スケジュールが無い時のみ、この一覧で当日の家事を全部見せる。
@@ -4858,7 +4869,13 @@ function toggleFsSub(blockId,subIdx){
   if(isFsDetailModalOpen(blockId))renderFsDetailModal(blockId);
 }
 // ヘッダータップで開く詳細パネル（会長承認済み新設計）: 全項目チェックリスト+編集+削除+追加をここで完結させる
-function fsFindBlock(blockId){return(S.fs||[]).find((f,i)=>(f.id||('b'+i))===blockId);}
+function fsFindBlock(blockId){
+  for(const schedule of(S.fsSchedules||[])){
+    const found=(schedule.blocks||[]).find((f,i)=>(f.id||('b'+i))===blockId);
+    if(found)return found;
+  }
+  return(S.fs||[]).find((f,i)=>(f.id||('b'+i))===blockId);
+}
 function fsBlockIndex(blockId){return(S.fs||[]).findIndex((f,i)=>(f.id||('b'+i))===blockId);}
 function openFsDetailModal(blockId){
   openModal(rFsDetailModalBody(blockId));
@@ -8502,12 +8519,12 @@ ${secTitle('📅 固定タイムスケジュール')}
     <label style="display:flex;flex-direction:column;gap:5px;min-width:220px;flex:1">
       <span style="font-size:11px;font-weight:700;color:var(--t2)">使用するスケジュール</span>
       <select aria-label="使用する固定スケジュール" style="width:100%;min-height:40px" onchange="fsSwitchSchedule(this.value)">
-        ${(S.fsSchedules||[]).map(x=>`<option value="${esc(x.id)}" ${x.id===S.activeFsScheduleId?'selected':''}>${esc(x.name)}</option>`).join('')}
+        ${(S.fsSchedules||[]).map(x=>`<option value="${esc(x.id)}" ${x.id===S.activeFsScheduleId?'selected':''}>${esc(x.name)}（${esc(fsScheduleRuleLabel(x))}）</option>`).join('')}
       </select>
     </label>
     <button class="btn btn-g btn-sm" onclick="fsOpenScheduleModal('new')">＋ 新規</button>
     <button class="btn btn-g btn-sm" onclick="fsOpenScheduleModal('duplicate')">複製</button>
-    <button class="btn btn-g btn-sm" onclick="fsOpenScheduleModal('rename')">名称変更</button>
+    <button class="btn btn-g btn-sm" onclick="fsOpenScheduleModal('rename')">設定変更</button>
     <button class="btn btn-g btn-sm" ${(S.fsSchedules||[]).length<=1?'disabled':''} onclick="fsDeleteSchedule()" style="${(S.fsSchedules||[]).length<=1?'opacity:.45;cursor:not-allowed':''}">削除</button>
   </div>
   <div id="fs-list">
@@ -9019,6 +9036,37 @@ function syncActiveFsSchedule(){
 function fsCloneBlocks(blocks){
   return JSON.parse(JSON.stringify(blocks||[])).map(block=>({...block,id:uid()}));
 }
+function fsScheduleRuleLabel(schedule){
+  if(!schedule)return'未設定';
+  if(schedule.mode==='date'){
+    if(!schedule.date)return'単発・日付未設定';
+    const d=new Date(schedule.date+'T00:00:00');
+    return`単発 ${d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'})}`;
+  }
+  if(schedule.mode==='weekly'){
+    const days=Array.isArray(schedule.weekdays)?schedule.weekdays:[];
+    if(days.length===7)return'毎日';
+    const labels=['日','月','火','水','木','金','土'];
+    return days.length?days.map(d=>labels[d]).join('・')+'曜日':'曜日未設定';
+  }
+  return'適用日未設定';
+}
+function fsScheduleForDate(date){
+  const schedules=(S.fsSchedules||[]).filter(x=>x&&Array.isArray(x.blocks));
+  if(!schedules.length)return null;
+  const day=new Date((date||today())+'T00:00:00').getDay();
+  const newest=list=>list.slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]||null;
+  const oneOff=newest(schedules.filter(x=>x.mode==='date'&&x.date===date));
+  if(oneOff)return oneOff;
+  const weekly=newest(schedules.filter(x=>x.mode==='weekly'&&!x.isFallback&&(x.weekdays||[]).includes(day)));
+  if(weekly)return weekly;
+  return schedules.find(x=>x.isFallback&&(x.weekdays||[]).includes(day))
+    ||schedules.find(x=>x.mode==='weekly'&&(x.weekdays||[]).includes(day))
+    ||null;
+}
+function fsBlocksForDate(date){
+  return fsScheduleForDate(date)?.blocks||[];
+}
 function fsSwitchSchedule(id){
   if(id===S.activeFsScheduleId)return;
   syncActiveFsSchedule();
@@ -9031,23 +9079,52 @@ function fsSwitchSchedule(id){
 function fsOpenScheduleModal(mode){
   const active=fsActiveSchedule();
   const initial=mode==='duplicate'&&active?`${active.name}のコピー`:mode==='rename'&&active?active.name:`スケジュール ${(S.fsSchedules||[]).length+1}`;
-  const title=mode==='rename'?'スケジュール名を変更':mode==='duplicate'?'スケジュールを複製':'新しいスケジュール';
+  const title=mode==='rename'?'スケジュール設定を変更':mode==='duplicate'?'スケジュールを複製':'新しいスケジュール';
+  const initialMode=active&&mode!=='new'&&active.mode==='date'?'date':'weekly';
+  const initialDays=active&&mode!=='new'&&Array.isArray(active.weekdays)?active.weekdays:[new Date().getDay()];
+  const initialDate=active&&mode!=='new'&&active.date?active.date:today();
+  const dayLabels=['日','月','火','水','木','金','土'];
   openModal(`<div class="mhdr"><div class="mtitle">${title}</div><button class="mclose" onclick="closeModal()">✕</button></div>
     <div class="fg"><div class="fl">スケジュール名</div><input id="fs-schedule-name" value="${esc(initial)}" maxlength="40" onkeydown="if(event.key==='Enter')fsSubmitScheduleModal('${mode}')"></div>
+    <div class="fg"><div class="fl">適用方法</div>
+      <select id="fs-schedule-mode" onchange="fsToggleScheduleRuleFields()">
+        <option value="weekly" ${initialMode==='weekly'?'selected':''}>曜日固定</option>
+        <option value="date" ${initialMode==='date'?'selected':''}>単発スケジュール</option>
+      </select>
+    </div>
+    <div id="fs-weekday-fields" class="fg">
+      <div class="fl">適用する曜日（複数選択可）</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${dayLabels.map((label,day)=>`<label style="display:flex;align-items:center;justify-content:center;gap:4px;min-width:48px;min-height:42px;padding:6px 9px;border:1px solid var(--border);border-radius:8px;cursor:pointer"><input class="fs-weekday-check" type="checkbox" value="${day}" ${initialDays.includes(day)?'checked':''}>${label}</label>`).join('')}</div>
+    </div>
+    <div id="fs-date-field" class="fg"><div class="fl">適用日</div><input id="fs-schedule-date" type="date" value="${esc(initialDate)}"></div>
     ${mode==='new'?`<div style="font-size:12px;color:var(--t2)">空のスケジュールを作成します。現在の内容を元にする場合は「複製」を使用してください。</div>`:''}
     <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="fsSubmitScheduleModal('${mode}')">${mode==='rename'?'変更':'作成'}</button></div>`);
+  fsToggleScheduleRuleFields();
   setTimeout(()=>{const input=document.getElementById('fs-schedule-name');input?.focus();input?.select();},0);
+}
+function fsToggleScheduleRuleFields(){
+  const mode=document.getElementById('fs-schedule-mode')?.value||'weekly';
+  const weekday=document.getElementById('fs-weekday-fields');
+  const date=document.getElementById('fs-date-field');
+  if(weekday)weekday.style.display=mode==='weekly'?'block':'none';
+  if(date)date.style.display=mode==='date'?'block':'none';
 }
 function fsSubmitScheduleModal(mode){
   const clean=(document.getElementById('fs-schedule-name')?.value||'').trim();
   if(!clean){toast('スケジュール名を入力してください','err');return;}
+  const scheduleMode=document.getElementById('fs-schedule-mode')?.value||'weekly';
+  const weekdays=[...document.querySelectorAll('.fs-weekday-check:checked')].map(x=>Number(x.value));
+  const date=document.getElementById('fs-schedule-date')?.value||'';
+  if(scheduleMode==='weekly'&&!weekdays.length){toast('適用する曜日を1つ以上選択してください','err');return;}
+  if(scheduleMode==='date'&&!date){toast('適用日を選択してください','err');return;}
   const active=fsActiveSchedule();
   if(mode==='rename'){
     if(!active)return;
-    active.name=clean;save();closeModal();render();toast('名称を変更しました');return;
+    Object.assign(active,{name:clean,mode:scheduleMode,weekdays:scheduleMode==='weekly'?weekdays:[],date:scheduleMode==='date'?date:null,isFallback:active.isFallback===true});
+    save();closeModal();render();toast('スケジュール設定を変更しました');return;
   }
   syncActiveFsSchedule();
-  const created={id:uid(),name:clean,blocks:mode==='duplicate'?fsCloneBlocks(S.fs):[]};
+  const created={id:uid(),name:clean,mode:scheduleMode,weekdays:scheduleMode==='weekly'?weekdays:[],date:scheduleMode==='date'?date:null,isFallback:false,createdAt:Date.now(),blocks:mode==='duplicate'?fsCloneBlocks(S.fs):[]};
   S.fsSchedules.push(created);
   S.activeFsScheduleId=created.id;
   S.fs=created.blocks;
@@ -11720,7 +11797,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260731-03';
+const APP_VERSION='20260731-04';
 
 render();
 function forceAppUpdate(){
