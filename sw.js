@@ -1,11 +1,18 @@
-// EditFlow Service Worker v20260731-01
-const CACHE = 'editflow-20260731-01';
+// EditFlow Service Worker v20260731-02
+const CACHE = 'editflow-20260731-02';
 const URLS = ['./', './editflow.html'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(URLS)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+      // 旧画面を開いたままでも、新しいアプリ本体へ自動的に切り替える。
+      .then(() => self.clients.matchAll({type:'window',includeUncontrolled:true}))
+      .then(clients => Promise.all(clients.map(client => client.navigate(client.url).catch(() => null))))
+  );
 });
 // ネットワーク優先: 常に最新を取得し、取得できた内容をキャッシュへ保存。
 // オフライン時のみキャッシュにフォールバックする。

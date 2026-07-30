@@ -11709,7 +11709,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260731-01';
+const APP_VERSION='20260731-02';
 
 render();
 function forceAppUpdate(){
@@ -11750,11 +11750,10 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/editflow-app/sw.js').then(reg=>{
     reg.update();
     navigator.serviceWorker.addEventListener('controllerchange',()=>{
-      if(sessionStorage.getItem('sw_init')){
-        sessionStorage.removeItem('sw_init');
+      const reloadKey='ef_sw_reloaded_'+APP_VERSION;
+      if(!sessionStorage.getItem(reloadKey)){
+        sessionStorage.setItem(reloadKey,'1');
         location.reload();
-      }else{
-        sessionStorage.setItem('sw_init','1');
       }
     });
   }).catch(e=>console.warn('SW:',e));
