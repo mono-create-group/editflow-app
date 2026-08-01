@@ -1,6 +1,6 @@
-// EditFlow Service Worker v20260731-04
-const CACHE = 'editflow-20260731-04';
-const URLS = ['./', './editflow.html'];
+// EditFlow Service Worker v20260801-02
+const CACHE = 'editflow-20260801-02';
+const URLS = ['./', './editflow.html', './ai-bridge-client.js'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(URLS)).then(() => self.skipWaiting()));
 });
