@@ -877,6 +877,7 @@ let FB_USER=null;
 let _fbSaveTimer=null;
 let _fbUnsubscribe=null;
 let _personalTaskBaseline=new Map();
+let _authSettled=false;
 
 function fbSave(){
   if(!FB_USER)return;
@@ -1121,6 +1122,32 @@ function _copyAppUrl(){
   }else{prompt('このURLをコピーしてSafariで開いてください',u);}
 }
 
+// 同期の唯一の入口をGoogle認証に固定する。未認証の端末内データを編集させると、
+// スマホとPCで別々のlocalStorageへ保存され「同期されない」状態になるため。
+function renderSyncGate(){
+  let el=document.getElementById('sync-auth-gate');
+  if(!el){
+    el=document.createElement('div');el.id='sync-auth-gate';
+    el.style.cssText='position:fixed;inset:0;z-index:99999;background:#f6f7fb;display:flex;align-items:center;justify-content:center;padding:24px;font-family:inherit';
+    document.body.appendChild(el);
+  }
+  if(!_authSettled){
+    el.style.display='flex';
+    el.innerHTML='<div style="width:min(420px,100%);background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;box-sizing:border-box;text-align:center;box-shadow:0 12px 36px rgba(15,23,42,.08)"><div style="font-size:18px;font-weight:800;color:#111827">同期状態を確認中…</div><div style="margin-top:10px;font-size:13px;line-height:1.7;color:#6b7280">EditFlowのデータを安全に読み込んでいます。</div></div>';
+    return;
+  }
+  if(FB_USER){el.style.display='none';el.innerHTML='';return;}
+  const embedded=_isEmbeddedWebview();
+  el.style.display='flex';
+  el.innerHTML=`<div style="width:min(420px,100%);background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;box-sizing:border-box;text-align:center;box-shadow:0 12px 36px rgba(15,23,42,.08)">
+    <div style="font-size:20px;font-weight:800;color:#111827">Googleでサインイン</div>
+    <div style="margin-top:10px;font-size:13px;line-height:1.75;color:#4b5563">スマホとパソコンで<strong>同じGoogleアカウント</strong>にサインインすると、入力内容が自動で同期されます。</div>
+    ${embedded?'<div style="margin-top:14px;padding:10px 12px;border-radius:8px;background:#fff7ed;color:#9a3412;font-size:12px;line-height:1.65">LINE・Instagram内の画面やホーム画面版ではなく、Safari／Chromeで開いてください。</div>':''}
+    <button onclick="signInWithGoogle()" style="width:100%;margin-top:18px;border:0;border-radius:9px;background:#111827;color:#fff;padding:12px 16px;font-size:14px;font-weight:700;cursor:pointer">Googleでサインインして同期を開始</button>
+    ${embedded?'<button onclick="_copyAppUrl()" style="width:100%;margin-top:9px;border:1px solid #d1d5db;border-radius:9px;background:#fff;color:#374151;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer">Safari／Chromeで開くためにリンクをコピー</button>':''}
+  </div>`;
+}
+
 function renderAuthUI(){
   const signedOut=_isEmbeddedWebview()
     ?`<div style="font-size:11px;line-height:1.7;background:#fff4e5;border:1px solid #f0c98a;border-radius:8px;padding:10px 12px;color:#8a5a00">
@@ -1145,6 +1172,7 @@ fbAuth.getRedirectResult().catch(e=>{console.warn('getRedirectResult:',e&&e.code
 
 fbAuth.onAuthStateChanged(user=>{
   FB_USER=user;
+  _authSettled=true;
   if(user){
     fbSetupRealtimeSync();
     fbSetupTeamSync();
@@ -1154,6 +1182,7 @@ fbAuth.onAuthStateChanged(user=>{
     TEAM_SHARE_OK=null;
   }
   renderAuthUI();
+  renderSyncGate();
   if(window.AIBridge){if(user)window.AIBridge.connect(user,'editflow');else window.AIBridge.disconnect();}
   renderGcalUI();
   // Gcal連携済みならサイレント再認証
@@ -11827,9 +11856,10 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260801-02';
+const APP_VERSION='20260804-01';
 
 render();
+renderSyncGate();
 function forceAppUpdate(){
   const bust='?v='+Date.now();
   if('caches' in window){
