@@ -832,6 +832,7 @@ const DB='ef_v5';
 const BUILTIN_VIEWS=[
   {id:'dashboard',label:'ダッシュボード',icon:'🏠'},
   {id:'tasks',label:'タスク管理',icon:'✅'},
+  {id:'performance',label:'達成率履歴',icon:'📈'},
   {id:'projects',label:'案件管理',icon:'🎬'},
   {id:'pipeline',label:'商談管理',icon:'🤝'},
   {id:'teamgoals',label:'チームKGI/KPI',icon:'📈'},
@@ -2665,7 +2666,7 @@ function render(){
     }
     sessionStorage.setItem('ef_view',V);
     if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    const views={dashboard:rDash,tasks:rTasks,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,chores:rChores,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
+    const views={dashboard:rDash,tasks:rTasks,performance:rPerformanceHistory,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,chores:rChores,goals:rGoals,journal:rJournal,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -3753,17 +3754,51 @@ function recordDailyPerformance(date=today()){
   const i=S.performanceLogs.findIndex(x=>x.date===date);if(i>=0)S.performanceLogs[i]=entry;else S.performanceLogs.unshift(entry);
   save();render();toast('📈 今日の達成率を記録しました');
 }
+let PERF_MONTH='all';
+function performanceLogMetrics(entry){
+  const zero={done:0,total:0};
+  const modern=!!entry?.fixedSchedule;
+  return{
+    tasks:entry?.tasks||zero,
+    schedule:modern?(entry.schedule||zero):zero,
+    fixedSchedule:modern?(entry.fixedSchedule||zero):(entry?.schedule||zero),
+    habits:entry?.habits||zero
+  };
+}
+function performanceMetricRate(metric){return metric.total?Math.round(metric.done/metric.total*100):0;}
+function performanceOverallRate(entry){
+  const m=performanceLogMetrics(entry),all=[m.tasks,m.schedule,m.fixedSchedule,m.habits];
+  const done=all.reduce((sum,x)=>sum+x.done,0),total=all.reduce((sum,x)=>sum+x.total,0);
+  return total?Math.round(done/total*100):0;
+}
+function rPerformanceHistory(){
+  const logs=(S.performanceLogs||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const months=[...new Set(logs.map(x=>(x.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  if(PERF_MONTH!=='all'&&!months.includes(PERF_MONTH))PERF_MONTH='all';
+  const filtered=PERF_MONTH==='all'?logs:logs.filter(x=>(x.date||'').startsWith(PERF_MONTH));
+  const avg=key=>filtered.length?Math.round(filtered.reduce((sum,x)=>sum+performanceMetricRate(performanceLogMetrics(x)[key]),0)/filtered.length):0;
+  const overallAvg=filtered.length?Math.round(filtered.reduce((sum,x)=>sum+performanceOverallRate(x),0)/filtered.length):0;
+  const summary=(icon,label,value,color)=>`<div class="card" style="flex:1;min-width:130px;padding:14px 16px;border-top:3px solid ${color}"><div style="font-size:11px;color:var(--t2);margin-bottom:5px">${icon} ${label}</div><div style="font-size:24px;font-weight:800;color:${color};font-variant-numeric:tabular-nums">${value}</div></div>`;
+  const metricCell=(metric,color)=>{const pct=performanceMetricRate(metric);return`<div style="min-width:104px"><div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-bottom:4px"><strong>${metric.done}/${metric.total}</strong><span style="color:var(--t2)">${pct}%</span></div><div role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" style="height:6px;background:var(--card2);border-radius:99px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:99px"></div></div></div>`;};
+  const rows=filtered.map(entry=>{
+    const m=performanceLogMetrics(entry),overall=performanceOverallRate(entry);
+    const d=new Date((entry.date||'')+'T00:00:00');
+    const dateLabel=isNaN(d)?esc(entry.date||''):d.toLocaleDateString('ja-JP',{year:'numeric',month:'short',day:'numeric',weekday:'short'});
+    return`<tr style="border-bottom:1px solid var(--border)"><td style="padding:12px 14px;font-weight:700;white-space:nowrap">${dateLabel}</td><td style="padding:10px 12px">${metricCell(m.tasks,'var(--green)')}</td><td style="padding:10px 12px">${metricCell(m.schedule,'var(--blue)')}</td><td style="padding:10px 12px">${metricCell(m.fixedSchedule,'var(--purple)')}</td><td style="padding:10px 12px">${metricCell(m.habits,'var(--amber)')}</td><td style="padding:10px 14px;text-align:center"><span class="badge ${overall>=80?'bg':overall>=50?'ba':'br'}" style="font-size:12px;padding:5px 10px">${overall}%</span></td></tr>`;
+  }).join('');
+  return`<div class="ph"><div><div class="ph-title">📈 達成率履歴</div><div style="font-size:12px;color:var(--t2);margin-top:3px">タスク・スケジュール・固定スケジュール・習慣の日別記録</div></div><div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-g btn-sm" onclick="V='tasks';TV='today';render()">← 今日のタスク</button><button class="btn btn-p btn-sm" onclick="recordDailyPerformance(today())">今日を記録</button></div></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${summary('🗓','記録日数',filtered.length+'日','var(--text)')}${summary('◎','総合平均',overallAvg+'%','var(--purple)')}${summary('✅','タスク平均',avg('tasks')+'%','var(--green)')}${summary('📅','予定平均',avg('schedule')+'%','var(--blue)')}${summary('🕐','固定平均',avg('fixedSchedule')+'%','var(--purple)')}${summary('🔥','習慣平均',avg('habits')+'%','var(--amber)')}</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap"><div style="font-size:13px;font-weight:700">日別履歴 <span style="color:var(--t2);font-weight:500">${filtered.length}件</span></div><label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--t2)">期間<select aria-label="表示する月" onchange="PERF_MONTH=this.value;render()" style="width:auto;min-width:130px;padding:5px 9px"><option value="all" ${PERF_MONTH==='all'?'selected':''}>すべて</option>${months.map(m=>`<option value="${m}" ${PERF_MONTH===m?'selected':''}>${m.replace('-','年')}月</option>`).join('')}</select></label></div>
+  ${filtered.length?`<div class="card" style="padding:0;overflow-x:auto"><table aria-label="達成率履歴" style="width:100%;min-width:780px;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--card2);color:var(--t2)"><th scope="col" style="padding:9px 14px;text-align:left">日付</th><th scope="col" style="padding:9px 12px;text-align:left">タスク</th><th scope="col" style="padding:9px 12px;text-align:left">スケジュール</th><th scope="col" style="padding:9px 12px;text-align:left">固定スケジュール</th><th scope="col" style="padding:9px 12px;text-align:left">習慣</th><th scope="col" style="padding:9px 14px;text-align:center">総合</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">達成率の記録がありません</div><div style="font-size:12px;color:var(--t3);margin-top:5px">「今日を記録」を押すと、ここに履歴が追加されます</div></div>`}`;
+}
 function rDailyPerformanceCard(date){
   const p=dailyPerformance(date),item=(icon,label,x)=>`<div style="flex:1;min-width:92px;background:var(--card2);border-radius:8px;padding:8px"><div style="font-size:11px;color:var(--t2)">${icon} ${label}</div><b>${x.done}/${x.total} (${p.rate(x.done,x.total)}%)</b></div>`;
   const history=(S.performanceLogs||[]).filter(x=>x.date!==date).slice(0,5);
   const historyLine=x=>{
-    const zero={done:0,total:0};
-    // 旧記録の schedule は固定スケジュール値だったため、固定側に引き継ぐ。
-    const schedule=x.fixedSchedule?(x.schedule||zero):zero;
-    const fixed=x.fixedSchedule||x.schedule||zero;
-    return`${x.date.slice(5).replace('-','/')} タスク${x.tasks.done}/${x.tasks.total}・予定${schedule.done}/${schedule.total}・固定${fixed.done}/${fixed.total}・習慣${x.habits.done}/${x.habits.total}`;
+    const m=performanceLogMetrics(x);
+    return`${x.date.slice(5).replace('-','/')} タスク${m.tasks.done}/${m.tasks.total}・予定${m.schedule.done}/${m.schedule.total}・固定${m.fixedSchedule.done}/${m.fixedSchedule.total}・習慣${m.habits.done}/${m.habits.total}`;
   };
-  return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>📈 今日の達成率</b><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('✅','タスク',p.tasks)}${item('📅','スケジュール',p.schedule)}${item('🕐','固定スケジュール',p.fixedSchedule)}${item('🔥','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(historyLine).join('　')}</div>`:''}</div>`;
+  return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b>📈 今日の達成率</b><div style="display:flex;gap:6px"><button class="btn btn-g btn-xs" onclick="V='performance';render()">履歴一覧</button><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('✅','タスク',p.tasks)}${item('📅','スケジュール',p.schedule)}${item('🕐','固定スケジュール',p.fixedSchedule)}${item('🔥','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(historyLine).join('　')}</div>`:''}</div>`;
 }
 function rTasks(){
   const sortSel=`<select onchange="setTaskSort(this.value)" style="font-size:11px;padding:3px 7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text)">${TASK_SORT_OPTS.map(([v,l])=>`<option value="${v}" ${getTaskSort()===v?'selected':''}>${l}</option>`).join('')}</select>`;
@@ -11915,7 +11950,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260809-07';
+const APP_VERSION='20260809-08';
 
 render();
 renderSyncGate();
