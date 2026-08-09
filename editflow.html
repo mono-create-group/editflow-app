@@ -8594,10 +8594,10 @@ ${secTitle('📅 固定タイムスケジュール')}
       </div>
       <div class="sched-edit-color" style="background:${f.c}"></div>
       <input style="width:34px;flex-shrink:0;padding:4px 4px;font-size:14px;text-align:center" value="${esc(f.icon||'')}" onchange="S.fs[${i}].icon=this.value.trim();save();render()" placeholder="🔥" title="ノードに表示するアイコン（1文字・未入力ならタイトル頭文字）" maxlength="4">
-      <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.s)}" onchange="fsSetBlockTime(${i},'s',this.value)" placeholder="開始">
+      <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.s)}" oninput="fsStageBlockTime(${i},'s',this.value)" onkeydown="fsCommitBlockTime(event,${i},'s')" placeholder="開始">
       <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.s?'0.7':'0.2'}" onclick="fsSetBlockTime(${i},'s','')" title="開始時間をクリア">✕</button>
       <span style="color:var(--t2)">〜</span>
-      <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.e)}" onchange="fsSetBlockTime(${i},'e',this.value)" placeholder="${f.e==='24:00'?'24:00(終日)':'終了'}">
+      <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.e)}" oninput="fsStageBlockTime(${i},'e',this.value)" onkeydown="fsCommitBlockTime(event,${i},'e')" placeholder="${f.e==='24:00'?'24:00(終日)':'終了'}">
       <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.e?'0.7':'0.2'}" onclick="fsSetBlockTime(${i},'e','')" title="終了時間をクリア">✕</button>
       <input style="flex:1;padding:4px 8px;font-size:12px" value="${esc(f.t)}" onchange="S.fs[${i}].t=this.value" placeholder="内容（→区切りで複数項目）">
       <input type="color" value="${f.c}" style="width:32px;height:32px;padding:2px;border-radius:6px;cursor:pointer;background:none;border:1px solid var(--border)" onchange="S.fs[${i}].c=this.value">
@@ -9208,13 +9208,25 @@ function fsResetSchedule(){
 function fsSetBlockTime(i,key,value){
   if(!S.fs[i]||(key!=='s'&&key!=='e'))return;
   S.fs[i][key]=value;
+  fsSortBlocks();
+  save();render();
+}
+function fsStageBlockTime(i,key,value){
+  if(!S.fs[i]||(key!=='s'&&key!=='e'))return;
+  S.fs[i][key]=value;
+}
+function fsCommitBlockTime(e,i,key){
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  fsSetBlockTime(i,key,e.currentTarget.value);
+}
+function fsSortBlocks(){
   // 開始時刻順に安定ソート。同時刻は現在の順序を維持し、時刻なしは末尾へ送る。
   S.fs=S.fs.map((block,order)=>({block,order})).sort((a,b)=>{
     const am=a.block.s&&a.block.s!=='-1'?tMin(a.block.s):Number.MAX_SAFE_INTEGER;
     const bm=b.block.s&&b.block.s!=='-1'?tMin(b.block.s):Number.MAX_SAFE_INTEGER;
     return am-bm||a.order-b.order;
   }).map(x=>x.block);
-  save();render();
 }
 function fsMove(i,dir){
   const j=i+dir;
@@ -11856,7 +11868,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260804-01';
+const APP_VERSION='20260809-03';
 
 render();
 renderSyncGate();
