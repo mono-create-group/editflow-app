@@ -3727,17 +3727,22 @@ function dailyPerformance(date){
   const tasks=(S.tasks||[]).filter(t=>!t.deleted&&t.dueDate===date);
   const scheduledTasks=tasks.filter(t=>t.startTime||t.fsBlockId);
   const habits=habitsForDate(date),blocks=fsBlocksForDate(date);
-  const doneBlock=f=>{
-    const ck=S.fsChecked?.[date]?.[f.id||('b'+blocks.indexOf(f))];if(!ck)return false;
-    const parts=[...(f.t||'').split('→').map(x=>x.trim()).filter(Boolean),...(f.d||'').split('→').map(x=>x.trim()).filter(Boolean)];
-    return !!ck.main||(parts.length>=2&&parts.every((_,i)=>!!ck.subs?.[i]));
-  };
+  // 固定スケジュールは時間ブロックではなく、画面上のチェック項目を1件ずつ集計する。
+  const fixedSchedule=blocks.reduce((sum,f,blockIndex)=>{
+    const titleParts=(f.t||'').includes('→')?(f.t||'').split('→').map(x=>x.trim()).filter(Boolean):[];
+    const descParts=(f.d||'').includes('→')?(f.d||'').split('→').map(x=>x.trim()).filter(Boolean):[];
+    const parts=[...titleParts,...descParts];
+    const itemCount=parts.length>=2?parts.length:1;
+    const ck=S.fsChecked?.[date]?.[f.id||('b'+blockIndex)];
+    const done=ck?.main?itemCount:(parts.length>=2?parts.filter((_,i)=>!!ck?.subs?.[i]).length:0);
+    sum.done+=done;sum.total+=itemCount;return sum;
+  },{done:0,total:0});
   const rate=(done,total)=>total?Math.round(done/total*100):0;
   return{
     date,
     tasks:{done:tasks.filter(t=>t.done).length,total:tasks.length},
     schedule:{done:scheduledTasks.filter(t=>t.done).length,total:scheduledTasks.length},
-    fixedSchedule:{done:blocks.filter(doneBlock).length,total:blocks.length},
+    fixedSchedule,
     habits:{done:habits.filter(h=>(h.completedDates||[]).includes(date)).length,total:habits.length},
     rate
   };
@@ -11910,7 +11915,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260809-06';
+const APP_VERSION='20260809-07';
 
 render();
 renderSyncGate();
