@@ -3726,7 +3726,11 @@ function sortTaskList(tasks){
 function dailyPerformance(date){
   const tasks=(S.tasks||[]).filter(t=>!t.deleted&&t.dueDate===date);
   const habits=habitsForDate(date),blocks=fsBlocksForDate(date);
-  const doneBlock=f=>!!S.fsChecked?.[date]?.[f.id||('b'+blocks.indexOf(f))]?.main;
+  const doneBlock=f=>{
+    const ck=S.fsChecked?.[date]?.[f.id||('b'+blocks.indexOf(f))];if(!ck)return false;
+    const parts=[...(f.t||'').split('→').map(x=>x.trim()).filter(Boolean),...(f.d||'').split('→').map(x=>x.trim()).filter(Boolean)];
+    return !!ck.main||(parts.length>=2&&parts.every((_,i)=>!!ck.subs?.[i]));
+  };
   const rate=(done,total)=>total?Math.round(done/total*100):0;
   return{date,tasks:{done:tasks.filter(t=>t.done).length,total:tasks.length},schedule:{done:blocks.filter(doneBlock).length,total:blocks.length},habits:{done:habits.filter(h=>(h.completedDates||[]).includes(date)).length,total:habits.length},rate};
 }
@@ -3739,7 +3743,7 @@ function recordDailyPerformance(date=today()){
 function rDailyPerformanceCard(date){
   const p=dailyPerformance(date),item=(icon,label,x)=>`<div style="flex:1;min-width:92px;background:var(--card2);border-radius:8px;padding:8px"><div style="font-size:11px;color:var(--t2)">${icon} ${label}</div><b>${x.done}/${x.total} (${p.rate(x.done,x.total)}%)</b></div>`;
   const history=(S.performanceLogs||[]).filter(x=>x.date!==date).slice(0,5);
-  return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>📈 今日の達成率</b><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('✅','タスク',p.tasks)}${item('🕐','予定',p.schedule)}${item('🔥','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(x=>x.date.slice(5).replace('-','/')).join('・')}</div>`:''}</div>`;
+  return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>📈 今日の達成率</b><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('✅','タスク',p.tasks)}${item('🕐','予定',p.schedule)}${item('🔥','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(x=>`${x.date.slice(5).replace('-','/')} タスク${x.tasks.done}/${x.tasks.total}・予定${x.schedule.done}/${x.schedule.total}・習慣${x.habits.done}/${x.habits.total}`).join('　')}</div>`:''}</div>`;
 }
 function rTasks(){
   const sortSel=`<select onchange="setTaskSort(this.value)" style="font-size:11px;padding:3px 7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text)">${TASK_SORT_OPTS.map(([v,l])=>`<option value="${v}" ${getTaskSort()===v?'selected':''}>${l}</option>`).join('')}</select>`;
@@ -11891,7 +11895,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260809-04';
+const APP_VERSION='20260809-05';
 
 render();
 renderSyncGate();
