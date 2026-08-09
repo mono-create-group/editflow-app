@@ -3723,6 +3723,24 @@ function sortTaskList(tasks){
   if(s==='created')return [...tasks].sort((a,b)=>(a.createdAt||'')>(b.createdAt||'')?1:-1);
   return tasks; // manual
 }
+function dailyPerformance(date){
+  const tasks=(S.tasks||[]).filter(t=>!t.deleted&&t.dueDate===date);
+  const habits=habitsForDate(date),blocks=fsBlocksForDate(date);
+  const doneBlock=f=>!!S.fsChecked?.[date]?.[f.id||('b'+blocks.indexOf(f))]?.main;
+  const rate=(done,total)=>total?Math.round(done/total*100):0;
+  return{date,tasks:{done:tasks.filter(t=>t.done).length,total:tasks.length},schedule:{done:blocks.filter(doneBlock).length,total:blocks.length},habits:{done:habits.filter(h=>(h.completedDates||[]).includes(date)).length,total:habits.length},rate};
+}
+function recordDailyPerformance(date=today()){
+  const entry={...dailyPerformance(date),recordedAt:new Date().toISOString()};
+  if(!Array.isArray(S.performanceLogs))S.performanceLogs=[];
+  const i=S.performanceLogs.findIndex(x=>x.date===date);if(i>=0)S.performanceLogs[i]=entry;else S.performanceLogs.unshift(entry);
+  save();render();toast('📈 今日の達成率を記録しました');
+}
+function rDailyPerformanceCard(date){
+  const p=dailyPerformance(date),item=(icon,label,x)=>`<div style="flex:1;min-width:92px;background:var(--card2);border-radius:8px;padding:8px"><div style="font-size:11px;color:var(--t2)">${icon} ${label}</div><b>${x.done}/${x.total} (${p.rate(x.done,x.total)}%)</b></div>`;
+  const history=(S.performanceLogs||[]).filter(x=>x.date!==date).slice(0,5);
+  return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>📈 今日の達成率</b><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('✅','タスク',p.tasks)}${item('🕐','予定',p.schedule)}${item('🔥','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(x=>x.date.slice(5).replace('-','/')).join('・')}</div>`:''}</div>`;
+}
 function rTasks(){
   const sortSel=`<select onchange="setTaskSort(this.value)" style="font-size:11px;padding:3px 7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text)">${TASK_SORT_OPTS.map(([v,l])=>`<option value="${v}" ${getTaskSort()===v?'selected':''}>${l}</option>`).join('')}</select>`;
   return`<div class="ph"><div class="ph-title">タスク管理</div><div style="display:flex;gap:7px;align-items:center">${sortSel}<button class="btn btn-p" onclick="openTaskModal()">＋ タスク追加</button></div></div>
@@ -3745,6 +3763,7 @@ function rTasksToday(){
   const totalCount=todays.length+gcalToday.length;
   const hasFs=S.fs&&S.fs.length>0;
   return`
+${rDailyPerformanceCard(td)}
 ${hasFs?`${secTitle('🕐 固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${rFsDashPanel()}`:''}
 <div ondragover="event.preventDefault()" ondrop="taskListDrop(event)">
 ${over.length?`${secTitle(`⚠️ 期限超過 (${over.length}件)`)}${over.map(t=>rTaskItem(t,isDraggable)).join('')}`:''}
@@ -3938,7 +3957,7 @@ function rFixedScheduleList(compact=false,droppable=false,date,timeline=false){
     }):[];
     // このブロック時間帯に時刻が入る家事（スケジュールの指定時刻へ配置）
     const blockChores=droppable&&hasStart&&sm!==null?choresForDate(td).filter(c=>{if(!c.time)return false;const tm=tMin(c.time);return tm>=sm&&tm<em;}):[];
-    const rBlockChore=c=>{const cdone=(c.completedDates||[]).includes(td);return`<div class="task-item" style="border-left:2px solid var(--teal,#0d9488);margin:2px 0;padding:6px 10px;box-shadow:none;flex-shrink:0">
+    const rBlockChore=c=>{const cdone=(c.completedDates||[]).includes(td);return`<div class="task-item" draggable="true" ondragstart="choreDragStart(event,'${c.id}')" ondragend="choreDragEnd(event)" style="border-left:2px solid var(--teal,#0d9488);margin:2px 0;padding:6px 10px;box-shadow:none;flex-shrink:0;cursor:grab">
   <div class="chk ${cdone?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleChoreDone('${c.id}','${td}')"></div>
   <div class="task-body" style="min-width:0"><div class="task-ttl ${cdone?'done':''}" style="font-size:12px">${c.time?`<span style="font-weight:700;color:var(--teal,#0d9488);margin-right:6px;font-variant-numeric:tabular-nums;font-size:11px">${c.time}</span>`:''}🧹 ${esc(c.name)}</div></div>
   <div class="task-acts" style="opacity:1;gap:2px"><button class="tact" style="padding:2px 5px;font-size:11px" onclick="V='chores';render()" title="家事ページで編集">✏️</button></div>
@@ -4019,7 +4038,7 @@ function rFixedScheduleList(compact=false,droppable=false,date,timeline=false){
   const unslotted=choresForDate(td).filter(c=>!droppable||!c.time);
   const choresTop=unslotted.length?`<div class="task-item" style="border-left:3px solid var(--teal,#0d9488);flex-direction:column;align-items:stretch;gap:5px;padding:10px 14px;margin-bottom:7px">
     <div style="font-size:11px;color:var(--t2);font-weight:700">🧹 今日の家事${droppable?'（時間指定なし）':''}</div>
-    ${unslotted.map(c=>{const cdone=(c.completedDates||[]).includes(td);return`<div style="display:flex;align-items:center;gap:8px">
+    ${unslotted.map(c=>{const cdone=(c.completedDates||[]).includes(td);return`<div draggable="true" ondragstart="choreDragStart(event,'${c.id}')" ondragend="choreDragEnd(event)" style="display:flex;align-items:center;gap:8px;cursor:grab">
       <div class="chk ${cdone?'done':''}" style="width:16px;height:16px;border-radius:4px;flex-shrink:0" onclick="toggleChoreDone('${c.id}','${td}')"></div>
       <span style="font-size:13px;${cdone?'text-decoration:line-through;color:var(--t3)':''}">${c.time?`<span style="font-weight:700;color:var(--teal,#0d9488);margin-right:5px;font-size:11px;font-variant-numeric:tabular-nums">${c.time}</span>`:''}🧹 ${esc(c.name)}</span>
     </div>`;}).join('')}
@@ -4422,7 +4441,7 @@ function saveRoutine(id){
 // 家事をタスク/スケジュールビュー内で表示（interactive=trueでその日チェック可）
 function rChoreInTaskView(c,date,interactive){
   const done=(c.completedDates||[]).includes(date);
-  return`<div class="task-item ${done?'done-item':''}" style="border-left:3px solid var(--teal,#0d9488)">
+  return`<div class="task-item ${done?'done-item':''}" draggable="true" ondragstart="choreDragStart(event,'${c.id}')" ondragend="choreDragEnd(event)" style="border-left:3px solid var(--teal,#0d9488);cursor:grab">
   ${interactive
     ?`<div class="chk ${done?'done':''}" onclick="toggleChoreDone('${c.id}','${date}')"></div>`
     :`<span style="font-size:18px;flex-shrink:0">🧹</span>`}
@@ -4831,7 +4850,9 @@ function schedSideDrop(e,date){
   _schedDragId=null;
 }
 // ===TASK LIST D&D===
-let _taskDragId=null,_taskDragSnap=null;
+let _taskDragId=null,_taskDragSnap=null,_choreDragId=null;
+function choreDragStart(e,id){_choreDragId=id;e.dataTransfer.effectAllowed='move';e.currentTarget.classList.add('dragging');}
+function choreDragEnd(e){e.currentTarget.classList.remove('dragging');_choreDragId=null;}
 // 安全網: ドラッグがどんな終わり方をしても（枠外ドロップ・タッチ中断等）
 // 残留状態を必ずリセットし、次のドラッグが誤動作しないようにする。
 document.addEventListener('dragend',()=>{
@@ -4869,6 +4890,7 @@ function fsBlockDragLeave(e,i){e.currentTarget?.classList.remove('fs-drag-over')
 function fsBlockDrop(e,startTime,blockId,i,date){
   e.preventDefault();e.stopPropagation();
   document.getElementById('fs-block-'+i)?.classList.remove('fs-drag-over');
+  if(_choreDragId){const c=(S.chores||[]).find(x=>x.id===_choreDragId);if(c&&startTime&&startTime!=='-1'){c.time=startTime;save();render();toast(`🧹 ${esc(c.name)} を ${startTime} に移動しました`);} _choreDragId=null;return;}
   const id=_taskDragId||_wdayDragId;
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
@@ -9565,6 +9587,7 @@ function openFsTaskModal(blockId,slot,startTime,date){
 function fsInternalDrop(e,blockId,slot,date,startTime){
   e.preventDefault();e.stopPropagation();
   e.currentTarget?.classList.remove('fs-dz-over');
+  if(_choreDragId){const c=(S.chores||[]).find(x=>x.id===_choreDragId);if(c&&startTime&&startTime!=='-1'){c.time=startTime;save();render();toast(`🧹 ${esc(c.name)} を ${startTime} に移動しました`);} _choreDragId=null;return;}
   const id=_taskDragId;
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
@@ -11868,7 +11891,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260809-03';
+const APP_VERSION='20260809-04';
 
 render();
 renderSyncGate();
