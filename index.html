@@ -964,19 +964,31 @@ function restoreUnsavedFormDraft(draft){
   const root=document.getElementById('view');if(!root)return;const fields=[...root.querySelectorAll('input,textarea,select')].filter(el=>!['button','submit','file','password','hidden'].includes(el.type)&&!el.readOnly),counts={},byKey=new Map();fields.forEach(el=>{const base=el.id?`id:${el.id}`:`${el.tagName}|${el.type||''}|${el.className||''}|${el.getAttribute('aria-label')||''}`,index=counts[base]||0;counts[base]=index+1;byKey.set(`${base}#${index}`,el);});draft.fields.forEach(item=>{const el=byKey.get(`${item.base}#${item.index}`);if(!el)return;if(el.type==='checkbox'||el.type==='radio')el.checked=!!item.checked;else el.value=item.value;});
 }
 function renderAfterCloudSync(draft){render();restoreUnsavedFormDraft(draft);}
+function syncBackupKeys(){try{return Object.keys(localStorage).filter(k=>k.startsWith('ef_sync_backup_')||k.startsWith('ef_v5_backup_')).sort((a,b)=>(Number(b.match(/(\d+)$/)?.[1])||0)-(Number(a.match(/(\d+)$/)?.[1])||0));}catch(_){return[];}}
+function backupLocalState(reason='cloud-sync'){
+  try{const key=`ef_sync_backup_${S._uid||'local'}_${Date.now()}`;localStorage.setItem(key,JSON.stringify({...S,_backupReason:reason,_backupAt:Date.now()}));const keys=Object.keys(localStorage).filter(k=>k.startsWith('ef_sync_backup_')).sort();while(keys.length>10)localStorage.removeItem(keys.shift());return key;}catch(e){console.warn('sync backup failed',e);return null;}
+}
+function mergeRecordArrays(local,remote){
+  const result=[],positions=new Map();const add=(item,isLocal)=>{if(!item||typeof item!=='object'){result.push(item);return;}const key=item.id?`id:${item.id}`:item.name?`name:${item.name}`:null;if(!key){result.push(item);return;}if(!positions.has(key)){positions.set(key,result.length);result.push(item);return;}const i=positions.get(key),current=result[i]||{},currentTs=Number(current.updatedAt||current.createdAt||current.ts||0),nextTs=Number(item.updatedAt||item.createdAt||item.ts||0);if(nextTs>currentTs||(isLocal&&nextTs===currentTs))result[i]={...current,...item};};(remote||[]).forEach(x=>add(x,false));(local||[]).forEach(x=>add(x,true));return result;
+}
+function mergeFinanceState(localFinance,remoteFinance){const l=localFinance||{},r=remoteFinance||{},merged={...r,...l,monthlyBudgets:{...(r.monthlyBudgets||{}),...(l.monthlyBudgets||{})},savings:{...(r.savings||{}),...(l.savings||{})}};['fixedExpenses','payments','incomes','debts'].forEach(k=>merged[k]=mergeRecordArrays(l[k],r[k]));return merged;}
+function mergeCloudStateWithLocal(local,remote){
+  const merged={...remote};const arrays=['habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','chores','choreRoutines','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];arrays.forEach(k=>merged[k]=mergeRecordArrays(local[k],remote[k]));
+  merged.finance=mergeFinanceState(local.finance,remote.finance);merged.dailyOpenReviews={...(remote.dailyOpenReviews||{}),...(local.dailyOpenReviews||{})};merged.goalReviews={...(remote.goalReviews||{}),...(local.goalReviews||{})};merged.dailySchedules={...(remote.dailySchedules||{}),...(local.dailySchedules||{})};merged.fsChecked={...(remote.fsChecked||{}),...(local.fsChecked||{})};return merged;
+}
 function _applyCloudData(json){
   if(typeof json==='string'&&json.slice(0,3)==='LZ:'){
     if(!window.LZString)return;                 // ライブラリ未ロード時はスキップ(既存Sを保持)
     json=LZString.decompressFromBase64(json.slice(3));
     if(json==null)return;
   }
-  const cloud=JSON.parse(json);
+  const cloud=JSON.parse(json);backupLocalState('before-cloud-apply');
   const def=defState();
-  const localTasks=Array.isArray(S.tasks)?S.tasks:[];
+  const localState=S,localTasks=Array.isArray(S.tasks)?S.tasks:[];
   if(window.AIBridge)AIBridge.stampChangedTasks(localTasks,_personalTaskBaseline);
   // チームデータは shared/team が唯一の真実。個人docで上書きせず現在のメモリ内容を保持する。
   const keepTeam={};TEAM_KEYS.forEach(k=>keepTeam[k]=S[k]);const keepBiz=S.bizBoard;
-  S=migrate(Object.assign(def,cloud));
+  S=migrate(mergeCloudStateWithLocal(localState,Object.assign(def,cloud)));
   if(window.AIBridge){const remoteTasks=Array.isArray(S.tasks)?S.tasks:[];S.tasks=AIBridge.mergeTaskChanges(localTasks,remoteTasks,_personalTaskBaseline);_personalTaskBaseline=AIBridge.taskBaseline(remoteTasks);}
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
@@ -2033,6 +2045,7 @@ function migrate(d){
   return d;
 }
 function load(){try{const d=Object.assign(defState(),JSON.parse(localStorage.getItem(DB))||{});return migrate(d);}catch{return migrate(defState());}}
+function restoreLatestSyncBackup(){const keys=syncBackupKeys();if(!keys.length)return toast('復元できる同期前バックアップはまだありません','warn');const key=keys[0];if(!confirm('最新の同期前バックアップを復元しますか？\n現在の状態も復元前に保存します。'))return;try{const raw=JSON.parse(localStorage.getItem(key)||'null');if(!raw)throw Error('バックアップを読み込めません');backupLocalState('before-manual-restore');delete raw._backupReason;delete raw._backupAt;S=migrate(raw);save();render();toast('同期前バックアップを復元しました');}catch(e){toast('復元に失敗しました: '+e.message,'warn');}}
 // ─── パフォーマンス最適化 ───────────────────────────────────────────
 // localStorageへの書き込みをRAFでバッチ化（同フレーム内の複数save()を1回に集約）
 let _lsPending=false;
@@ -8941,6 +8954,13 @@ ${secTitle('🔄 アプリのアップデート')}
   <button class="btn btn-p btn-sm" onclick="forceAppUpdate()">🔄 キャッシュをクリアして最新版に更新</button>
 </div>
 
+${secTitle('同期バックアップ')}
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:13px;color:var(--t2);margin-bottom:10px">他のデバイスから同期する直前の状態を自動保存します。端末側とクラウド側の記録は差分統合され、一方を丸ごと消しません。</div>
+  <div style="font-size:12px;color:var(--t3);margin-bottom:10px">この端末の復元候補: ${syncBackupKeys().length}件</div>
+  <button class="btn btn-g btn-sm" onclick="restoreLatestSyncBackup()">最新の同期前バックアップを復元</button>
+</div>
+
 ${secTitle('🤖 AI APIキー設定')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:12px">AIアシスタント機能で使用するAPIキーを登録します。キーはFirebaseに暗号化保存されます。</div>
@@ -12257,7 +12277,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260818-08';
+const APP_VERSION='20260818-09';
 
 render();
 renderSyncGate();
