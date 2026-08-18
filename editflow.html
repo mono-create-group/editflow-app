@@ -12293,40 +12293,14 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260819-19';
+const APP_VERSION='20260819-20';
 
 render();
 renderSyncGate();
-function forceAppUpdate(){
-  const bust='?v='+Date.now();
-  if('caches' in window){
-    caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).then(()=>{
-      if('serviceWorker' in navigator){
-        navigator.serviceWorker.getRegistrations().then(regs=>Promise.all(regs.map(r=>r.unregister()))).then(()=>{
-          location.href=location.pathname+bust; // キャッシュバスティングURLで再読み込み
-        });
-      }else{location.href=location.pathname+bust;}
-    });
-  }else{location.href=location.pathname+bust;}
-}
 (function(){
   const stored=localStorage.getItem('ef_app_ver');
   if(stored!==APP_VERSION){
     localStorage.setItem('ef_app_ver',APP_VERSION);
-    if(stored){
-      // ループ防止: sessionStorageで試行回数を管理
-      const attempts=parseInt(sessionStorage.getItem('ef_update_attempts')||'0');
-      if(attempts<3){
-        sessionStorage.setItem('ef_update_attempts',String(attempts+1));
-        forceAppUpdate();
-      }else{
-        // 3回試みても解決しない場合はループを止める
-        sessionStorage.removeItem('ef_update_attempts');
-        console.warn('Update loop detected, skipping forceAppUpdate');
-      }
-    }
-  }else{
-    sessionStorage.removeItem('ef_update_attempts');
   }
 })();
 
@@ -12334,13 +12308,6 @@ function forceAppUpdate(){
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/editflow-app/sw.js').then(reg=>{
     reg.update();
-    navigator.serviceWorker.addEventListener('controllerchange',()=>{
-      const reloadKey='ef_sw_reloaded_'+APP_VERSION;
-      if(!sessionStorage.getItem(reloadKey)){
-        sessionStorage.setItem(reloadKey,'1');
-        location.reload();
-      }
-    });
   }).catch(e=>console.warn('SW:',e));
 }
 </script>

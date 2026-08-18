@@ -1,6 +1,7 @@
-// EditFlow Service Worker v20260819-19
-const CACHE = 'editflow-20260819-19';
-const LATEST_APP_URL = new URL('./editflow.html?app=20260819-19', self.registration.scope).href;
+// EditFlow Service Worker v20260819-20
+const CACHE = 'editflow-20260819-20';
+const LATEST_APP_URL = new URL('./editflow.html?app=20260819-20', self.registration.scope).href;
+const APP_SHELL_URL = new URL('./editflow.html', self.registration.scope).href;
 const URLS = ['./', './editflow.html', './ai-bridge-client.js'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(URLS)).then(() => self.skipWaiting()));
@@ -15,10 +16,17 @@ self.addEventListener('activate', e => {
       .then(clients => Promise.all(clients.map(client => client.navigate(LATEST_APP_URL).catch(() => null))))
   );
 });
-// ネットワーク優先: 常に最新を取得し、取得できた内容をキャッシュへ保存。
-// オフライン時のみキャッシュにフォールバックする。
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  if (e.request.mode === 'navigate') {
+    const update = fetch(APP_SHELL_URL, {cache:'no-cache'}).then(r => {
+      if (r.ok) caches.open(CACHE).then(cache => cache.put(APP_SHELL_URL, r.clone())).catch(() => {});
+      return r;
+    }).catch(() => new Response('オフラインです。通信を確認して再度開いてください。',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}}));
+    e.waitUntil(update.then(() => {}));
+    e.respondWith(caches.match(APP_SHELL_URL).then(cached => cached || update));
+    return;
+  }
   e.respondWith(
     fetch(e.request).then(r => {
       const copy = r.clone();
