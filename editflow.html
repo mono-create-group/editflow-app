@@ -159,7 +159,7 @@ a{color:inherit;text-decoration:none}
 .focus-now-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .focus-now-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.focus-now-actions .btn{min-height:44px}
 .later-intro{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;margin-bottom:12px;background:var(--card2);border:1.5px solid var(--border);border-radius:12px}
-.later-task{align-items:center}.later-task .task-body{cursor:pointer}.later-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}.later-actions .btn{min-height:40px}
+.later-task{align-items:center}.later-task .task-body{cursor:pointer}.later-actions{display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap}.later-actions .btn{min-height:40px}
 @media(max-width:700px){.focus-now-card{padding:16px 14px}.focus-now-title{font-size:18px}.later-intro{align-items:flex-start;flex-direction:column}.later-task{flex-wrap:wrap}.later-task .task-body{flex-basis:calc(100% - 40px)}.later-actions{width:100%;padding-left:38px}.later-actions .btn{flex:1;min-height:44px}}
 .chk{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .chk:hover{border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,40,217,0.1)}
@@ -4003,6 +4003,36 @@ function taskSendLater(id){
   if(S.frogId===id)S.frogId=null;
   save();TV='later';render();toast('後回しリストに戻しました');
 }
+function openLaterScheduleModal(id){
+  const task=(S.tasks||[]).find(t=>t.id===id&&!t.deleted&&!t.done);if(!task)return;
+  const now=new Date();
+  const rounded=Math.min(23*60+45,Math.ceil((now.getHours()*60+now.getMinutes())/15)*15);
+  const scheduleDate=task.dueDate&&task.dueDate>=today()?task.dueDate:today();
+  openModal(`<div class="mhdr"><div><div class="mtitle">スケジュールへ入れる</div><div style="font-size:12px;color:var(--t2);margin-top:4px">${esc(task.title)}</div></div><button class="mclose" onclick="closeModal()">✕</button></div>
+  <div class="fg"><div class="fl">日付 *</div><input type="date" id="later-schedule-date" value="${scheduleDate}" onchange="markModalDirty()"></div>
+  <div class="frow">
+    <div class="fg"><div class="fl">開始時刻 *</div><input type="time" id="later-schedule-start" value="${fsTimeInputVal(task.startTime)||mToT(rounded)}" onchange="markModalDirty()"></div>
+    <div class="fg"><div class="fl">終了時刻（任意）</div><input type="time" id="later-schedule-end" value="${fsTimeInputVal(task.endTime)}" onchange="markModalDirty()"></div>
+  </div>
+  <label style="display:flex;gap:10px;align-items:center;min-height:44px;font-size:13px;font-weight:700;cursor:pointer"><input type="checkbox" id="later-schedule-now" style="width:20px;height:20px" onchange="markModalDirty()">同時に「今やる」に設定する</label>
+  <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="saveLaterSchedule('${id}')">スケジュールへ入れる</button></div>`);
+}
+function saveLaterSchedule(id){
+  const task=(S.tasks||[]).find(t=>t.id===id&&!t.deleted&&!t.done);if(!task){closeModal();return;}
+  const date=document.getElementById('later-schedule-date')?.value;
+  const start=document.getElementById('later-schedule-start')?.value;
+  const end=document.getElementById('later-schedule-end')?.value||null;
+  if(!date||!start){toast('日付と開始時刻を入力してください','err');return;}
+  if(end&&tMin(end)<=tMin(start)){toast('終了時刻は開始時刻より後にしてください','err');return;}
+  task.dueDate=date;task.startTime=start;task.endTime=end;task.updatedAt=Date.now();
+  if(document.getElementById('later-schedule-now')?.checked){
+    if(!S.settings)S.settings={};
+    S.settings.nowTaskId=id;S.frogId=id;
+  }
+  save();closeModal();
+  SD=Math.round((new Date(date+'T00:00:00')-new Date(today()+'T00:00:00'))/86400000);
+  TV='schedule';render();toast(`「${task.title}」をスケジュールへ入れました`);
+}
 function rFocusNowCard(){
   const task=currentFocusTask();
   if(!task)return`<div class="focus-now-card"><div class="focus-now-label">◉ 今やること</div><div class="focus-now-title">まだ選ばれていません</div><div style="font-size:13px;color:var(--t2);margin-top:6px">後回しリストから1件だけ選ぶと、そのタスク以外を見ずに集中できます。</div><div class="focus-now-actions"><button class="btn btn-p" onclick="TV='later';render()">後回しリストから選ぶ</button></div></div>`;
@@ -4012,7 +4042,7 @@ function rFocusNowCard(){
 function rLaterTaskItem(task){
   const isOver=task.dueDate&&task.dueDate<today();
   const priorityLabel={high:'優先度 高',medium:'優先度 中',low:'優先度 低'}[task.priority];
-  return`<div class="task-item later-task ${isOver?'overdue':''}" id="ti-${task.id}"><div class="chk" onclick="toggleDone('${task.id}')" aria-label="${esc(task.title)}を完了"></div><div class="task-body" onclick="openTaskModal('${task.id}')"><div class="task-ttl">${esc(task.title)}</div>${task.description?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(task.description)}</div>`:''}<div class="task-meta">${task.dueDate?`<span class="badge ${isOver?'br':'bk'}">期限 ${fmt(task.dueDate,task.dueTime)}</span>`:'<span class="badge bk">期限なし</span>'}${task.startTime?`<span class="badge bb">${esc(task.startTime)}</span>`:''}${priorityLabel?`<span class="badge ${task.priority==='high'?'br':task.priority==='medium'?'ba':'bk'}">${priorityLabel}</span>`:''}</div></div><div class="later-actions"><button class="btn btn-p btn-sm" onclick="taskSetNow('${task.id}')">今やる</button><button class="btn btn-g btn-sm" onclick="openTaskModal('${task.id}')" aria-label="${esc(task.title)}を編集">編集</button></div></div>`;
+  return`<div class="task-item later-task ${isOver?'overdue':''}" id="ti-${task.id}"><div class="chk" onclick="toggleDone('${task.id}')" aria-label="${esc(task.title)}を完了"></div><div class="task-body" onclick="openTaskModal('${task.id}')"><div class="task-ttl">${esc(task.title)}</div>${task.description?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(task.description)}</div>`:''}<div class="task-meta">${task.dueDate?`<span class="badge ${isOver?'br':'bk'}">期限 ${fmt(task.dueDate,task.dueTime)}</span>`:'<span class="badge bk">期限なし</span>'}${task.startTime?`<span class="badge bb">${esc(task.startTime)}</span>`:''}${priorityLabel?`<span class="badge ${task.priority==='high'?'br':task.priority==='medium'?'ba':'bk'}">${priorityLabel}</span>`:''}</div></div><div class="later-actions"><button class="btn btn-p btn-sm" onclick="taskSetNow('${task.id}')">今やる</button><button class="btn btn-g btn-sm" onclick="openLaterScheduleModal('${task.id}')" aria-label="${esc(task.title)}をスケジュールへ入れる">スケジュールへ</button><button class="btn btn-g btn-sm" onclick="openTaskModal('${task.id}')" aria-label="${esc(task.title)}を編集">編集</button></div></div>`;
 }
 function rTasksLater(){
   const focus=currentFocusTask();
@@ -12311,7 +12341,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260819-21';
+const APP_VERSION='20260819-22';
 
 render();
 renderSyncGate();
