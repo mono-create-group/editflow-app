@@ -1,6 +1,6 @@
-// EditFlow Service Worker v20260819-20
-const CACHE = 'editflow-20260819-20';
-const LATEST_APP_URL = new URL('./editflow.html?app=20260819-20', self.registration.scope).href;
+// EditFlow Service Worker v20260819-21
+const CACHE = 'editflow-20260819-21';
+const LATEST_APP_URL = new URL('./editflow.html?app=20260819-21', self.registration.scope).href;
 const APP_SHELL_URL = new URL('./editflow.html', self.registration.scope).href;
 const URLS = ['./', './editflow.html', './ai-bridge-client.js'];
 self.addEventListener('install', e => {

@@ -972,9 +972,22 @@ function backupLocalState(reason='cloud-sync'){
 function mergeRecordArrays(local,remote){
   const result=[],positions=new Map();const add=(item,isLocal)=>{if(!item||typeof item!=='object'){result.push(item);return;}const key=item.id?`id:${item.id}`:item.name?`name:${item.name}`:null;if(!key){result.push(item);return;}if(!positions.has(key)){positions.set(key,result.length);result.push(item);return;}const i=positions.get(key),current=result[i]||{},currentTs=Number(current.updatedAt||current.createdAt||current.ts||0),nextTs=Number(item.updatedAt||item.createdAt||item.ts||0);if(nextTs>currentTs||(isLocal&&nextTs===currentTs))result[i]={...current,...item};};(remote||[]).forEach(x=>add(x,false));(local||[]).forEach(x=>add(x,true));return result;
 }
+function compactHistoryRecords(records,type){
+  const result=[],positions=new Map();
+  (Array.isArray(records)?records:[]).forEach((item,index)=>{
+    if(!item||typeof item!=='object')return;
+    const date=String(item.date||'');
+    const key=date?(type==='journals'?`${date}:${item.type||'morning'}`:date):`unknown:${index}:${JSON.stringify(item)}`;
+    if(!positions.has(key)){positions.set(key,result.length);result.push(item);return;}
+    const i=positions.get(key),current=result[i]||{},currentTs=Date.parse(current.updatedAt||current.recordedAt||'')||Number(current.updatedAt||0),nextTs=Date.parse(item.updatedAt||item.recordedAt||'')||Number(item.updatedAt||0);
+    if(nextTs>=currentTs)result[i]=item;
+  });
+  return result;
+}
 function mergeFinanceState(localFinance,remoteFinance){const l=localFinance||{},r=remoteFinance||{},merged={...r,...l,monthlyBudgets:{...(r.monthlyBudgets||{}),...(l.monthlyBudgets||{})},savings:{...(r.savings||{}),...(l.savings||{})}};['fixedExpenses','payments','incomes','debts','rewards'].forEach(k=>merged[k]=mergeRecordArrays(l[k],r[k]));return merged;}
 function mergeCloudStateWithLocal(local,remote){
-  const merged={...remote};const arrays=['habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','chores','choreRoutines','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];arrays.forEach(k=>merged[k]=mergeRecordArrays(local[k],remote[k]));
+  const merged={...remote};const arrays=['habits','jobs','logs','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','choreRoutines','meals','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];arrays.forEach(k=>merged[k]=mergeRecordArrays(local[k],remote[k]));
+  ['journals','performanceLogs','workouts'].forEach(k=>merged[k]=compactHistoryRecords([...(remote[k]||[]),...(local[k]||[])],k));
   merged.finance=mergeFinanceState(local.finance,remote.finance);merged.dailyOpenReviews={...(remote.dailyOpenReviews||{}),...(local.dailyOpenReviews||{})};merged.goalReviews={...(remote.goalReviews||{}),...(local.goalReviews||{})};merged.dailySchedules={...(remote.dailySchedules||{}),...(local.dailySchedules||{})};merged.fsChecked={...(remote.fsChecked||{}),...(local.fsChecked||{})};return merged;
 }
 function _applyCloudData(json){
@@ -1921,6 +1934,11 @@ function migrate(d){
   if(!Array.isArray(d.chores))d.chores=[];
   if(!Array.isArray(d.choreRoutines))d.choreRoutines=[];
   if(!Array.isArray(d.performanceLogs))d.performanceLogs=[];
+  if(!Array.isArray(d.journals))d.journals=[];
+  if(!Array.isArray(d.workouts))d.workouts=[];
+  d.performanceLogs=compactHistoryRecords(d.performanceLogs,'performanceLogs');
+  d.journals=compactHistoryRecords(d.journals,'journals');
+  d.workouts=compactHistoryRecords(d.workouts,'workouts');
   if(!d.finance||typeof d.finance!=='object')d.finance={};
   if(!d.finance.monthlyBudgets)d.finance.monthlyBudgets={};
   ['fixedExpenses','payments','incomes','debts','rewards'].forEach(k=>{if(!Array.isArray(d.finance[k]))d.finance[k]=[];});
@@ -3904,7 +3922,7 @@ function dailyPerformance(date){
   };
 }
 function recordDailyPerformance(date=today()){
-  const entry={...dailyPerformance(date),recordedAt:new Date().toISOString()};
+  const entry={...dailyPerformance(date),recordedAt:new Date().toISOString(),updatedAt:Date.now()};
   if(!Array.isArray(S.performanceLogs))S.performanceLogs=[];
   const i=S.performanceLogs.findIndex(x=>x.date===date);if(i>=0)S.performanceLogs[i]=entry;else S.performanceLogs.unshift(entry);
   if(date===today()){
@@ -7750,11 +7768,11 @@ ${S.journals.filter(j=>(j.topPriority||j.content||j.achievement)&&j.date!==JD).s
 function saveJournalEntry(){
   if(JT==='morning'){
     const mood=[...document.querySelectorAll('#j-mood-row .mood-btn.sel')][0]?.dataset.mood;
-    const entry={date:JD,type:'morning',mood:+mood||null,topPriority:document.getElementById('j-top')?.value.trim(),focusBlock:document.getElementById('j-focus')?.value.trim(),notToDo:document.getElementById('j-notdo')?.value.trim(),decisions:document.getElementById('j-decision')?.value.trim(),obstacle:document.getElementById('j-obstacle')?.value.trim(),commitment:document.getElementById('j-commit')?.value.trim()};
+    const entry={date:JD,type:'morning',mood:+mood||null,topPriority:document.getElementById('j-top')?.value.trim(),focusBlock:document.getElementById('j-focus')?.value.trim(),notToDo:document.getElementById('j-notdo')?.value.trim(),decisions:document.getElementById('j-decision')?.value.trim(),obstacle:document.getElementById('j-obstacle')?.value.trim(),commitment:document.getElementById('j-commit')?.value.trim(),updatedAt:Date.now()};
     S.journals=S.journals.filter(j=>!(j.date===JD&&(j.type==='morning'||!j.type)));
     if(Object.values(entry).some(v=>v&&v!==JD&&v!=='morning'))S.journals.push(entry);
   }else{
-    const entry={date:JD,type:'evening',achievement:document.getElementById('j-achievement')?.value.trim(),tomorrow:document.getElementById('j-tomorrow')?.value.trim(),reflection:document.getElementById('j-evening-reflection')?.value.trim()};
+    const entry={date:JD,type:'evening',achievement:document.getElementById('j-achievement')?.value.trim(),tomorrow:document.getElementById('j-tomorrow')?.value.trim(),reflection:document.getElementById('j-evening-reflection')?.value.trim(),updatedAt:Date.now()};
     S.journals=S.journals.filter(j=>!(j.date===JD&&j.type==='evening'));
     if(Object.values(entry).some(v=>v&&v!==JD&&v!=='evening'))S.journals.push(entry);
   }
@@ -12293,7 +12311,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260819-20';
+const APP_VERSION='20260819-21';
 
 render();
 renderSyncGate();
