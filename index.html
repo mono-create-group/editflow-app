@@ -4046,8 +4046,9 @@ function rLaterTaskItem(task){
 }
 function rTasksLater(){
   const focus=currentFocusTask();
-  const tasks=sortTaskList((S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.id!==focus?.id));
-  return`${rFocusNowCard()}<div class="later-intro"><div><div style="font-size:15px;font-weight:800">後回しリスト</div><div style="font-size:12px;color:var(--t2);margin-top:3px">「今やる」1件以外の未完了タスクは、すべてここにまとまります。</div></div><span class="badge bk">${tasks.length}件</span></div>${tasks.length?tasks.map(rLaterTaskItem).join(''):`<div class="card card-sm" style="text-align:center;color:var(--t2);padding:28px">後回しのタスクはありません。</div>`}`;
+  const isScheduled=t=>!!(t.startTime||t.fsBlockId||(t.timeSlots||[]).some(slot=>slot.s));
+  const tasks=sortTaskList((S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.id!==focus?.id&&!isScheduled(t)));
+  return`${rFocusNowCard()}<div class="later-intro"><div><div style="font-size:15px;font-weight:800">後回しリスト</div><div style="font-size:12px;color:var(--t2);margin-top:3px">「今やる」とスケジュール済みを除いた未完了タスクが、ここにまとまります。</div></div><span class="badge bk">${tasks.length}件</span></div>${tasks.length?tasks.map(rLaterTaskItem).join(''):`<div class="card card-sm" style="text-align:center;color:var(--t2);padding:28px">後回しのタスクはありません。</div>`}`;
 }
 
 function rTasksToday(){
@@ -12341,7 +12342,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260819-22';
+const APP_VERSION='20260819-23';
 
 render();
 renderSyncGate();
