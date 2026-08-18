@@ -953,6 +953,17 @@ function _decodePersonalState(raw){
   if(raw.slice(0,3)==='LZ:'){if(!window.LZString)return{};raw=LZString.decompressFromBase64(raw.slice(3));}
   try{const parsed=JSON.parse(raw);return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};}catch(_){return{};}
 }
+function captureUnsavedFormDraft(){
+  const root=document.getElementById('view');if(!root)return null;
+  const fields=[...root.querySelectorAll('input,textarea,select')].filter(el=>!['button','submit','file','password','hidden'].includes(el.type)&&!el.readOnly);
+  const counts={};return{view:V,incomeRows:{fin:root.querySelectorAll('#fin-income-rows [data-income-row]').length,daily:root.querySelectorAll('#daily-income-rows [data-income-row]').length},fields:fields.map(el=>{const base=el.id?`id:${el.id}`:`${el.tagName}|${el.type||''}|${el.className||''}|${el.getAttribute('aria-label')||''}`,index=counts[base]||0;counts[base]=index+1;return{base,index,value:el.value,checked:el.checked};})};
+}
+function restoreUnsavedFormDraft(draft){
+  if(!draft||draft.view!==V)return;
+  [['fin','fin-income-rows'],['daily','daily-income-rows']].forEach(([scope,id])=>{const box=document.getElementById(id),target=Number(draft.incomeRows?.[scope]||0);if(!box)return;while(box.querySelectorAll('[data-income-row]').length<target)box.insertAdjacentHTML('beforeend',finIncomeRowHtml(scope,box.querySelectorAll('[data-income-row]').length));});
+  const root=document.getElementById('view');if(!root)return;const fields=[...root.querySelectorAll('input,textarea,select')].filter(el=>!['button','submit','file','password','hidden'].includes(el.type)&&!el.readOnly),counts={},byKey=new Map();fields.forEach(el=>{const base=el.id?`id:${el.id}`:`${el.tagName}|${el.type||''}|${el.className||''}|${el.getAttribute('aria-label')||''}`,index=counts[base]||0;counts[base]=index+1;byKey.set(`${base}#${index}`,el);});draft.fields.forEach(item=>{const el=byKey.get(`${item.base}#${item.index}`);if(!el)return;if(el.type==='checkbox'||el.type==='radio')el.checked=!!item.checked;else el.value=item.value;});
+}
+function renderAfterCloudSync(draft){render();restoreUnsavedFormDraft(draft);}
 function _applyCloudData(json){
   if(typeof json==='string'&&json.slice(0,3)==='LZ:'){
     if(!window.LZString)return;                 // ライブラリ未ロード時はスキップ(既存Sを保持)
@@ -1011,15 +1022,15 @@ function fbSetupRealtimeSync(){
         toast('☁️ ローカルデータをクラウドに同期中…');
         return;
       }
-      _applyCloudData(doc.data().json);
+      const formDraft=captureUnsavedFormDraft();_applyCloudData(doc.data().json);
       fbSave();
-      render();
+      renderAfterCloudSync(formDraft);
       toast('☁️ クラウドから同期しました');
     } else {
       // リアルタイム更新 — クラウドが明らかに新しい場合のみ適用
       if(cloudTs>localTs+2000){
-        _applyCloudData(doc.data().json);
-        render();
+        const formDraft=captureUnsavedFormDraft();_applyCloudData(doc.data().json);
+        renderAfterCloudSync(formDraft);
         toast('📱 他のデバイスから同期しました');
       }
     }
@@ -1101,7 +1112,7 @@ function fbSetupTeamSync(){
     });
     // 経営ボード(bizBoard): オブジェクト全体を「新しい方優先」で取り込む
     if(typeof d.bizBoard==='string'){const rb=_teamDecode(d.bizBoard);if(rb&&(rb.updatedAt||0)>((S.bizBoard&&S.bizBoard.updatedAt)||0)){S.bizBoard=rb;changed=true;}}
-    if(changed){_teamSnapRebase();localStorage.setItem(DB,JSON.stringify(S));render();}
+    if(changed){const formDraft=captureUnsavedFormDraft();_teamSnapRebase();localStorage.setItem(DB,JSON.stringify(S));renderAfterCloudSync(formDraft);}
   },e=>{const c=e&&e.code;if(c==='permission-denied'&&TEAM_SHARE_OK!==false){TEAM_SHARE_OK=false;renderAuthUI();}console.warn('team share sync:',c||e);});
 }
 function signInWithGoogle(){
@@ -12246,7 +12257,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260818-07';
+const APP_VERSION='20260818-08';
 
 render();
 renderSyncGate();
