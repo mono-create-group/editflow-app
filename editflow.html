@@ -969,7 +969,7 @@ function _applyCloudData(json){
   if(window.AIBridge){const remoteTasks=Array.isArray(S.tasks)?S.tasks:[];S.tasks=AIBridge.mergeTaskChanges(localTasks,remoteTasks,_personalTaskBaseline);_personalTaskBaseline=AIBridge.taskBaseline(remoteTasks);}
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','choreRoutines','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','chores','choreRoutines','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -1865,7 +1865,7 @@ let FIN_MONTH=today().slice(0,7); // 家計簿の表示月
 let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
-  tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[],
+  tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[], performanceLogs:[],
   checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[], salesLeads:[], hpFees:[], salesSites:[], templates:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
@@ -1896,6 +1896,7 @@ function migrate(d){
   if(!Array.isArray(d.customExSets))d.customExSets=[];
   if(!Array.isArray(d.chores))d.chores=[];
   if(!Array.isArray(d.choreRoutines))d.choreRoutines=[];
+  if(!Array.isArray(d.performanceLogs))d.performanceLogs=[];
   if(!d.finance||typeof d.finance!=='object')d.finance={};
   if(!d.finance.monthlyBudgets)d.finance.monthlyBudgets={};
   ['fixedExpenses','payments','incomes','debts'].forEach(k=>{if(!Array.isArray(d.finance[k]))d.finance[k]=[];});
@@ -3545,9 +3546,10 @@ function rFinance(){
 }
 function dailyOpenGateRecord(){const td=today(),sharedKey='mono_daily_open_gate_'+td;let shared=null;try{shared=JSON.parse(localStorage.getItem(sharedKey)||'null');}catch(_){}return(S.dailyOpenReviews||{})[td]||shared;}
 function dailyIncomeRecorded(){return fin().incomes.some(x=>!x.deleted&&x.date===today());}
-function dailyOpenGatePassed(){const r=dailyOpenGateRecord();return!!(r&&r.goalConfirmed&&Number.isFinite(Number(r.achievementRate))&&dailyIncomeRecorded());}
-function submitDailyOpenGate(){const rate=Number(document.getElementById('daily-achievement-rate')?.value),confirmed=!!document.getElementById('daily-goal-confirm')?.checked,amount=Number(document.getElementById('daily-income-amount')?.value),source=(document.getElementById('daily-income-source')?.value||'日次収入').trim();if(!confirmed)return toast('社内目標を確認してチェックしてください','warn');if(!Number.isFinite(rate)||rate<0||rate>100)return toast('達成率を0〜100%で入力してください','warn');if(!dailyIncomeRecorded()&&(!Number.isFinite(amount)||amount<0))return toast('今日の収入額を0円以上で入力してください','warn');const td=today(),record={date:td,goalConfirmed:true,achievementRate:rate,confirmedAt:Date.now()};if(!S.dailyOpenReviews)S.dailyOpenReviews={};S.dailyOpenReviews[td]=record;try{localStorage.setItem('mono_daily_open_gate_'+td,JSON.stringify(record));}catch(_){}if(!dailyIncomeRecorded())fin().incomes.push({id:uid(),date:td,amount,source,createdAt:Date.now(),dailyRequired:true});save();render();toast('本日の確認と収入記録が完了しました');}
-function rDailyOpenGate(appName){const r=dailyOpenGateRecord(),hasIncome=dailyIncomeRecorded(),target=Number(S.settings?.target||0),rev=thisMonthRev();return`<section class="fin-gate" role="dialog" aria-labelledby="daily-gate-title"><div class="fin-kicker" style="color:#2563eb">${esc(appName)} DAILY CHECK</div><h2 id="daily-gate-title">目標確認と本日の記録</h2><div class="fin-help">以下を完了するまでアプリは開きません。毎日、目標との差を数字で確認します。</div><div class="fin-alert"><b>社内目標</b><br>${esc(BIZ_BOARD?.north||'今月の目標を達成する')}<br>${target?`今月の収益目標 ${finMoney(target)} / 現在 ${finMoney(rev)}`:'目標・KPI管理に設定された目標を確認してください。'}</div><div class="fin-form"><label class="wide" style="flex-direction:row;align-items:center;min-height:44px"><input id="daily-goal-confirm" type="checkbox" style="width:22px;height:22px" ${r?.goalConfirmed?'checked':''}>社内目標を確認しました</label><label class="wide">現在の達成率（0〜100%）<input id="daily-achievement-rate" type="number" min="0" max="100" inputmode="decimal" value="${r?.achievementRate??''}" placeholder="例：45"></label>${hasIncome?'<div class="fin-alert wide">今日の収入は記録済みです。</div>':`<label>今日の収入額（0円の日も必須）<input id="daily-income-amount" type="number" min="0" inputmode="numeric" placeholder="0"></label><label>収入源<input id="daily-income-source" placeholder="案件名・売上など"></label>`}<button class="btn btn-p wide" style="min-height:48px" onclick="submitDailyOpenGate()">確認してアプリを開く</button></div></section>`;}
+function dailyTaskPerformanceRecorded(){return(S.performanceLogs||[]).some(x=>x.date===today())||!!dailyOpenGateRecord()?.taskPerformanceRecorded;}
+function submitDailyOpenGate(){const confirmed=!!document.getElementById('daily-goal-confirm')?.checked,amount=Number(document.getElementById('daily-income-amount')?.value),source=(document.getElementById('daily-income-source')?.value||'日次収入').trim();if(!dailyTaskPerformanceRecorded())return toast('先に既存の「今日の達成率」を記録してください','warn');if(!confirmed)return toast('社内目標を確認してチェックしてください','warn');if(!dailyIncomeRecorded()&&(!Number.isFinite(amount)||amount<0))return toast('今日の収入額を0円以上で入力してください','warn');const td=today(),old=dailyOpenGateRecord()||{},record={...old,date:td,goalConfirmed:true,confirmedAt:Date.now()};if(!S.dailyOpenReviews)S.dailyOpenReviews={};S.dailyOpenReviews[td]=record;try{localStorage.setItem('mono_daily_open_gate_'+td,JSON.stringify(record));}catch(_){}if(!dailyIncomeRecorded())fin().incomes.push({id:uid(),date:td,amount,source,createdAt:Date.now(),dailyRequired:true});save();render();toast('本日の確認と収入記録が完了しました');}
+function dailyOpenGatePassed(){const r=dailyOpenGateRecord();return!!(r&&r.goalConfirmed&&dailyTaskPerformanceRecorded()&&dailyIncomeRecorded());}
+function rDailyOpenGate(appName){const r=dailyOpenGateRecord(),hasIncome=dailyIncomeRecorded(),recorded=dailyTaskPerformanceRecorded(),p=dailyPerformance(today()),taskRate=p.rate(p.tasks.done,p.tasks.total),target=Number(S.settings?.target||0),rev=thisMonthRev();return`<section class="fin-gate" role="dialog" aria-labelledby="daily-gate-title"><div class="fin-kicker" style="color:#2563eb">${esc(appName)} DAILY CHECK</div><h2 id="daily-gate-title">目標確認と本日の記録</h2><div class="fin-help">以下を完了するまでアプリは開きません。達成率は既存のタスク達成率から自動計算します。</div><div class="fin-alert"><b>社内目標</b><br>${esc(BIZ_BOARD?.north||'今月の目標を達成する')}<br>${target?`今月の収益目標 ${finMoney(target)} / 現在 ${finMoney(rev)}`:'目標・KPI管理に設定された目標を確認してください。'}</div><div class="fin-alert"><b>今日のタスク達成率 ${taskRate}%</b><br>完了 ${p.tasks.done}件 / 対象 ${p.tasks.total}件<br><button class="btn ${recorded?'btn-g':'btn-p'}" style="margin-top:9px;width:100%" onclick="recordDailyPerformance(today())">${recorded?'記録済み（再記録する）':'既存の達成率へ記録する'}</button></div><div class="fin-form"><label class="wide" style="flex-direction:row;align-items:center;min-height:44px"><input id="daily-goal-confirm" type="checkbox" style="width:22px;height:22px" ${r?.goalConfirmed?'checked':''}>社内目標を確認しました</label>${hasIncome?'<div class="fin-alert wide">今日の収入は記録済みです。</div>':`<label>今日の収入額（0円の日も必須）<input id="daily-income-amount" type="number" min="0" inputmode="numeric" placeholder="0"></label><label>収入源<input id="daily-income-source" placeholder="案件名・売上など"></label>`}<button class="btn btn-p wide" style="min-height:48px" onclick="submitDailyOpenGate()">確認してアプリを開く</button></div></section>`;}
 
 // ===DASHBOARD===
 function rDashTeamSummary(){
@@ -3857,6 +3859,12 @@ function recordDailyPerformance(date=today()){
   const entry={...dailyPerformance(date),recordedAt:new Date().toISOString()};
   if(!Array.isArray(S.performanceLogs))S.performanceLogs=[];
   const i=S.performanceLogs.findIndex(x=>x.date===date);if(i>=0)S.performanceLogs[i]=entry;else S.performanceLogs.unshift(entry);
+  if(date===today()){
+    if(!S.dailyOpenReviews)S.dailyOpenReviews={};
+    const review=S.dailyOpenReviews[date]||{};
+    S.dailyOpenReviews[date]={...review,date,taskPerformanceRecorded:true,taskPerformanceRate:performanceMetricRate(entry.tasks),taskPerformanceRecordedAt:entry.recordedAt};
+    try{const key='mono_daily_open_gate_'+date,shared=JSON.parse(localStorage.getItem(key)||'{}');localStorage.setItem(key,JSON.stringify({...shared,...S.dailyOpenReviews[date]}));}catch(_){}
+  }
   save();render();toast('📈 今日の達成率を記録しました');
 }
 let PERF_MONTH='all';
@@ -12229,7 +12237,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260818-03';
+const APP_VERSION='20260818-05';
 
 render();
 renderSyncGate();
