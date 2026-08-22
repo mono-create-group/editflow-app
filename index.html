@@ -3992,6 +3992,8 @@ function currentFocusTask(){
   const id=S.settings?.nowTaskId||S.frogId;
   return(S.tasks||[]).find(t=>t.id===id&&!t.deleted&&!t.done)||null;
 }
+function isTaskOverdue(t){return!!(!t?.deleted&&!t?.done&&t.dueDate&&t.dueDate<today());}
+function isTaskScheduled(t){return!!(t?.startTime||t?.fsBlockId||(t?.timeSlots||[]).some(slot=>slot.s));}
 function taskSetNow(id){
   const task=(S.tasks||[]).find(t=>t.id===id&&!t.deleted&&!t.done);if(!task)return;
   if(!S.settings)S.settings={};
@@ -4046,9 +4048,10 @@ function rLaterTaskItem(task){
 }
 function rTasksLater(){
   const focus=currentFocusTask();
-  const isScheduled=t=>!!(t.startTime||t.fsBlockId||(t.timeSlots||[]).some(slot=>slot.s));
-  const tasks=sortTaskList((S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.id!==focus?.id&&!isScheduled(t)));
-  return`${rFocusNowCard()}<div class="later-intro"><div><div style="font-size:15px;font-weight:800">後回しリスト</div><div style="font-size:12px;color:var(--t2);margin-top:3px">「今やる」とスケジュール済みを除いた未完了タスクが、ここにまとまります。</div></div><span class="badge bk">${tasks.length}件</span></div>${tasks.length?tasks.map(rLaterTaskItem).join(''):`<div class="card card-sm" style="text-align:center;color:var(--t2);padding:28px">後回しのタスクはありません。</div>`}`;
+  // 期限超過は予定済み・「今やる」指定より優先して後回しへ表示する。保存値は変更しない。
+  const tasks=sortTaskList((S.tasks||[]).filter(t=>!t.deleted&&!t.done&&(isTaskOverdue(t)||(t.id!==focus?.id&&!isTaskScheduled(t)))));
+  const overdueCount=tasks.filter(isTaskOverdue).length;
+  return`${rFocusNowCard()}<div class="later-intro"><div><div style="font-size:15px;font-weight:800">後回しリスト</div><div style="font-size:12px;color:var(--t2);margin-top:3px">期限超過のタスクは、予定済み・「今やる」指定にかかわらず自動でここに表示します。</div></div><span class="badge ${overdueCount?'br':'bk'}">${tasks.length}件${overdueCount?`・期限超過 ${overdueCount}件`:''}</span></div>${tasks.length?tasks.map(rLaterTaskItem).join(''):`<div class="card card-sm" style="text-align:center;color:var(--t2);padding:28px">後回しのタスクはありません。</div>`}`;
 }
 
 function rTasksToday(){
@@ -12342,7 +12345,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260819-23';
+const APP_VERSION='20260822-01';
 
 render();
 renderSyncGate();
