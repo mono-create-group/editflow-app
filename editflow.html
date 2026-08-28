@@ -160,6 +160,11 @@ a{color:inherit;text-decoration:none}
 .focus-now-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.focus-now-actions .btn{min-height:44px}
 .later-intro{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;margin-bottom:12px;background:var(--card2);border:1.5px solid var(--border);border-radius:12px}
 .later-task{align-items:center}.later-task .task-body{cursor:pointer}.later-actions{display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap}.later-actions .btn{min-height:40px}
+.decision-card{border-left:3px solid var(--amber)}
+.decision-card.decided{border-left-color:var(--green);opacity:.78}
+.decision-result{margin-top:8px;padding:9px 11px;border-radius:8px;background:var(--gdim);color:var(--text);font-size:12px;line-height:1.6}
+.session-card{border-left:3px solid var(--blue)}
+.session-card.done-item{border-left-color:var(--green);opacity:.72}
 @media(max-width:700px){.focus-now-card{padding:16px 14px}.focus-now-title{font-size:18px}.later-intro{align-items:flex-start;flex-direction:column}.later-task{flex-wrap:wrap}.later-task .task-body{flex-basis:calc(100% - 40px)}.later-actions{width:100%;padding-left:38px}.later-actions .btn{flex:1;min-height:44px}}
 .chk{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .chk:hover{border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,40,217,0.1)}
@@ -986,6 +991,7 @@ function compactHistoryRecords(records,type){
 }
 function mergeFinanceState(localFinance,remoteFinance){const l=localFinance||{},r=remoteFinance||{},merged={...r,...l,monthlyBudgets:{...(r.monthlyBudgets||{}),...(l.monthlyBudgets||{})},savings:{...(r.savings||{}),...(l.savings||{})}};['fixedExpenses','payments','incomes','debts','rewards'].forEach(k=>merged[k]=mergeRecordArrays(l[k],r[k]));return merged;}
 function mergeCloudStateWithLocal(local,remote){
+  remote={...remote,decisions:mergeRecordArrays(local.decisions,remote.decisions),sessionTasks:mergeRecordArrays(local.sessionTasks,remote.sessionTasks)};
   const merged={...remote};const arrays=['habits','jobs','logs','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','choreRoutines','meals','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];arrays.forEach(k=>merged[k]=mergeRecordArrays(local[k],remote[k]));
   ['journals','performanceLogs','workouts'].forEach(k=>merged[k]=compactHistoryRecords([...(remote[k]||[]),...(local[k]||[])],k));
   merged.finance=mergeFinanceState(local.finance,remote.finance);merged.dailyOpenReviews={...(remote.dailyOpenReviews||{}),...(local.dailyOpenReviews||{})};merged.goalReviews={...(remote.goalReviews||{}),...(local.goalReviews||{})};merged.dailySchedules={...(remote.dailySchedules||{}),...(local.dailySchedules||{})};merged.fsChecked={...(remote.fsChecked||{}),...(local.fsChecked||{})};return merged;
@@ -1902,7 +1908,7 @@ let FIN_MONTH=today().slice(0,7); // 家計簿の表示月
 let JOB_SORT='deadline'; // job sort order
 
 function defState(){return{
-  tasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[], performanceLogs:[],
+  tasks:[], decisions:[], sessionTasks:[], clients:[], jobs:[], habits:[], goals:[], journals:[], logs:[], rewards:[], performanceLogs:[],
   checkIns:[], workouts:[], workers:[], memos:[], meals:[], pipeline:[], teamKgis:[], teamKpis:[], teamPosts:[], teamDocs:[], salesLeads:[], hpFees:[], salesSites:[], templates:[],
   fs:JSON.parse(JSON.stringify(DEFAULT_FS)),
   dailySchedules:{},
@@ -1934,6 +1940,8 @@ function migrate(d){
   if(!Array.isArray(d.chores))d.chores=[];
   if(!Array.isArray(d.choreRoutines))d.choreRoutines=[];
   if(!Array.isArray(d.performanceLogs))d.performanceLogs=[];
+  if(!Array.isArray(d.decisions))d.decisions=[];
+  if(!Array.isArray(d.sessionTasks))d.sessionTasks=[];
   if(!Array.isArray(d.journals))d.journals=[];
   if(!Array.isArray(d.workouts))d.workouts=[];
   d.performanceLogs=compactHistoryRecords(d.performanceLogs,'performanceLogs');
@@ -3984,13 +3992,104 @@ function rDailyPerformanceCard(date){
   return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b>📈 今日の達成率</b><div style="display:flex;gap:6px"><button class="btn btn-g btn-xs" onclick="V='performance';render()">履歴一覧</button><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('✅','タスク',p.tasks)}${item('📅','スケジュール',p.schedule)}${item('🕐','固定スケジュール',p.fixedSchedule)}${item('🔥','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(historyLine).join('　')}</div>`:''}</div>`;
 }
 function rTasks(){
+  const isDecisionView=TV==='decisions',isSessionView=TV==='sessions';
+  const pendingDecisions=(S.decisions||[]).filter(d=>!d.deleted&&d.status!=='decided').length;
+  const activeSessions=(S.sessionTasks||[]).filter(t=>!t.deleted&&!t.done).length;
   const sortSel=`<select onchange="setTaskSort(this.value)" style="font-size:11px;padding:3px 7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text)">${TASK_SORT_OPTS.map(([v,l])=>`<option value="${v}" ${getTaskSort()===v?'selected':''}>${l}</option>`).join('')}</select>`;
-  return`<div class="ph"><div class="ph-title">タスク管理</div><div style="display:flex;gap:7px;align-items:center">${sortSel}<button class="btn btn-p" onclick="openTaskModal()">＋ タスク追加</button></div></div>
-${rGoalActionWidget()}
-${subTabs([['today','今やる'],['later','後回し'],['tomorrow','明日'],['weekly','週間'],['monthly','月間'],['schedule','スケジュール']],TV,'setTV')}
-${{today:rTasksToday,later:rTasksLater,tomorrow:rTasksTomorrow,weekly:rTasksWeekly,monthly:rTasksMonthly,schedule:rTasksSchedule}[TV]?.()??rTasksToday()}`;
+  const headerActions=isDecisionView
+    ?`<button class="btn btn-p" onclick="openDecisionModal()">＋ 判断事項を追加</button>`
+    :isSessionView
+    ?`<button class="btn btn-p" onclick="openSessionTaskModal()">＋ セッションを追加</button>`
+    :`${sortSel}<button class="btn btn-p" onclick="openTaskModal()">＋ タスク追加</button>`;
+  return`<div class="ph"><div class="ph-title">タスク管理</div><div style="display:flex;gap:7px;align-items:center">${headerActions}</div></div>
+${isDecisionView||isSessionView?'':rGoalActionWidget()}
+${subTabs([['today','今やる'],['later','後回し'],['sessions',`進行中セッション${activeSessions?` (${activeSessions})`:''}`],['decisions',`判断するべき事項${pendingDecisions?` (${pendingDecisions})`:''}`],['tomorrow','明日'],['weekly','週間'],['monthly','月間'],['schedule','スケジュール']],TV,'setTV')}
+${{today:rTasksToday,later:rTasksLater,sessions:rSessionTasks,decisions:rDecisions,tomorrow:rTasksTomorrow,weekly:rTasksWeekly,monthly:rTasksMonthly,schedule:rTasksSchedule}[TV]?.()??rTasksToday()}`;
 }
 function setTV(v){TV=v;if(v==='weekly')WO=0;if(v==='monthly')MO=0;render();}
+
+function decisionPriorityMeta(priority){
+  return{high:{label:'優先度 高',cls:'br',rank:0},medium:{label:'優先度 中',cls:'ba',rank:1},low:{label:'優先度 低',cls:'bk',rank:2}}[priority]||{label:'優先度なし',cls:'bk',rank:3};
+}
+function sortDecisionList(list){
+  return[...list].sort((a,b)=>{
+    const pr=decisionPriorityMeta(a.priority).rank-decisionPriorityMeta(b.priority).rank;if(pr)return pr;
+    const da=a.deadline||'9999-12-31',db=b.deadline||'9999-12-31';if(da!==db)return da.localeCompare(db);
+    return Number(b.updatedAt||b.createdAt||0)-Number(a.updatedAt||a.createdAt||0);
+  });
+}
+function rDecisionItem(d){
+  const decided=d.status==='decided',overdue=!decided&&d.deadline&&d.deadline<today(),pm=decisionPriorityMeta(d.priority);
+  return`<div class="task-item later-task decision-card ${decided?'decided':''} ${overdue?'overdue':''}" id="decision-${d.id}">
+  <div class="chk ${decided?'done':''}" onclick="${decided?`reopenDecision('${d.id}')`:`openDecisionModal('${d.id}',true)`}" title="${decided?'未決に戻す':'判断を記録'}"></div>
+  <div class="task-body" onclick="openDecisionModal('${d.id}')"><div class="task-ttl ${decided?'done':''}">${esc(d.title)}</div>
+    ${d.context?`<div style="font-size:12px;color:var(--t2);margin-top:3px;line-height:1.55;white-space:pre-wrap">${esc(d.context)}</div>`:''}
+    <div class="task-meta"><span class="badge ${pm.cls}">${pm.label}</span>${d.deadline?`<span class="badge ${overdue?'br':'bk'}">判断期限 ${fmt(d.deadline)}</span>`:'<span class="badge bk">期限なし</span>'}<span class="badge ${decided?'bg':'ba'}">${decided?'判断済み':'判断待ち'}</span></div>
+    ${decided&&d.result?`<div class="decision-result" style="white-space:pre-wrap"><strong>判断結果</strong><br>${esc(d.result)}</div>`:''}
+  </div>
+  <div class="later-actions">${decided?`<button class="btn btn-g btn-sm" onclick="reopenDecision('${d.id}')">未決に戻す</button>`:`<button class="btn btn-p btn-sm" onclick="openDecisionModal('${d.id}',true)">判断する</button>`}<button class="btn btn-g btn-sm" onclick="openDecisionModal('${d.id}')">編集</button><button class="btn btn-g btn-sm" style="color:var(--red);border-color:var(--red)" onclick="delDecision('${d.id}')">削除</button></div>
+  </div>`;
+}
+function rDecisions(){
+  const active=(S.decisions||[]).filter(d=>!d.deleted),pending=sortDecisionList(active.filter(d=>d.status!=='decided'));
+  const decided=[...active.filter(d=>d.status==='decided')].sort((a,b)=>Number(b.decidedAt||b.updatedAt||0)-Number(a.decidedAt||a.updatedAt||0));
+  return`<div class="later-intro"><div><div style="font-size:15px;font-weight:800">判断するべき事項</div><div style="font-size:12px;color:var(--t2);margin-top:3px">まだ決めきれていない事項と、決めた結果を一緒に残せます。</div></div><span class="badge ${pending.length?'ba':'bk'}">判断待ち ${pending.length}件</span></div>
+  ${pending.length?pending.map(rDecisionItem).join(''):`<div class="card card-sm" style="text-align:center;color:var(--t2);padding:28px"><div style="font-weight:700;color:var(--text);margin-bottom:5px">判断待ちの事項はありません</div><button class="btn btn-p btn-sm" style="margin-top:10px" onclick="openDecisionModal()">＋ 判断事項を追加</button></div>`}
+  ${decided.length?`${secTitle(`判断済み (${decided.length}件)`)}${decided.map(rDecisionItem).join('')}`:''}`;
+}
+function openDecisionModal(id,recordResult=false){
+  const d=id?(S.decisions||[]).find(x=>x.id===id&&!x.deleted):null,status=recordResult?'decided':(d?.status||'pending');
+  openModal(`<div class="mhdr"><div class="mtitle">${d?'判断事項を編集':'判断事項を追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  <div class="fg"><div class="fl">判断する事項 *</div><input id="dec-title" value="${esc(d?.title||'')}" placeholder="例：この案件を受けるか"></div>
+  <div class="fg"><div class="fl">背景・確認したいこと</div><textarea id="dec-context" rows="3" placeholder="判断に必要な前提や、迷っている点">${esc(d?.context||'')}</textarea></div>
+  <div class="frow"><div class="fg"><div class="fl">判断期限</div><input type="date" id="dec-deadline" value="${d?.deadline||''}"></div><div class="fg"><div class="fl">優先度</div><select id="dec-priority"><option value="">なし</option><option value="high" ${d?.priority==='high'?'selected':''}>高</option><option value="medium" ${d?.priority==='medium'?'selected':''}>中</option><option value="low" ${d?.priority==='low'?'selected':''}>低</option></select></div></div>
+  <div class="fg"><div class="fl">状態</div><select id="dec-status" onchange="document.getElementById('dec-result-wrap').style.display=this.value==='decided'?'block':'none'"><option value="pending" ${status!=='decided'?'selected':''}>判断待ち</option><option value="decided" ${status==='decided'?'selected':''}>判断済み</option></select></div>
+  <div class="fg" id="dec-result-wrap" style="display:${status==='decided'?'block':'none'}"><div class="fl">判断結果 *</div><textarea id="dec-result" rows="3" placeholder="最終的にどう決めたか">${esc(d?.result||'')}</textarea><div class="fhint">「判断済み」にする場合は、結果を残してください。</div></div>
+  <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="saveDecision('${id||''}')">保存</button></div>`);
+  setTimeout(()=>document.getElementById(recordResult?'dec-result':'dec-title')?.focus(),0);
+}
+function saveDecision(id){
+  const title=document.getElementById('dec-title')?.value.trim();if(!title){toast('判断する事項を入力してください','err');return;}
+  const status=document.getElementById('dec-status')?.value==='decided'?'decided':'pending',result=document.getElementById('dec-result')?.value.trim()||'';
+  if(status==='decided'&&!result){toast('判断結果を入力してください','err');return;}
+  const now=Date.now(),data={title,context:document.getElementById('dec-context')?.value.trim()||'',deadline:document.getElementById('dec-deadline')?.value||null,priority:document.getElementById('dec-priority')?.value||null,status,result,updatedAt:now,decidedAt:status==='decided'?now:null};
+  if(!Array.isArray(S.decisions))S.decisions=[];
+  if(id){const d=S.decisions.find(x=>x.id===id&&!x.deleted);if(!d)return;if(status==='decided'&&d.status==='decided'&&d.decidedAt)data.decidedAt=d.decidedAt;Object.assign(d,data);}else S.decisions.unshift({id:uid(),createdAt:now,deleted:false,...data});
+  save();closeModal();render();toast(id?'判断事項を更新しました':'判断事項を追加しました');
+}
+function reopenDecision(id){const d=(S.decisions||[]).find(x=>x.id===id&&!x.deleted);if(!d)return;d.status='pending';d.decidedAt=null;d.updatedAt=Date.now();save();render();toast('判断待ちに戻しました');}
+function delDecision(id){const d=(S.decisions||[]).find(x=>x.id===id&&!x.deleted);if(!d)return;if(!confirm(`「${d.title}」を削除しますか？`))return;d.deleted=true;d.updatedAt=Date.now();save();closeModal();render();toast('判断事項を削除しました');}
+
+function rSessionTaskItem(t){
+  return`<div class="task-item later-task session-card ${t.done?'done-item':''}" id="session-task-${t.id}">
+  <div class="chk ${t.done?'done':''}" onclick="toggleSessionTaskDone('${t.id}')" title="${t.done?'進行中に戻す':'完了にする'}"></div>
+  <div class="task-body" onclick="openSessionTaskModal('${t.id}')"><div class="task-ttl ${t.done?'done':''}">${esc(t.title)}</div>${t.objective?`<div style="font-size:12px;color:var(--t2);margin-top:3px;line-height:1.55;white-space:pre-wrap">${esc(t.objective)}</div>`:''}<div class="task-meta"><span class="badge ${t.done?'bg':'bb'}">${t.done?'完了':'進行中'}</span>${t.threadId?'<span class="badge bk">Codexセッション</span>':''}</div></div>
+  <div class="later-actions">${t.done?`<button class="btn btn-g btn-sm" onclick="toggleSessionTaskDone('${t.id}')">進行中に戻す</button>`:''}<button class="btn btn-g btn-sm" onclick="openSessionTaskModal('${t.id}')">編集</button><button class="btn btn-g btn-sm" style="color:var(--red);border-color:var(--red)" onclick="delSessionTask('${t.id}')">削除</button></div>
+  </div>`;
+}
+function rSessionTasks(){
+  const all=(S.sessionTasks||[]).filter(t=>!t.deleted),active=[...all.filter(t=>!t.done)].sort((a,b)=>Number(b.updatedAt||0)-Number(a.updatedAt||0)),done=[...all.filter(t=>t.done)].sort((a,b)=>Number(b.doneAt||0)-Number(a.doneAt||0));
+  return`<div class="later-intro"><div><div style="font-size:15px;font-weight:800">進行中セッション</div><div style="font-size:12px;color:var(--t2);margin-top:3px">各セッションが今解決しようとしていることを、タスクと同じ形で確認できます。セッション完了後、確認に「完了する」と答えた場合だけチェックされます。</div></div><span class="badge ${active.length?'bb':'bk'}">進行中 ${active.length}件</span></div>
+  ${active.length?active.map(rSessionTaskItem).join(''):`<div class="card card-sm" style="text-align:center;color:var(--t2);padding:28px"><div style="font-weight:700;color:var(--text);margin-bottom:5px">進行中のセッションはありません</div><button class="btn btn-p btn-sm" style="margin-top:10px" onclick="openSessionTaskModal()">＋ セッションを追加</button></div>`}
+  ${done.length?`${secTitle(`完了済みセッション (${done.length}件)`)}${done.map(rSessionTaskItem).join('')}`:''}`;
+}
+function openSessionTaskModal(id){
+  const t=id?(S.sessionTasks||[]).find(x=>x.id===id&&!x.deleted):null;
+  openModal(`<div class="mhdr"><div class="mtitle">${t?'セッションタスクを編集':'セッションを追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  <div class="fg"><div class="fl">セッション名 *</div><input id="st-title" value="${esc(t?.title||'')}" placeholder="Codexのタスク名"></div>
+  <div class="fg"><div class="fl">今、何を解決しようとしているか *</div><textarea id="st-objective" rows="4" placeholder="このセッションの目的と完了条件">${esc(t?.objective||'')}</textarea></div>
+  <div class="fg"><div class="fl">CodexセッションID</div><input id="st-thread" value="${esc(t?.threadId||'')}" placeholder="任意"><div class="fhint">同名セッションの識別に使います。</div></div>
+  <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="saveSessionTask('${id||''}')">保存</button></div>`);document.getElementById('st-title')?.focus();
+}
+function saveSessionTask(id){
+  const title=document.getElementById('st-title')?.value.trim(),objective=document.getElementById('st-objective')?.value.trim();
+  if(!title||!objective){toast('セッション名と、解決しようとしていることを入力してください','err');return;}
+  const now=Date.now(),data={title,objective,threadId:document.getElementById('st-thread')?.value.trim()||'',updatedAt:now};if(!Array.isArray(S.sessionTasks))S.sessionTasks=[];
+  if(id){const t=S.sessionTasks.find(x=>x.id===id&&!x.deleted);if(!t)return;Object.assign(t,data);}else S.sessionTasks.unshift({id:uid(),done:false,deleted:false,createdAt:now,doneAt:null,...data});
+  save();closeModal();render();toast(id?'セッションタスクを更新しました':'セッションタスクを追加しました');
+}
+function toggleSessionTaskDone(id){const t=(S.sessionTasks||[]).find(x=>x.id===id&&!x.deleted);if(!t)return;t.done=!t.done;t.doneAt=t.done?Date.now():null;t.updatedAt=Date.now();save();render();toast(t.done?'セッションタスクを完了にしました':'セッションタスクを進行中に戻しました');}
+function delSessionTask(id){const t=(S.sessionTasks||[]).find(x=>x.id===id&&!x.deleted);if(!t)return;if(!confirm(`「${t.title}」を削除しますか？`))return;t.deleted=true;t.updatedAt=Date.now();save();closeModal();render();toast('セッションタスクを削除しました');}
 
 function currentFocusTask(){
   const id=S.settings?.nowTaskId||S.frogId;
@@ -12349,7 +12448,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260825-02';
+const APP_VERSION='20260828-01';
 
 render();
 renderSyncGate();
