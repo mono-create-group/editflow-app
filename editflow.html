@@ -905,38 +905,68 @@ firebase.initializeApp({
 });
 const fbAuth=firebase.auth();
 const fbDb=firebase.firestore();
+// 同じブラウザでEditFlowを複数タブ開いても、Firestoreへの接続は1本にまとめる。
+// 端末内キャッシュはSDKが管理し、無料枠回復後の再同期にも利用する。
+const _fbPersistenceReady=fbDb.enablePersistence({synchronizeTabs:true}).catch(e=>{
+  const code=(e&&e.code)||'';
+  if(code!=='failed-precondition'&&code!=='unimplemented')console.warn('Firestore persistence:',code||e);
+});
 let FB_USER=null;
 let _fbSaveTimer=null;
 let _fbUnsubscribe=null;
 let _personalTaskBaseline=new Map();
 let _authSettled=false;
+let PERSONAL_SYNC_STATE='checking';
+let _fbSaveInFlight=false;
+let _fbSaveQueued=false;
+let _lastPersonalSyncSignature='';
+let _lastTeamSaveSignature='';
+let _fbQuotaBlockedUntil=(()=>{try{return Number(sessionStorage.getItem('ef_sync_quota_until')||0);}catch(_){return 0;}})();
+let _fbQuotaResumeTimer=null;
+const FB_SAVE_DEBOUNCE_MS=12000;
+
+function _personalSyncSignature(value){const clean={...(value||{})};delete clean._savedAt;return JSON.stringify(clean);}
+function _setPersonalRemoteBaseline(raw){_lastPersonalSyncSignature=_personalSyncSignature(_decodePersonalState(raw));}
+function _setPersonalSyncState(state){if(PERSONAL_SYNC_STATE===state)return;PERSONAL_SYNC_STATE=state;if(typeof renderAuthUI==='function')renderAuthUI();}
+function _firestoreErrorCode(e){return String((e&&e.code)||'').replace(/^firestore\//,'');}
+function _pacificParts(ms){const out={};new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date(ms)).forEach(p=>{if(p.type!=='literal')out[p.type]=Number(p.value);});return out;}
+function _pacificMidnightUtc(year,month,day){let guess=Date.UTC(year,month-1,day,8);for(let i=0;i<3;i++){const p=_pacificParts(guess),actual=Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second),target=Date.UTC(year,month-1,day);guess+=target-actual;}return guess;}
+function _nextFirestoreQuotaResumeAt(now=Date.now()){const p=_pacificParts(now),next=new Date(Date.UTC(p.year,p.month-1,p.day)+86400000);return _pacificMidnightUtc(next.getUTCFullYear(),next.getUTCMonth()+1,next.getUTCDate())+15*60*1000;}
+function _isFirestoreQuotaBlocked(){if(!_fbQuotaBlockedUntil)return false;if(Date.now()<_fbQuotaBlockedUntil)return true;_fbQuotaBlockedUntil=0;try{sessionStorage.removeItem('ef_sync_quota_until');}catch(_){}return false;}
+function _scheduleQuotaResume(){clearTimeout(_fbQuotaResumeTimer);if(!_isFirestoreQuotaBlocked()||!FB_USER)return;_fbQuotaResumeTimer=setTimeout(()=>{_fbQuotaBlockedUntil=0;try{sessionStorage.removeItem('ef_sync_quota_until');}catch(_){}if(!FB_USER)return;_setPersonalSyncState('checking');fbSetupRealtimeSync();fbSetupTeamSync();},Math.max(1000,_fbQuotaBlockedUntil-Date.now()));}
+function _pauseFirestoreForQuota(){_fbQuotaBlockedUntil=_nextFirestoreQuotaResumeAt();try{sessionStorage.setItem('ef_sync_quota_until',String(_fbQuotaBlockedUntil));}catch(_){}clearTimeout(_fbSaveTimer);if(_fbUnsubscribe){_fbUnsubscribe();_fbUnsubscribe=null;}if(_teamUnsub){_teamUnsub();_teamUnsub=null;}TEAM_SHARE_OK=null;_setPersonalSyncState('quota');_scheduleQuotaResume();try{toast('クラウド無料枠の回復待ちです。入力内容はこの端末に保存します','warn');}catch(_){}}
+function _handleFirestoreError(e,source){const code=_firestoreErrorCode(e);if(code==='resource-exhausted'||/quota exceeded/i.test(String(e&&e.message||''))){_pauseFirestoreForQuota();return true;}if(code==='unavailable'||code==='deadline-exceeded'||code==='network-request-failed'){_setPersonalSyncState('offline');return false;}_setPersonalSyncState('error');console.warn(source+':',code||e);return false;}
+
+async function _flushFirebaseSave(){
+  if(!FB_USER||_isFirestoreQuotaBlocked())return;
+  if(_fbSaveInFlight){_fbSaveQueued=true;return;}
+  _fbSaveInFlight=true;
+  _fbSaveQueued=false;
+  try{
+    _stampTeamChanges();
+    if(window.AIBridge)AIBridge.stampChangedTasks(S.tasks||[],_personalTaskBaseline);
+    const ref=fbDb.collection('users').doc(FB_USER.uid),local=_decodePersonalState(_packState()),signature=_personalSyncSignature(local);
+    if(signature!==_lastPersonalSyncSignature){
+      _setPersonalSyncState('saving');
+      await ref.set({json:_packPersonalState(local),ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      _lastPersonalSyncSignature=signature;
+      if(window.AIBridge)_personalTaskBaseline=AIBridge.taskBaseline(local.tasks||[]);
+    }
+    await _teamSave();
+    if(!_isFirestoreQuotaBlocked())_setPersonalSyncState('synced');
+  }catch(e){_handleFirestoreError(e,'Firestore save error');}
+  finally{
+    _fbSaveInFlight=false;
+    if(_fbSaveQueued&&!_isFirestoreQuotaBlocked())fbSave();
+  }
+}
 
 function fbSave(){
-  if(!FB_USER)return;
+  if(!FB_USER||_isFirestoreQuotaBlocked())return;
   S._uid=FB_USER.uid;
   clearTimeout(_fbSaveTimer);
-  _fbSaveTimer=setTimeout(()=>{
-    _stampTeamChanges();
-    const mergeBaseline=_personalTaskBaseline;
-    if(window.AIBridge)AIBridge.stampChangedTasks(S.tasks||[],_personalTaskBaseline);
-    const ref=fbDb.collection('users').doc(FB_USER.uid);
-    const local=_decodePersonalState(_packState());
-    const saveBaseline=window.AIBridge?AIBridge.taskBaseline(local.tasks||[]):new Map();
-    let committedTasks=local.tasks||[];
-    fbDb.runTransaction(async tx=>{
-      const snap=await tx.get(ref),remote=_decodePersonalState(snap.exists?(snap.data()||{}).json:null);
-      if(window.AIBridge&&remote&&Array.isArray(remote.tasks))local.tasks=AIBridge.mergeTaskChanges(local.tasks||[],remote.tasks,mergeBaseline);
-      committedTasks=local.tasks||[];
-      tx.set(ref,{json:_packPersonalState(local),ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-    }).then(()=>{
-      if(!window.AIBridge)return;
-      AIBridge.stampChangedTasks(S.tasks||[],saveBaseline);
-      S.tasks=AIBridge.mergeTaskChanges(S.tasks||[],committedTasks,saveBaseline);
-      _personalTaskBaseline=AIBridge.taskBaseline(committedTasks);
-      try{localStorage.setItem(DB,JSON.stringify(S));}catch(e){console.warn('save error',e);}
-    }).catch(e=>console.error('Firestore save error:',e));
-    _teamSave();
-  },2000);
+  _setPersonalSyncState('pending');
+  _fbSaveTimer=setTimeout(_flushFirebaseSave,FB_SAVE_DEBOUNCE_MS);
 }
 
 // 個人ドキュメント(users/{uid})も肥大時はLZ圧縮する(Firestore 1MiB制限対策)
@@ -972,8 +1002,9 @@ function restoreUnsavedFormDraft(draft){
 function renderAfterCloudSync(draft){render();restoreUnsavedFormDraft(draft);}
 function syncBackupKeys(){try{return Object.keys(localStorage).filter(k=>k.startsWith('ef_sync_backup_')||k.startsWith('ef_v5_backup_')).sort((a,b)=>(Number(b.match(/(\d+)$/)?.[1])||0)-(Number(a.match(/(\d+)$/)?.[1])||0));}catch(_){return[];}}
 function backupLocalState(reason='cloud-sync'){
-  try{const key=`ef_sync_backup_${S._uid||'local'}_${Date.now()}`;localStorage.setItem(key,JSON.stringify({...S,_backupReason:reason,_backupAt:Date.now()}));const keys=Object.keys(localStorage).filter(k=>k.startsWith('ef_sync_backup_')).sort();while(keys.length>10)localStorage.removeItem(keys.shift());return key;}catch(e){console.warn('sync backup failed',e);return null;}
+  try{const existing=syncBackupKeys();if(existing.length>=3)return existing[0];const key=`ef_sync_backup_${S._uid||'local'}_${Date.now()}`,personal={..._decodePersonalState(_packState()),_backupReason:reason,_backupAt:Date.now()},json=JSON.stringify(personal),stored=window.LZString?'LZ1:'+LZString.compressToUTF16(json):json;localStorage.setItem(key,stored);return key;}catch(e){console.warn('sync backup skipped',e&&e.name||e);return null;}
 }
+function decodeSyncBackup(raw){if(typeof raw!=='string'||!raw)return null;if(raw.slice(0,4)==='LZ1:'){if(!window.LZString)return null;const json=LZString.decompressFromUTF16(raw.slice(4));return json?JSON.parse(json):null;}return JSON.parse(raw);}
 function mergeRecordArrays(local,remote){
   const result=[],positions=new Map();const add=(item,isLocal)=>{if(!item||typeof item!=='object'){result.push(item);return;}const key=item.id?`id:${item.id}`:item.name?`name:${item.name}`:null;if(!key){result.push(item);return;}if(!positions.has(key)){positions.set(key,result.length);result.push(item);return;}const i=positions.get(key),current=result[i]||{},currentTs=Number(current.updatedAt||current.createdAt||current.ts||0),nextTs=Number(item.updatedAt||item.createdAt||item.ts||0);if(nextTs>currentTs||(isLocal&&nextTs===currentTs))result[i]={...current,...item};};(remote||[]).forEach(x=>add(x,false));(local||[]).forEach(x=>add(x,true));return result;
 }
@@ -1019,6 +1050,7 @@ function _applyCloudData(json){
 
 function fbSetupRealtimeSync(){
   if(!FB_USER)return;
+  if(_isFirestoreQuotaBlocked()){_setPersonalSyncState('quota');_scheduleQuotaResume();return;}
   if(_fbUnsubscribe){_fbUnsubscribe();_fbUnsubscribe=null;}
   // 同じ端末で別アカウントがサインインした場合、前アカウントの個人データが
   // 新アカウントへ漏れる/上書きするのを防ぐため、ローカルを初期化してクラウド優先にする。
@@ -1041,32 +1073,37 @@ function fbSetupRealtimeSync(){
   S=migrate(S);
   let _firstLoad=true;
   _fbUnsubscribe=fbDb.collection('users').doc(FB_USER.uid).onSnapshot(doc=>{
-    if(!doc.exists||!doc.data()?.json){
-      if(_firstLoad){fbSave();_firstLoad=false;}
+    const fromCache=doc.metadata?.fromCache===true,pending=doc.metadata?.hasPendingWrites===true,data=doc.data()||{},raw=data.json||'';
+    if(!fromCache&&!pending&&raw)_setPersonalRemoteBaseline(raw);
+    if(fromCache&&!pending)_setPersonalSyncState('offline');
+    else if(!pending)_setPersonalSyncState('synced');
+    if(!doc.exists||!raw){
+      if(_firstLoad){_firstLoad=false;if(!fromCache)fbSave();}
       return;
     }
-    const cloudTs=doc.data().ts?.toMillis?.()??0;
+    const cloudTs=data.ts?.toMillis?.()??0;
     const localTs=S._savedAt||0;
     if(_firstLoad){
       _firstLoad=false;
-      if(localTs>cloudTs+1000){
+      if(!fromCache&&localTs>cloudTs+1000){
         fbSave();
         toast('☁️ ローカルデータをクラウドに同期中…');
         return;
       }
-      const formDraft=captureUnsavedFormDraft();_applyCloudData(doc.data().json);
-      fbSave();
+      const remoteSignature=_personalSyncSignature(_decodePersonalState(raw)),formDraft=captureUnsavedFormDraft();_applyCloudData(raw);
       renderAfterCloudSync(formDraft);
-      toast('☁️ クラウドから同期しました');
+      if(!fromCache&&_personalSyncSignature(_decodePersonalState(_packState()))!==remoteSignature)fbSave();
+      toast(fromCache?'端末内の保存データを表示しています':'☁️ クラウドから同期しました',fromCache?'warn':'ok');
     } else {
       // リアルタイム更新 — クラウドが明らかに新しい場合のみ適用
-      if(cloudTs>localTs+2000){
-        const formDraft=captureUnsavedFormDraft();_applyCloudData(doc.data().json);
+      if(!pending&&cloudTs>localTs+2000){
+        const remoteSignature=_personalSyncSignature(_decodePersonalState(raw)),formDraft=captureUnsavedFormDraft();_applyCloudData(raw);
         renderAfterCloudSync(formDraft);
-        toast('📱 他のデバイスから同期しました');
+        if(!fromCache&&_personalSyncSignature(_decodePersonalState(_packState()))!==remoteSignature)fbSave();
+        if(!fromCache)toast('📱 他のデバイスから同期しました');
       }
     }
-  },e=>console.error('Firestore snapshot error:',e));
+  },e=>_handleFirestoreError(e,'Firestore snapshot error'));
 }
 
 // ===チーム共有（案件・クライアント・編集者を全アカウントで共有）===
@@ -1116,24 +1153,26 @@ function mergeTeamArr(local,remote){
   (remote||[]).forEach(e=>{if(!e||!e.id)return;const ex=by[e.id];if(!ex||(e.updatedAt||0)>(ex.updatedAt||0))by[e.id]=e;});
   return Object.values(by);
 }
+function _teamPayloadSignature(payload){return JSON.stringify([...TEAM_KEYS.map(k=>payload[k]||''),payload.bizBoard||'']);}
 function _teamSave(){
-  if(!FB_USER||TEAM_SHARE_OK===false)return;
+  if(!FB_USER||TEAM_SHARE_OK===false||_isFirestoreQuotaBlocked())return Promise.resolve();
   const payload={ts:firebase.firestore.FieldValue.serverTimestamp(),by:FB_USER.uid};
   // salesLeadsは件数が多くFirestoreの1ドキュメント1MiB制限を超えるためLZ圧縮して格納
   // (プレフィックス "LZ:" で圧縮済みを判別。読み手は圧縮/非圧縮どちらも解釈する)
   TEAM_KEYS.forEach(k=>{payload[k]=_teamEncode(k,S[k]||[]);});
   payload.bizBoard=_teamEncode('bizBoard',S.bizBoard||{});
-  fbDb.collection('shared').doc('team').set(payload,{merge:true})
-    .then(()=>{if(TEAM_SHARE_OK!==true){TEAM_SHARE_OK=true;renderAuthUI();}})
-    .catch(e=>{const c=e&&e.code;if(c==='permission-denied'&&TEAM_SHARE_OK!==false){TEAM_SHARE_OK=false;renderAuthUI();}console.warn('team share save:',c||e);});
+  const signature=_teamPayloadSignature(payload);if(signature===_lastTeamSaveSignature)return Promise.resolve();
+  return fbDb.collection('shared').doc('team').set(payload,{merge:true})
+    .then(()=>{_lastTeamSaveSignature=signature;if(TEAM_SHARE_OK!==true){TEAM_SHARE_OK=true;renderAuthUI();}})
+    .catch(e=>{const c=_firestoreErrorCode(e);if(c==='permission-denied'){if(TEAM_SHARE_OK!==false){TEAM_SHARE_OK=false;renderAuthUI();}return;}if(_handleFirestoreError(e,'team share save'))throw e;});
 }
 function fbSetupTeamSync(){
-  if(!FB_USER)return;
+  if(!FB_USER||_isFirestoreQuotaBlocked())return;
   if(_teamUnsub){_teamUnsub();_teamUnsub=null;}
   _teamUnsub=fbDb.collection('shared').doc('team').onSnapshot(doc=>{
     if(TEAM_SHARE_OK!==true){TEAM_SHARE_OK=true;renderAuthUI();}
     if(!doc.exists){_teamSave();return;}
-    const d=doc.data()||{};
+    const d=doc.data()||{};if(doc.metadata?.hasPendingWrites!==true)_lastTeamSaveSignature=_teamPayloadSignature(d);
     let changed=false;
     TEAM_KEYS.forEach(k=>{
       if(typeof d[k]!=='string')return;
@@ -1145,7 +1184,7 @@ function fbSetupTeamSync(){
     // 経営ボード(bizBoard): オブジェクト全体を「新しい方優先」で取り込む
     if(typeof d.bizBoard==='string'){const rb=_teamDecode(d.bizBoard);if(rb&&(rb.updatedAt||0)>((S.bizBoard&&S.bizBoard.updatedAt)||0)){S.bizBoard=rb;changed=true;}}
     if(changed){const formDraft=captureUnsavedFormDraft();_teamSnapRebase();localStorage.setItem(DB,JSON.stringify(S));renderAfterCloudSync(formDraft);}
-  },e=>{const c=e&&e.code;if(c==='permission-denied'&&TEAM_SHARE_OK!==false){TEAM_SHARE_OK=false;renderAuthUI();}console.warn('team share sync:',c||e);});
+  },e=>{const c=_firestoreErrorCode(e);if(c==='permission-denied'){if(TEAM_SHARE_OK!==false){TEAM_SHARE_OK=false;renderAuthUI();}return;}_handleFirestoreError(e,'team share sync');});
 }
 function signInWithGoogle(){
   // スマホ含め全端末でポップアップ優先(タップ直結ならモバイルSafari/Chromeでも開ける)。
@@ -1217,6 +1256,15 @@ function renderSyncGate(){
   </div>`;
 }
 
+function personalSyncStatusHtml(){
+  if(PERSONAL_SYNC_STATE==='synced')return'<div style="font-size:10px;color:var(--green)">☁️ スマホ・PC同期 ON</div>';
+  if(PERSONAL_SYNC_STATE==='saving'||PERSONAL_SYNC_STATE==='pending')return'<div style="font-size:10px;color:var(--amber)">☁️ クラウドへ保存中</div>';
+  if(PERSONAL_SYNC_STATE==='quota'){const t=_fbQuotaBlockedUntil?new Date(_fbQuotaBlockedUntil).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'';return`<div style="font-size:10px;line-height:1.55;color:var(--red)">⚠️ 同期停止・無料枠回復待ち${t?'（'+t+'頃に再開）':''}<br>入力はこの端末に保存中</div>`;}
+  if(PERSONAL_SYNC_STATE==='offline')return'<div style="font-size:10px;line-height:1.55;color:var(--amber)">⚠️ クラウド確認待ち・端末内に保存中</div>';
+  if(PERSONAL_SYNC_STATE==='error')return'<div style="font-size:10px;color:var(--red)">⚠️ クラウド同期エラー</div>';
+  return'<div style="font-size:10px;color:var(--t3)">☁️ 同期状態を確認中</div>';
+}
+
 function renderAuthUI(){
   const signedOut=_isEmbeddedWebview()
     ?`<div style="font-size:11px;line-height:1.7;background:#fff4e5;border:1px solid #f0c98a;border-radius:8px;padding:10px 12px;color:#8a5a00">
@@ -1229,7 +1277,7 @@ function renderAuthUI(){
       </div>`
     :`<button onclick="signInWithGoogle()" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);display:flex;align-items:center;gap:7px;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>Googleでサインイン</button>`;
   const html=FB_USER
-    ?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)"><img src="${esc(FB_USER.photoURL||'')}" style="width:24px;height:24px;border-radius:50%;flex-shrink:0" onerror="this.style.display='none'"><div style="min-width:0"><div style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(FB_USER.displayName||FB_USER.email||'')}</div><button onclick="fbSignOut()" style="color:var(--t3);font-size:11px;padding:0">サインアウト</button>${TEAM_SHARE_OK===true?'<div style="font-size:10px;color:var(--green)">👥 チーム共有 ON</div>':TEAM_SHARE_OK===false?'<div style="font-size:10px;color:var(--t3)">👤 個人モード</div>':''}</div></div>`
+    ?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)"><img src="${esc(FB_USER.photoURL||'')}" style="width:24px;height:24px;border-radius:50%;flex-shrink:0" onerror="this.style.display='none'"><div style="min-width:0"><div style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(FB_USER.displayName||FB_USER.email||'')}</div><button onclick="fbSignOut()" style="color:var(--t3);font-size:11px;padding:0">サインアウト</button>${personalSyncStatusHtml()}${TEAM_SHARE_OK===true?'<div style="font-size:10px;color:var(--green)">👥 チーム共有 ON</div>':TEAM_SHARE_OK===false?'<div style="font-size:10px;color:var(--t3)">👤 個人モード</div>':''}</div></div>`
     :signedOut;
   const el=document.getElementById('auth-ui');if(el)el.innerHTML=html;
   const mob=document.getElementById('mob-auth-ui');if(mob)mob.innerHTML=html;
@@ -1239,16 +1287,19 @@ function renderAuthUI(){
 // ここではリダイレクト起因のエラー（例: auth/unauthorized-domain）を握りつぶすだけに留める。
 fbAuth.getRedirectResult().catch(e=>{console.warn('getRedirectResult:',e&&e.code||e);});
 
-fbAuth.onAuthStateChanged(user=>{
+fbAuth.onAuthStateChanged(async user=>{
   FB_USER=user;
   _authSettled=true;
+  _lastPersonalSyncSignature='';_lastTeamSaveSignature='';
   if(user){
-    fbSetupRealtimeSync();
-    fbSetupTeamSync();
+    await _fbPersistenceReady;
+    if(_isFirestoreQuotaBlocked()){_setPersonalSyncState('quota');_scheduleQuotaResume();}
+    else{_setPersonalSyncState('checking');fbSetupRealtimeSync();fbSetupTeamSync();}
   } else {
     if(_fbUnsubscribe){_fbUnsubscribe();_fbUnsubscribe=null;}
     if(_teamUnsub){_teamUnsub();_teamUnsub=null;}
     TEAM_SHARE_OK=null;
+    _setPersonalSyncState('signed-out');
   }
   renderAuthUI();
   renderSyncGate();
@@ -2072,7 +2123,7 @@ function migrate(d){
   return d;
 }
 function load(){try{const d=Object.assign(defState(),JSON.parse(localStorage.getItem(DB))||{});return migrate(d);}catch{return migrate(defState());}}
-function restoreLatestSyncBackup(){const keys=syncBackupKeys();if(!keys.length)return toast('復元できる同期前バックアップはまだありません','warn');const key=keys[0];if(!confirm('最新の同期前バックアップを復元しますか？\n現在の状態も復元前に保存します。'))return;try{const raw=JSON.parse(localStorage.getItem(key)||'null');if(!raw)throw Error('バックアップを読み込めません');backupLocalState('before-manual-restore');delete raw._backupReason;delete raw._backupAt;S=migrate(raw);save();render();toast('同期前バックアップを復元しました');}catch(e){toast('復元に失敗しました: '+e.message,'warn');}}
+function restoreLatestSyncBackup(){const keys=syncBackupKeys();if(!keys.length)return toast('復元できる同期前バックアップはまだありません','warn');const key=keys[0];if(!confirm('最新の同期前バックアップを復元しますか？\n現在の状態も復元前に保存します。'))return;try{const raw=decodeSyncBackup(localStorage.getItem(key)||'');if(!raw)throw Error('バックアップを読み込めません');backupLocalState('before-manual-restore');delete raw._backupReason;delete raw._backupAt;S=migrate({...S,...raw});save();render();toast('同期前バックアップを復元しました');}catch(e){toast('復元に失敗しました: '+e.message,'warn');}}
 // ─── パフォーマンス最適化 ───────────────────────────────────────────
 // localStorageへの書き込みをRAFでバッチ化（同フレーム内の複数save()を1回に集約）
 let _lsPending=false;
@@ -12451,7 +12502,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260828-02';
+const APP_VERSION='20260830-01';
 
 render();
 renderSyncGate();
