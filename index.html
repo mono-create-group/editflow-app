@@ -208,23 +208,31 @@ a{color:inherit;text-decoration:none}
 
 /* ─── MONTH CALENDAR ─── */
 .month-nav{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.month-nav span{font-size:15px;font-weight:800;flex:1;text-align:center;letter-spacing:-.2px}
-.month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.month-dow{font-size:10px;font-weight:700;color:var(--t3);text-align:center;padding:4px 0;text-transform:uppercase;letter-spacing:.4px}
-.mday{background:var(--card);border:1.5px solid var(--border);border-radius:var(--rs);padding:6px;min-height:80px;cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm)}
-.mday:hover{border-color:var(--t3);box-shadow:var(--shadow)}
-.mday.today-day{border-color:rgba(109,40,217,0.3);background:linear-gradient(135deg,rgba(109,40,217,0.06),rgba(79,70,229,0.04))}
+.month-nav span{font-size:18px;font-weight:850;flex:1;text-align:center;letter-spacing:-.35px}
+.month-scroll{max-width:100%;overflow-x:auto;padding:1px 1px 8px;scrollbar-gutter:stable}
+.month-grid{display:grid;grid-template-columns:repeat(7,minmax(142px,1fr));gap:8px;min-width:1050px}
+.month-dow{font-size:12px;font-weight:800;color:var(--t2);text-align:center;padding:7px 0 6px;letter-spacing:.05em}
+.month-dow.sat{color:#2563eb}.month-dow.sun{color:#dc2626}
+.mday{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px;min-height:144px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.mday:hover{border-color:rgba(109,40,217,.4);box-shadow:0 5px 14px rgba(15,23,42,.09);transform:translateY(-1px)}
+.mday.today-day{border:2px solid rgba(109,40,217,.48);padding:9px;background:linear-gradient(135deg,rgba(109,40,217,.075),rgba(79,70,229,.035));box-shadow:0 4px 14px rgba(109,40,217,.11)}
+.mday.sat-day{background:linear-gradient(180deg,rgba(37,99,235,.035),var(--card) 42%)}
+.mday.sun-day{background:linear-gradient(180deg,rgba(220,38,38,.03),var(--card) 42%)}
 .mday.empty{background:transparent;border-color:transparent;cursor:default;box-shadow:none}
-.mday-num{font-size:12px;font-weight:700;line-height:1}
+.mday.empty:hover{transform:none}
+.mday-num{display:flex;align-items:baseline;gap:5px;font-size:17px;font-weight:850;line-height:1.1;margin-bottom:7px;font-variant-numeric:tabular-nums}
+.mday-weekday{display:none;font-size:11px;font-weight:750;color:var(--t3)}
 .mday.today-day .mday-num{color:var(--purple)}
 .mday-dots{display:flex;flex-wrap:wrap;gap:2px;margin-top:4px}
 .mdot{width:5px;height:5px;border-radius:50%;background:var(--purple);flex-shrink:0}
 .mdot.red{background:var(--red)}
-.mday-task{font-size:10px;margin-top:2px;padding:1px 4px;border-radius:4px;background:var(--pdim);color:var(--purple);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;font-weight:500}
+.mday-task{display:grid;grid-template-columns:39px minmax(0,1fr);align-items:start;gap:5px;font-size:13px;margin-top:5px;padding:5px 7px;border-radius:5px;border-left:3px solid var(--purple);background:var(--pdim);color:var(--purple);line-height:1.35;font-weight:700;min-width:0}
+.mday-task.gcal{border-left-color:var(--blue);background:var(--bdim);color:#1d4ed8}
 .mday-task.over{background:var(--rdim);color:var(--red)}
 .mday-task.done-t{opacity:.4;text-decoration:line-through}
-.mday-time{font-weight:700;opacity:.75;margin-right:3px;font-variant-numeric:tabular-nums}
-.mday-more{font-size:10px;color:var(--t3);margin-top:2px;padding-left:2px}
+.mday-time{font-size:11px;font-weight:850;line-height:1.6;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mday-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mday-more{font-size:12px;font-weight:700;color:var(--t2);margin-top:7px;padding-left:3px}
 .wtask.drag-over{border:1.5px dashed var(--purple);background:var(--pdim)}
 .fs-drop-zone.fs-drag-over{outline:2px dashed var(--purple);outline-offset:-2px;background:var(--pdim)!important}
 
@@ -578,7 +586,8 @@ a{color:inherit;text-decoration:none}
   .ph>*{min-width:0}.ph .btn{max-width:100%}
   .fs-tl-daynav{align-items:stretch}.fs-tl-daynav>div{max-width:100%;min-width:0}.fs-tl-daynav select{max-width:100%!important}
   .fs-tl-wrap{min-width:0;width:100%}.sched-wrap{max-width:100%}
-  .week-grid,.month-grid{gap:3px}.wday-col{min-width:0;padding:8px 3px}.mday{min-width:0;padding:5px 3px}
+  .week-grid{gap:3px}.wday-col{min-width:0;padding:8px 3px}
+  .month-nav span{font-size:16px}.month-scroll{margin:0 -14px;padding:1px 14px 10px;scroll-snap-type:x proximity}.month-grid{gap:7px;min-width:1040px}.mday{scroll-snap-align:start}
 }
 #mob-topbar{display:none}
 #mob-nav{
@@ -5134,33 +5143,24 @@ function rTasksMonthly(){
   <button class="btn btn-g btn-sm" onclick="MO=0;render()">今月</button>
   <button class="btn btn-g btn-sm" onclick="MO++;render()">›</button>
 </div>
-<div class="month-grid">
-  ${['月','火','水','木','金','土','日'].map(d=>`<div class="month-dow">${d}</div>`).join('')}
+<div class="month-scroll" aria-label="月間カレンダー（横にスクロールできます）"><div class="month-grid">
+  ${['月','火','水','木','金','土','日'].map((d,i)=>`<div class="month-dow ${i===5?'sat':i===6?'sun':''}">${d}</div>`).join('')}
   ${days.map(d=>{
     if(!d)return`<div class="mday empty"></div>`;
     const tasks=tasksForDate(d);
     const gcEvs=gcalEventsForDate(d);
-    const dChores=choresForDate(d);
-    const dRoutines=routinesForDate(d);
+    const dayOfWeek=new Date(d+'T00:00:00').getDay();
+    const weekday=['日','月','火','水','木','金','土'][dayOfWeek];
     const combined=[
-      ...gcEvs.map(e=>({_g:true,time:e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'',title:e.summary||'(無題)'})),
-      ...dRoutines.map(r=>({_r:true,done:routineDoneList(r,d).length>=(r.items||[]).length&&(r.items||[]).length>0,time:r.time||'',title:r.name})),
-      ...dChores.map(c=>({_c:true,done:(c.completedDates||[]).includes(d),time:c.time||'',title:c.name})),
-      ...tasks.map(t=>({_g:false,done:t.done,over:!t.done&&t.dueDate<today(),time:t.startTime||'',title:t.title}))
+      ...gcEvs.map(e=>({kind:'gcal',time:e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'',title:e.summary||'(無題)'})),
+      ...tasks.map(t=>({kind:'task',done:t.done,over:!t.done&&t.dueDate<today(),time:t.startTime||'',title:t.title}))
     ].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
-    return`<div class="mday ${d===today()?'today-day':''}" onclick="openDayModal('${d}')">
-      <div class="mday-num">${+d.slice(8)}</div>
-      ${combined.slice(0,3).map(item=>item._g
-        ?`<div class="mday-task" style="border-left:2px solid var(--blue)">${item.time?`<span class="mday-time">${item.time}</span>`:''}📅 ${esc(item.title)}</div>`
-        :item._r
-        ?`<div class="mday-task ${item.done?'done-t':''}" style="border-left:2px solid var(--teal,#0d9488)">${item.time?`<span class="mday-time">${item.time}</span>`:''}🔁 ${esc(item.title)}</div>`
-        :item._c
-        ?`<div class="mday-task ${item.done?'done-t':''}" style="border-left:2px solid var(--teal,#0d9488)">${item.time?`<span class="mday-time">${item.time}</span>`:''}🧹 ${esc(item.title)}</div>`
-        :`<div class="mday-task ${item.over?'over':item.done?'done-t':''}">${item.time?`<span class="mday-time">${item.time}</span>`:''}${esc(item.title)}</div>`
-      ).join('')}
-      ${combined.length>3?`<div class="mday-more">+${combined.length-3}</div>`:''}
+    return`<div class="mday ${d===today()?'today-day ':''}${dayOfWeek===6?'sat-day':dayOfWeek===0?'sun-day':''}" onclick="openDayModal('${d}')" aria-label="${m+1}月${+d.slice(8)}日（${weekday}）の予定">
+      <div class="mday-num">${+d.slice(8)}<span class="mday-weekday">${weekday}曜</span></div>
+      ${combined.slice(0,4).map(item=>`<div class="mday-task ${item.kind==='gcal'?'gcal':item.over?'over':item.done?'done-t':''}"><span class="mday-time">${item.time||'終日'}</span><span class="mday-title" title="${esc(item.title)}">${esc(item.title)}</span></div>`).join('')}
+      ${combined.length>4?`<div class="mday-more">ほか ${combined.length-4}件</div>`:''}
     </div>`;}).join('')}
-</div>`;
+</div></div>`;
 }
 
 function schedDate(off){const d=new Date();d.setDate(d.getDate()+off);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -12502,7 +12502,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260830-01';
+const APP_VERSION='20260903-01';
 
 render();
 renderSyncGate();
