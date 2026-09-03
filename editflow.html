@@ -231,8 +231,7 @@ a{color:inherit;text-decoration:none}
 .mday-task.over{background:var(--rdim);color:var(--red)}
 .mday-task.done-t{opacity:.4;text-decoration:line-through}
 .mday-time{font-size:12px;font-weight:850;line-height:1.58;font-variant-numeric:tabular-nums;white-space:nowrap}
-.mday-title{min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
-.mday-more{font-size:12px;font-weight:700;color:var(--t2);margin-top:7px;padding-left:3px}
+.mday-title{min-width:0;white-space:normal;overflow:visible;word-break:normal;line-break:strict}
 .wtask.drag-over{border:1.5px dashed var(--purple);background:var(--pdim)}
 .fs-drop-zone.fs-drag-over{outline:2px dashed var(--purple);outline-offset:-2px;background:var(--pdim)!important}
 
@@ -5157,8 +5156,7 @@ function rTasksMonthly(){
     ].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
     return`<div class="mday ${d===today()?'today-day ':''}${dayOfWeek===6?'sat-day':dayOfWeek===0?'sun-day':''}" onclick="openDayModal('${d}')" aria-label="${m+1}月${+d.slice(8)}日（${weekday}）の予定">
       <div class="mday-num">${+d.slice(8)}<span class="mday-weekday">${weekday}曜</span></div>
-      ${combined.slice(0,4).map(item=>`<div class="mday-task ${item.kind==='gcal'?'gcal':item.over?'over':item.done?'done-t':''}"><span class="mday-time">${item.time||'終日'}</span><span class="mday-title" title="${esc(item.title)}">${esc(item.title)}</span></div>`).join('')}
-      ${combined.length>4?`<div class="mday-more">ほか ${combined.length-4}件</div>`:''}
+      ${combined.map(item=>`<div class="mday-task ${item.kind==='gcal'?'gcal':item.over?'over':item.done?'done-t':''}"><span class="mday-time">${item.time||'終日'}</span><span class="mday-title">${esc(item.title)}</span></div>`).join('')}
     </div>`;}).join('')}
 </div></div>`;
 }
@@ -12502,7 +12500,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260903-02';
+const APP_VERSION='20260903-03';
 
 render();
 renderSyncGate();
