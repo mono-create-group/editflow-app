@@ -210,7 +210,7 @@ a{color:inherit;text-decoration:none}
 .month-nav{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .month-nav span{font-size:18px;font-weight:850;flex:1;text-align:center;letter-spacing:-.35px}
 .month-scroll{max-width:100%;overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--card);scrollbar-gutter:stable}
-.month-grid{display:grid;grid-template-columns:repeat(7,minmax(180px,1fr));gap:0;min-width:1260px}
+.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:0;width:100%;min-width:0}
 .month-grid>*{border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
 .month-grid>*:nth-child(7n){border-right:0}
 .month-dow{font-size:13px;font-weight:800;color:var(--t2);text-align:center;padding:11px 0 10px;letter-spacing:.05em;background:var(--bg)}
@@ -589,7 +589,7 @@ a{color:inherit;text-decoration:none}
   .fs-tl-daynav{align-items:stretch}.fs-tl-daynav>div{max-width:100%;min-width:0}.fs-tl-daynav select{max-width:100%!important}
   .fs-tl-wrap{min-width:0;width:100%}.sched-wrap{max-width:100%}
   .week-grid{gap:3px}.wday-col{min-width:0;padding:8px 3px}
-  .month-nav span{font-size:16px}.month-scroll{margin:0 -14px;border-left:0;border-right:0;border-radius:0;scroll-snap-type:x proximity}.month-grid{min-width:1260px}.mday{scroll-snap-align:start}
+  .month-nav span{font-size:16px}.month-scroll{margin:0 -14px;border-left:0;border-right:0;border-radius:0;scroll-snap-type:x proximity}.month-grid{min-width:980px}.mday{scroll-snap-align:start}
 }
 #mob-topbar{display:none}
 #mob-nav{
@@ -12508,7 +12508,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260903-04';
+const APP_VERSION='20260903-05';
 
 render();
 renderSyncGate();
