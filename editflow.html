@@ -233,6 +233,11 @@ a{color:inherit;text-decoration:none}
 .mday-task.gcal{border-color:rgba(37,99,235,.24);border-left-color:var(--blue);background:var(--bdim);color:#1d4ed8}
 .mday-task.over{background:var(--rdim);color:var(--red)}
 .mday-task.done-t{opacity:.4;text-decoration:line-through}
+.mday-task[draggable="true"]{cursor:grab;transition:transform .14s ease,box-shadow .14s ease,opacity .14s ease}
+.mday-task[draggable="true"]:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(76,29,149,.12)}
+.mday-task.month-drag-card{opacity:.42;cursor:grabbing;transform:scale(.98)}
+.mday.month-drop-target{background:rgba(109,40,217,.1);box-shadow:inset 0 0 0 2px var(--purple)}
+body.month-drag-active .mday:not(.empty){cursor:copy}
 .mday-time{display:block;margin-top:2px;font-size:10px;font-weight:400;line-height:1.3;color:var(--t2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .mday-title{display:block;min-width:0;white-space:normal;overflow:visible;overflow-wrap:anywhere;word-break:normal;line-break:strict}
 .wtask.drag-over{border:1.5px dashed var(--purple);background:var(--pdim)}
@@ -5159,15 +5164,42 @@ function rTasksMonthly(){
     const weekday=['日','月','火','水','木','金','土'][dayOfWeek];
     const combined=[
       ...gcEvs.map(e=>({kind:'gcal',time:e.start?.dateTime?new Date(e.start.dateTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'',title:e.summary||'(無題)'})),
-      ...tasks.map(t=>({kind:'task',done:t.done,over:!t.done&&t.dueDate<today(),time:t.startTime||'',title:t.title}))
+      ...tasks.map(t=>({kind:'task',id:t.id,done:t.done,over:!t.done&&t.dueDate<today(),time:t.startTime||'',title:t.title}))
     ].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
-    return`<div class="mday ${d===today()?'today-day ':''}${dayOfWeek===6?'sat-day':dayOfWeek===0?'sun-day':''}" onclick="openDayModal('${d}')" aria-label="${m+1}月${+d.slice(8)}日（${weekday}）の予定">
+    return`<div class="mday ${d===today()?'today-day ':''}${dayOfWeek===6?'sat-day':dayOfWeek===0?'sun-day':''}" onclick="openDayModal('${d}')" ondragover="monthDragOver(event)" ondragleave="monthDragLeave(event)" ondrop="monthDrop(event,'${d}')" aria-label="${m+1}月${+d.slice(8)}日（${weekday}）の予定">
       <div class="mday-num">${+d.slice(8)}<span class="mday-weekday">${weekday}曜</span></div>
       ${d===today()?'<span class="mday-today-badge">本日</span>':''}
-      ${combined.map(item=>`<div class="mday-task ${item.kind==='gcal'?'gcal':item.over?'over':item.done?'done-t':''}"><span class="mday-title">${esc(item.title)}</span><span class="mday-time">${item.time||'終日'}</span></div>`).join('')}
+      ${combined.map(item=>`<div class="mday-task ${item.kind==='gcal'?'gcal':item.over?'over':item.done?'done-t':''}"${item.kind==='task'?` draggable="true" ondragstart="monthDragStart(event,'${item.id}')" ondragend="monthDragEnd(event)"`:''}><span class="mday-title">${esc(item.title)}</span><span class="mday-time">${item.time||'終日'}</span></div>`).join('')}
     </div>`;}).join('')}
 </div></div>`;
 }
+
+let _monthDragId=null;
+function monthClearDragUI(){
+  document.body.classList.remove('month-drag-active');
+  document.querySelectorAll('.month-drag-card').forEach(el=>el.classList.remove('month-drag-card'));
+  document.querySelectorAll('.month-drop-target').forEach(el=>el.classList.remove('month-drop-target'));
+}
+function monthDragStart(e,id){
+  _monthDragId=id;e.stopPropagation();e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id);
+  e.currentTarget.classList.add('month-drag-card');document.body.classList.add('month-drag-active');
+}
+function monthDragOver(e){
+  if(!_monthDragId)return;e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.month-drop-target').forEach(el=>el.classList.remove('month-drop-target'));
+  e.currentTarget.classList.add('month-drop-target');
+}
+function monthDragLeave(e){
+  if(e.relatedTarget&&!e.currentTarget.contains(e.relatedTarget))e.currentTarget.classList.remove('month-drop-target');
+}
+function monthDrop(e,date){
+  e.preventDefault();e.stopPropagation();
+  const t=S.tasks.find(t=>t.id===_monthDragId),from=t?.dueDate;
+  monthClearDragUI();
+  if(t&&from!==date){t.dueDate=date;save();render();toast(`${from.slice(5).replace('-','/')} → ${date.slice(5).replace('-','/')} に移動しました`);}
+  _monthDragId=null;
+}
+function monthDragEnd(){monthClearDragUI();_monthDragId=null;}
 
 function schedDate(off){const d=new Date();d.setDate(d.getDate()+off);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function rTasksSchedule(){
@@ -5215,11 +5247,21 @@ ${dayChores.length?`${secTitle(`🧹 家事 (${dayChores.filter(c=>(c.completedD
 ${dayRoutines.length?`${secTitle(`🔁 家事ルーティン (${dayRoutines.length}件)`)}${dayRoutines.map(r=>rRoutineInTaskView(r,d,true)).join('')}`:''}`;
 }
 
-function openDayModal(d){
+function rDayModalBody(d){
   const tasks=tasksForDate(d);
-  openModal(`<div class="mhdr"><div class="mtitle">${d} のタスク</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  return`<div class="mhdr"><div class="mtitle">${d} のタスク</div><button class="mclose" onclick="closeModal()">✕</button></div>
 <div style="margin-bottom:12px">${tasks.length?tasks.map(t=>rTaskItem(t)).join(''):'<div style="color:var(--t2);text-align:center;padding:20px">この日のタスクはありません</div>'}</div>
-<button class="btn btn-p btn-sm" onclick="closeModal();openTaskModal(null,'${d}')">＋ この日にタスク追加</button>`);
+<button class="btn btn-p btn-sm" onclick="closeModal();openTaskModal(null,'${d}')">＋ この日にタスク追加</button>`;
+}
+function openDayModal(d){
+  openModal(rDayModalBody(d));
+  const modal=document.querySelector('#modal-overlay .modal');
+  if(modal)modal.dataset.dayDate=d;
+}
+function currentDayModalDate(){return document.querySelector('#modal-overlay .modal')?.dataset.dayDate||'';}
+function refreshDayModal(d){
+  const modal=document.querySelector('#modal-overlay .modal');
+  if(modal&&d&&modal.dataset.dayDate===d)modal.innerHTML=rDayModalBody(d);
 }
 // ===SCHEDULE D&D===
 // IDフォーマット: タスク → "taskId" / サブタスク → "taskId::N" / 追加時間帯 → "taskId::tsN"
@@ -10825,13 +10867,15 @@ function saveLog(){
 }
 // ===ACTIONS===
 function toggleDone(id){
-  const t=S.tasks.find(t=>t.id===id);if(!t)return;
+  const t=S.tasks.find(t=>t.id===id&&!t.deleted);if(!t)return;
+  const dayModalDate=currentDayModalDate();
   t.done=!t.done;t.doneDate=t.done?today():null;t.updatedAt=Date.now();
   playCheckSound(t.done);
   if(t.done&&S.settings?.nowTaskId===id)S.settings.nowTaskId=null;
   if(t.done&&id===S.frogId){S.frogId=null;toast('🐸 カエルを食べました！お疲れ様！');}
   else toast(t.done?'✅ 完了！':'↩ 未完了に戻しました');
   save();render();
+  if(dayModalDate)refreshDayModal(dayModalDate);
   if(t.done){const el=document.getElementById(`ti-${id}`);if(el){el.classList.add('celebrating');setTimeout(()=>el.classList.remove('celebrating'),400);}}
 }
 function toggleSub(tid,idx){
@@ -10881,8 +10925,10 @@ function confirmSplitTask(id){
   save();closeModal();render();toast('タスクを分割しました ✂');
 }
 function delTask(id){
-  const t=S.tasks.find(t=>t.id===id);if(t){t.deleted=true;t.updatedAt=Date.now();}
-  if(S.frogId===id)S.frogId=null;save();render();toast('タスクを削除しました');
+  const dayModalDate=currentDayModalDate();
+  const t=S.tasks.find(t=>t.id===id&&!t.deleted);if(!t)return;
+  t.deleted=true;t.updatedAt=Date.now();
+  if(S.frogId===id)S.frogId=null;save();render();if(dayModalDate)refreshDayModal(dayModalDate);toast('タスクを削除しました');
 }
 function procrastinate(id){
   const t=S.tasks.find(t=>t.id===id);if(!t)return;
@@ -12508,7 +12554,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260903-06';
+const APP_VERSION='20260903-07';
 
 render();
 renderSyncGate();
