@@ -210,10 +210,10 @@ a{color:inherit;text-decoration:none}
 .month-nav{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .month-nav span{font-size:18px;font-weight:850;flex:1;text-align:center;letter-spacing:-.35px}
 .month-scroll{max-width:100%;overflow-x:auto;padding:1px 1px 8px;scrollbar-gutter:stable}
-.month-grid{display:grid;grid-template-columns:repeat(7,minmax(142px,1fr));gap:8px;min-width:1050px}
+.month-grid{display:grid;grid-template-columns:repeat(7,minmax(154px,1fr));gap:8px;min-width:1130px}
 .month-dow{font-size:12px;font-weight:800;color:var(--t2);text-align:center;padding:7px 0 6px;letter-spacing:.05em}
 .month-dow.sat{color:#2563eb}.month-dow.sun{color:#dc2626}
-.mday{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px;min-height:144px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.mday{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px;min-height:164px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;box-shadow:0 1px 3px rgba(15,23,42,.06)}
 .mday:hover{border-color:rgba(109,40,217,.4);box-shadow:0 5px 14px rgba(15,23,42,.09);transform:translateY(-1px)}
 .mday.today-day{border:2px solid rgba(109,40,217,.48);padding:9px;background:linear-gradient(135deg,rgba(109,40,217,.075),rgba(79,70,229,.035));box-shadow:0 4px 14px rgba(109,40,217,.11)}
 .mday.sat-day{background:linear-gradient(180deg,rgba(37,99,235,.035),var(--card) 42%)}
@@ -226,12 +226,12 @@ a{color:inherit;text-decoration:none}
 .mday-dots{display:flex;flex-wrap:wrap;gap:2px;margin-top:4px}
 .mdot{width:5px;height:5px;border-radius:50%;background:var(--purple);flex-shrink:0}
 .mdot.red{background:var(--red)}
-.mday-task{display:grid;grid-template-columns:39px minmax(0,1fr);align-items:start;gap:5px;font-size:13px;margin-top:5px;padding:5px 7px;border-radius:5px;border-left:3px solid var(--purple);background:var(--pdim);color:var(--purple);line-height:1.35;font-weight:700;min-width:0}
+.mday-task{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:start;gap:5px;font-size:14px;margin-top:5px;padding:6px 7px;border-radius:5px;border-left:3px solid var(--purple);background:var(--pdim);color:var(--purple);line-height:1.35;font-weight:700;min-width:0}
 .mday-task.gcal{border-left-color:var(--blue);background:var(--bdim);color:#1d4ed8}
 .mday-task.over{background:var(--rdim);color:var(--red)}
 .mday-task.done-t{opacity:.4;text-decoration:line-through}
-.mday-time{font-size:11px;font-weight:850;line-height:1.6;font-variant-numeric:tabular-nums;white-space:nowrap}
-.mday-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mday-time{font-size:12px;font-weight:850;line-height:1.58;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mday-title{min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 .mday-more{font-size:12px;font-weight:700;color:var(--t2);margin-top:7px;padding-left:3px}
 .wtask.drag-over{border:1.5px dashed var(--purple);background:var(--pdim)}
 .fs-drop-zone.fs-drag-over{outline:2px dashed var(--purple);outline-offset:-2px;background:var(--pdim)!important}
@@ -587,7 +587,7 @@ a{color:inherit;text-decoration:none}
   .fs-tl-daynav{align-items:stretch}.fs-tl-daynav>div{max-width:100%;min-width:0}.fs-tl-daynav select{max-width:100%!important}
   .fs-tl-wrap{min-width:0;width:100%}.sched-wrap{max-width:100%}
   .week-grid{gap:3px}.wday-col{min-width:0;padding:8px 3px}
-  .month-nav span{font-size:16px}.month-scroll{margin:0 -14px;padding:1px 14px 10px;scroll-snap-type:x proximity}.month-grid{gap:7px;min-width:1040px}.mday{scroll-snap-align:start}
+  .month-nav span{font-size:16px}.month-scroll{margin:0 -14px;padding:1px 14px 10px;scroll-snap-type:x proximity}.month-grid{gap:7px;min-width:1120px}.mday{scroll-snap-align:start}
 }
 #mob-topbar{display:none}
 #mob-nav{
@@ -12502,7 +12502,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260903-01';
+const APP_VERSION='20260903-02';
 
 render();
 renderSyncGate();
