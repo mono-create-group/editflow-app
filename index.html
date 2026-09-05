@@ -15,30 +15,33 @@
 <title>EditFlow — クリエイター専用管理アプリ</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* 色の意味を6つに固定する:
+   purple = 今の1件 / green = 完了 / amber = 今日中 / red = 期限超過のみ / blue = 時刻・予定 / grey = その他
+   （--pink / --cyan は既存コードの参照を壊さないために残すが、新UIでは使わない） */
 :root{
-  --bg:#f1f2f8;
+  --bg:#f7f8fb;
   --surface:#ffffff;
   --card:#ffffff;
-  --card2:#f4f5fb;
-  --border:#e3e5f0;
+  --card2:#eef0f6;
+  --border:#d7dae6;
   --purple:#6d28d9;
-  --pl:#7c3aed;
-  --pdim:rgba(109,40,217,0.07);
-  --green:#059669;
-  --gdim:rgba(5,150,105,0.08);
-  --amber:#b45309;
-  --adim:rgba(180,83,9,0.08);
-  --red:#dc2626;
-  --rdim:rgba(220,38,38,0.08);
+  --pl:#6d28d9;
+  --pdim:rgba(109,40,217,0.08);
+  --green:#047857;
+  --gdim:rgba(4,120,87,0.09);
+  --amber:#92400e;
+  --adim:rgba(146,64,14,0.09);
+  --red:#b91c1c;
+  --rdim:rgba(185,28,28,0.09);
   --blue:#1d4ed8;
-  --bdim:rgba(29,78,216,0.08);
-  --pink:#be185d;
-  --pkdim:rgba(190,24,93,0.08);
-  --cyan:#0e7490;
-  --cdim:rgba(14,116,144,0.08);
+  --bdim:rgba(29,78,216,0.09);
+  --pink:#6d28d9;
+  --pkdim:rgba(109,40,217,0.08);
+  --cyan:#1d4ed8;
+  --cdim:rgba(29,78,216,0.09);
   --text:#0f172a;
-  --t2:#64748b;
-  --t3:#94a3b8;
+  --t2:#475569;
+  --t3:#667085;
   --r:14px;
   --rs:9px;
   --shadow:0 1px 3px rgba(15,23,42,.05),0 4px 20px rgba(15,23,42,.08);
@@ -46,6 +49,38 @@
   --shadow-lg:0 8px 32px rgba(15,23,42,.14),0 2px 6px rgba(15,23,42,.06);
   --fs-tl-ppm:1.2px; /* 固定タイムスケジュール: 1分あたりのpx（JS側 TL_PPM と一致させる） */
   --fs-tl-axis-w:52px; /* 時間軸の幅 */
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#101318;
+    --surface:#181c23;
+    --card:#181c23;
+    --card2:#212734;
+    --border:#2c3340;
+    --purple:#a78bfa;
+    --pl:#a78bfa;
+    --pdim:rgba(167,139,250,0.15);
+    --green:#34d399;
+    --gdim:rgba(52,211,153,0.15);
+    --amber:#fbbf24;
+    --adim:rgba(251,191,36,0.15);
+    --red:#f87171;
+    --rdim:rgba(248,113,113,0.15);
+    --blue:#7dabff;
+    --bdim:rgba(125,171,255,0.15);
+    --pink:#a78bfa;
+    --pkdim:rgba(167,139,250,0.15);
+    --cyan:#7dabff;
+    --cdim:rgba(125,171,255,0.15);
+    --text:#e8ebf2;
+    --t2:#a8b2c1;
+    --t3:#8b95a5;
+    --shadow:0 1px 3px rgba(0,0,0,.5),0 4px 20px rgba(0,0,0,.45);
+    --shadow-sm:0 1px 3px rgba(0,0,0,.45);
+    --shadow-lg:0 8px 32px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.4);
+    color-scheme:dark;
+  }
 }
 @media(max-width:700px){:root{--fs-tl-axis-w:40px}}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,'Hiragino Sans','Yu Gothic',BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;height:100vh;overflow:hidden;display:flex;-webkit-font-smoothing:antialiased}
@@ -98,15 +133,20 @@ a{color:inherit;text-decoration:none}
 .card-sm{padding:12px 14px}
 
 /* ─── BADGES ─── */
+/* ─── SVGアイコン（絵文字の置換） ─── */
+.ic{width:1em;height:1em;display:inline-block;vertical-align:-0.125em;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.nav-icon .ic{width:1.15em;height:1.15em}
+.sec-ic{width:15px;height:15px;stroke-width:1.8;margin-right:2px;vertical-align:-2px;color:var(--t2)}
 .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:100px;font-size:11px;font-weight:700;letter-spacing:.1px}
-.bp{background:var(--pdim);color:var(--purple)}
+.badge .ic{width:12px;height:12px;stroke-width:2}
+/* バッジは6種のみ。bp=今の1件 / bg=完了 / ba=今日中 / br=期限超過 / bb=時刻・予定 / bk=その他
+   bc・bpk は旧コード互換のエイリアス（新UIでは使わない） */
+.bp,.bpk{background:var(--pdim);color:var(--purple)}
 .br{background:var(--rdim);color:var(--red)}
 .ba{background:var(--adim);color:var(--amber)}
 .bg{background:var(--gdim);color:var(--green)}
-.bb{background:var(--bdim);color:var(--blue)}
-.bc{background:var(--cdim);color:var(--cyan)}
+.bb,.bc{background:var(--bdim);color:var(--blue)}
 .bk{background:var(--card2);color:var(--t2)}
-.bpk{background:var(--pkdim);color:var(--pink)}
 
 /* ─── STATS GRID ─── */
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px}
@@ -178,7 +218,7 @@ a{color:inherit;text-decoration:none}
 .task-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;align-items:center}
 .task-acts{display:flex;gap:3px;opacity:0;transition:opacity .15s;flex-shrink:0}
 .task-item:hover .task-acts{opacity:1}
-.tact{padding:4px 7px;border-radius:6px;font-size:12px;color:var(--t2);transition:all .15s}
+.tact{padding:7px;border-radius:6px;font-size:14px;line-height:1;min-width:34px;min-height:34px;display:inline-flex;align-items:center;justify-content:center;color:var(--t2);transition:all .15s}
 .tact:hover{color:var(--text);background:var(--card2)}
 .tact.del:hover{color:var(--red);background:var(--rdim)}
 .proc-count{font-size:11px;color:var(--amber);background:var(--adim);padding:1px 6px;border-radius:100px;font-weight:700}
@@ -491,7 +531,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .stab:hover:not(.act){color:var(--text)}
 
 /* ─── SECTION TITLE ─── */
-.section-ttl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:10px;margin-top:20px}
+.section-ttl{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:10px;margin-top:20px}
 .section-ttl:first-child{margin-top:0}
 
 /* ─── EMPTY STATE ─── */
@@ -606,7 +646,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .mnav-item{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 3px 5px;font-size:10px;color:var(--t2);cursor:pointer;gap:2px;border-radius:12px;min-height:60px}
 .mnav-item.active{color:var(--pl)}
 .mnav-item .nav-icon{font-size:17px;line-height:1}.mnav-add{color:#fff;background:linear-gradient(135deg,var(--purple),#4f46e5);box-shadow:0 5px 14px rgba(109,40,217,.32);margin:-20px 2px 0;min-height:58px;border:3px solid var(--bg);font-weight:700}.mnav-add .nav-icon{font-size:23px;font-weight:400}.mnav-add:active,.mnav-item:active{transform:scale(.96)}
-@media(max-width:700px){#mob-nav{display:flex}#mob-topbar{display:flex;position:fixed;z-index:95;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 56px);padding:calc(env(safe-area-inset-top) + 9px) 14px 8px 62px;align-items:center;justify-content:space-between;background:rgba(255,255,255,.92);border-bottom:1px solid rgba(227,229,240,.9);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.mob-title{font-size:14px;font-weight:800;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mob-subtitle{font-size:10px;color:var(--t2);line-height:1.2;margin-top:1px}.mob-quick{width:36px;height:36px;border-radius:10px;background:var(--pdim);color:var(--purple);display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}}
+@media(max-width:700px){#mob-nav{display:flex}#mob-topbar{display:flex;position:fixed;z-index:95;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 56px);padding:calc(env(safe-area-inset-top) + 9px) 14px 8px 62px;align-items:center;justify-content:space-between;background:var(--surface);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.mob-title{font-size:14px;font-weight:800;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mob-subtitle{font-size:10px;color:var(--t2);line-height:1.2;margin-top:1px}.mob-quick{width:36px;height:36px;border-radius:10px;background:var(--pdim);color:var(--purple);display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}}
 #mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;opacity:0;transition:opacity .2s}
 #mob-overlay.open{display:block;opacity:1}
 #mob-drawer{
@@ -647,6 +687,58 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .task-item[draggable]{cursor:grab}
 .task-item.drag-over{border:2px dashed var(--purple);background:var(--pdim)}
 .task-item.dragging{opacity:.4}
+
+/* ─── 直感操作（スワイプ / 長押し並べ替え / 44px以上のタップ領域） ─── */
+.task-item[data-kind]{touch-action:pan-y;min-height:56px;-webkit-user-select:none;user-select:none}
+.task-item[data-kind] .task-body{cursor:pointer;align-self:center}
+.task-item[data-kind] .chk{position:relative;width:24px;height:24px;margin-top:1px}
+/* チェックの当たり判定を52px角まで広げる（見た目は変えない） */
+.task-item[data-kind] .chk::before{content:'';position:absolute;top:-14px;left:-14px;right:-14px;bottom:-14px}
+.task-item.swiping{transition:none;z-index:2}
+.task-item:not(.swiping){transition:transform .18s ease,border-color .2s,box-shadow .2s}
+.task-item.swipe-right{box-shadow:inset 5px 0 0 var(--green),var(--shadow)}
+.task-item.swipe-left{box-shadow:inset -5px 0 0 var(--blue),var(--shadow)}
+.task-item.reordering{opacity:.9;box-shadow:var(--shadow-lg);border-color:var(--purple);transform:scale(1.01)}
+.row-ic{width:18px;height:18px;flex-shrink:0;margin-top:3px;color:var(--t2)}
+.swipe-hint{font-size:11px;color:var(--t3);margin:-4px 0 8px}
+
+/* ─── 今日ビュー ─── */
+.today-sticky{position:sticky;top:0;z-index:20;background:var(--bg);padding:6px 0 2px}
+.quick-add{display:flex;gap:7px;align-items:center;margin-bottom:16px}
+.quick-add input{min-height:46px}
+.quick-add .btn{min-height:46px;flex-shrink:0;white-space:nowrap}
+.now-block{background:var(--card);border:1.5px solid var(--border);border-left:3px solid var(--blue);border-radius:var(--r);padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow-sm)}
+.now-block.is-now{border-left-color:var(--purple)}
+.now-block-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.now-block-time{font-size:12px;color:var(--t2);font-variant-numeric:tabular-nums;font-weight:700}
+.now-block-ttl{font-size:16px;font-weight:800;line-height:1.45;overflow-wrap:anywhere}
+.now-block-desc{font-size:12px;color:var(--t2);margin-top:4px;line-height:1.6}
+.done-fold{margin-top:18px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.done-fold>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--t2);min-height:24px;list-style:none}
+.done-fold>summary::-webkit-details-marker{display:none}
+.done-fold>summary::before{content:'▸ ';color:var(--t3)}
+.done-fold[open]>summary::before{content:'▾ '}
+
+/* ─── 記録ビュー ─── */
+.log-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.log-card{display:flex;align-items:center;gap:12px;text-align:left;background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:15px 16px;min-height:66px;box-shadow:var(--shadow-sm);transition:border-color .15s,transform .15s}
+.log-card:hover{border-color:var(--purple);transform:translateY(-1px)}
+.log-card-ic{display:flex;align-items:center;justify-content:center;width:38px;height:38px;flex-shrink:0;border-radius:10px;background:var(--card2);color:var(--purple);font-size:20px}
+.log-card-body{display:flex;flex-direction:column;min-width:0}
+.log-card-ttl{font-size:14px;font-weight:800}
+.log-card-desc{font-size:11px;color:var(--t2);margin-top:2px}
+
+/* ─── 目標ホライズンの絞り込みチップ ─── */
+.hz-chips{display:flex;flex-wrap:wrap;gap:6px;margin:-8px 0 14px}
+.hz-chip{padding:6px 13px;min-height:34px;border-radius:100px;font-size:12px;font-weight:700;background:var(--card2);color:var(--t2);border:1.5px solid var(--border)}
+.hz-chip.on{background:var(--pdim);color:var(--purple);border-color:var(--purple)}
+
+/* ─── 夜の締め ─── */
+.rv-metric{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--border)}
+.rv-metric:last-child{border-bottom:none}
+.rv-chips{display:flex;flex-wrap:wrap;gap:7px}
+.rv-chip{padding:9px 14px;min-height:40px;border-radius:100px;font-size:12px;font-weight:700;background:var(--card2);color:var(--t2);border:1.5px solid var(--border)}
+.rv-chip.on{background:var(--gdim);color:var(--green);border-color:var(--green)}
 .task-blk[draggable]{cursor:grab}
 .drop-zone{position:absolute;left:0;right:0;height:30px;z-index:5;transition:background .1s}
 .drop-zone.drag-over{background:var(--pdim);border:2px dashed var(--purple);border-radius:4px}
@@ -697,8 +789,8 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .block-item{background:var(--card2);border:1px solid var(--border);border-radius:var(--rs);padding:11px 13px;margin-bottom:8px}
 .block-type-tag{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
 .block-add-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
-.icon-pick{font-size:22px;cursor:pointer;padding:4px 5px;border-radius:6px;border:2px solid transparent;display:inline-block;line-height:1.2;transition:border-color .1s}
-.icon-pick.sel{border-color:var(--purple)}
+.icon-pick{font-size:22px;cursor:pointer;padding:6px;border-radius:6px;border:2px solid transparent;display:inline-flex;align-items:center;justify-content:center;line-height:1;color:var(--t2);transition:border-color .1s}
+.icon-pick.sel{border-color:var(--purple);color:var(--purple)}
 .cpb{margin-bottom:14px}
 .cpb-heading{font-size:21px;font-weight:700;border-bottom:1px solid var(--border);padding-bottom:8px}
 .cpb-heading-input{font-size:21px;font-weight:700;width:100%;border:none;background:transparent;color:var(--text);padding:0 0 8px;border-bottom:1px solid var(--border);outline:none;box-sizing:border-box}
@@ -801,7 +893,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .ai-typing span:nth-child(2){animation-delay:.2s}
 .ai-typing span:nth-child(3){animation-delay:.4s}
 @keyframes aibounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
-.ai-input-bar{position:fixed;bottom:0;left:220px;right:0;padding:12px 18px;background:rgba(255,255,255,0.9);border-top:1.5px solid var(--border);display:flex;gap:8px;align-items:flex-end;z-index:90;backdrop-filter:blur(8px)}
+.ai-input-bar{position:fixed;bottom:0;left:220px;right:0;padding:12px 18px;background:var(--surface);border-top:1.5px solid var(--border);display:flex;gap:8px;align-items:flex-end;z-index:90;backdrop-filter:blur(8px)}
 @media(max-width:700px){.ai-input-bar{left:0;bottom:calc(env(safe-area-inset-bottom) + var(--mob-nav-h));padding:8px 12px}}
 .ai-input-bar textarea{flex:1;border:1.5px solid var(--border);border-radius:14px;padding:10px 14px;font-size:14px;background:var(--card);color:var(--text);resize:none;max-height:120px;min-height:42px;outline:none;font-family:inherit;line-height:1.4;box-shadow:var(--shadow-sm)}
 .ai-input-bar textarea:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,40,217,0.1)}
@@ -820,17 +912,63 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 </head>
 <body>
 
+<!-- ICON SPRITE: 絵文字を使わないためのSVGシンボル集（stroke=currentColorで文字色に追従） -->
+<svg id="ef-sprite" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
+<symbol id="i-today" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></symbol>
+<symbol id="i-plan" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></symbol>
+<symbol id="i-life" viewBox="0 0 24 24"><path d="M4 11.2 12 4.5l8 6.7"/><path d="M6.3 10v9.5h11.4V10"/></symbol>
+<symbol id="i-log" viewBox="0 0 24 24"><path d="M5 4.5h11l3 3v12H5z"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.7 4.6 4.6L19 7.7"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.2 12 4.5l8 6.7"/><path d="M6.3 10v9.5h11.4V10"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 19.5h16"/><path d="M7 19.5V12M12 19.5V6.5M17 19.5v-5"/></symbol>
+<symbol id="i-film" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M3.5 10h17M3.5 14h17M8.5 5.5v13M15.5 5.5v13"/></symbol>
+<symbol id="i-handshake" viewBox="0 0 24 24"><path d="M3.5 10.5 7 7h4l2 2 2-2h4l3.5 3.5"/><path d="M7 13.5 10 17l2-2 2 2 3-3.5"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 6.5h6l2 2.5h9V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.2"/><path d="M3.5 19c0-3 2.5-4.8 5.5-4.8s5.5 1.8 5.5 4.8"/><path d="M16 6.4a3.2 3.2 0 0 1 0 6.2M17 14.6c2.2.5 3.5 2.2 3.5 4.4"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3.5c3.5 3.4 5.5 6 5.5 9a5.5 5.5 0 1 1-11 0c0-1.6.7-3 2-4.4.3 1.4 1 2.2 2 2.4-.4-3 .5-5.3 1.5-7z"/></symbol>
+<symbol id="i-broom" viewBox="0 0 24 24"><path d="M14.5 3.5 9 9"/><path d="M6 12.5h7l1.5 8h-10z"/><path d="M8 12.5v8M11 12.5v8"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5h9a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M8 19.5h11"/></symbol>
+<symbol id="i-yen" viewBox="0 0 24 24"><path d="M7 5.5 12 12l5-6.5M12 12v7M8.5 14h7M8.5 17h7"/></symbol>
+<symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M12 6.5a3 3 0 0 0-5.6 1.3A2.8 2.8 0 0 0 5 13a3 3 0 0 0 2.6 4.4A2.6 2.6 0 0 0 12 18.5"/><path d="M12 6.5a3 3 0 0 1 5.6 1.3A2.8 2.8 0 0 1 19 13a3 3 0 0 1-2.6 4.4A2.6 2.6 0 0 1 12 18.5"/></symbol>
+<symbol id="i-robot" viewBox="0 0 24 24"><rect x="4.5" y="7.5" width="15" height="11" rx="3"/><path d="M12 4v3.5M9 12.5h.01M15 12.5h.01M9.5 16h5"/></symbol>
+<symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10"/></symbol>
+<symbol id="i-building" viewBox="0 0 24 24"><path d="M5 20V5.5h9V20"/><path d="M14 10h5v10M8 9h3M8 12.5h3M8 16h3M3.5 20h17"/></symbol>
+<symbol id="i-store" viewBox="0 0 24 24"><path d="M4 9.5 5.5 5h13L20 9.5"/><path d="M4 9.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0"/><path d="M5.5 11.5V20h13v-8.5"/></symbol>
+<symbol id="i-note" viewBox="0 0 24 24"><path d="M5 4.5h14v15H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5.5 5.5L16 13l4 1.5v3a2 2 0 0 1-2.2 2A15.5 15.5 0 0 1 4.5 6.2 2 2 0 0 1 6.5 4z"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.6 3.6 5.4 3.6 8.5S14.4 18.4 12 20.5c-2.4-2.1-3.6-5-3.6-8.5S9.6 6.1 12 3.5z"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="4" rx="1.2"/><path d="M5.5 9v10.5h13V9M10 13h4"/></symbol>
+<symbol id="i-tools" viewBox="0 0 24 24"><path d="M14.5 6.5a3.5 3.5 0 0 0 4.6 4.6l-8.6 8.6-4.6-4.6z"/><path d="M6 5l3 3"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.2M12 18.3v2.2M20.5 12h-2.2M5.7 12H3.5M18 6l-1.5 1.5M7.5 16.5 6 18M18 18l-1.5-1.5M7.5 7.5 6 6"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 3.9 1 5.6-5-2.7-5 2.7 1-5.6-4-3.9 5.5-.8z"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 20.5V14"/><path d="M8 4h8l-1.2 5.2 2.7 2.4H6.5l2.7-2.4z"/></symbol>
+<symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 17h6M10 20h4"/><path d="M12 3.5a5.5 5.5 0 0 1 3.3 9.9V17H8.7v-3.6A5.5 5.5 0 0 1 12 3.5z"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2h-14z"/><path d="M10 21h4"/></symbol>
+<symbol id="i-clip" viewBox="0 0 24 24"><rect x="5.5" y="4.5" width="13" height="16" rx="2"/><path d="M9 4.5V3h6v1.5M9 10h6M9 14h4"/></symbol>
+<symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="3.5" y="8" width="17" height="11" rx="2"/><path d="M9 8V5.5h6V8M3.5 13h17"/></symbol>
+<symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 20.5a8.5 8.5 0 1 1 8.5-8.5c0 2.2-2 2.6-3.6 2.6h-1.7a2 2 0 0 0-1.4 3.4 1.7 1.7 0 0 1-1.8 2.5z"/><path d="M8 10h.01M12 8h.01M16 11h.01"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="9.5" r="4"/><path d="M11 12l8 8M16.5 17.5l2-2M14 15l2-2"/></symbol>
+<symbol id="i-drag" viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M19 14.5A8 8 0 0 1 9.5 5a8 8 0 1 0 9.5 9.5z"/></symbol>
+</defs></svg>
+
 <nav id="sidebar">
   <div class="logo">EditFlow <small>クリエイター専用管理</small></div>
   <div id="nav-items"></div>
   <div class="nav-sep"></div>
-  <div class="nav-item" data-view="customize"><span class="nav-icon">🛠</span>カスタマイズ</div>
-  <div class="nav-item" data-view="settings"><span class="nav-icon">⚙️</span>設定</div>
+  <div class="nav-item" data-view="customize"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-tools"></use></svg></span>カスタマイズ</div>
+  <div class="nav-item" data-view="settings"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-gear"></use></svg></span>設定</div>
   <div class="nav-sep"></div>
   <div id="gcal-ui" style="padding:0 14px 8px"></div>
   <div id="auth-ui" style="padding:0 14px 10px"></div>
   <div id="pomo-mini">
-    <div class="pomo-lbl">🍅 ポモドーロ</div>
+    <div class="pomo-lbl"><svg class="ic" aria-hidden="true"><use href="#i-clock"></use></svg> ポモドーロ</div>
     <div id="pomo-display">25:00</div>
     <div id="pomo-task-name" class="pomo-task-name" style="display:none"></div>
     <div id="pomo-sessions" class="pomo-sessions">今日: 0セッション</div>
@@ -846,7 +984,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 <div id="mob-hamburger" onclick="toggleDrawer()">
   <span></span><span></span><span></span>
 </div>
-<header id="mob-topbar" aria-live="polite"><div><div class="mob-title" id="mob-title">ホーム</div><div class="mob-subtitle" id="mob-subtitle">今日の流れを確認</div></div><button class="mob-quick" onclick="openTaskModal(null,today())" aria-label="タスクを追加">＋</button></header>
+<header id="mob-topbar" aria-live="polite"><div><div class="mob-title" id="mob-title">今日</div><div class="mob-subtitle" id="mob-subtitle">今日の流れを確認</div></div><button class="mob-quick" onclick="openTaskModal(null,today())" aria-label="タスクを追加">＋</button></header>
 <div id="mob-overlay" onclick="closeDrawer()"></div>
 <div id="mob-drawer">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:0 14px 16px">
@@ -859,7 +997,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
   <div style="padding:0 14px 10px" id="mob-auth-ui"></div>
 </div>
 <div id="mob-nav">
-  <button class="mnav-item active" data-view="dashboard"><span class="nav-icon">⌂</span><span>ホーム</span></button><button class="mnav-item" data-view="tasks"><span class="nav-icon">✓</span><span>タスク</span></button><button class="mnav-item mnav-add" onclick="openTaskModal(null,today())" aria-label="タスクを追加"><span class="nav-icon">＋</span><span>追加</span></button><button class="mnav-item" data-view="projects"><span class="nav-icon">▣</span><span>案件</span></button><button class="mnav-item" id="mnav-more" onclick="toggleDrawer()"><span class="nav-icon">☰</span><span>メニュー</span></button>
+  <button class="mnav-item active" data-view="today"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-today"></use></svg></span><span>今日</span></button><button class="mnav-item" data-view="plan"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-plan"></use></svg></span><span>予定</span></button><button class="mnav-item mnav-add" onclick="openTaskModal(null,today())" aria-label="タスクを追加"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg></span><span>追加</span></button><button class="mnav-item" data-view="life"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-life"></use></svg></span><span>くらし</span></button><button class="mnav-item" data-view="log"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-log"></use></svg></span><span>記録</span></button>
 </div>
 
 <div id="toast"></div>
@@ -875,32 +1013,50 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
 <script>
 // ===CONSTANTS===
 const DB='ef_v5';
+// 個人運用の中核4ビュー。既存ビューは削除せず、初期状態で非表示にするだけ（カスタマイズから復帰可）。
+const CORE_VIEWS=['today','plan','life','log'];
 const BUILTIN_VIEWS=[
-  {id:'dashboard',label:'ダッシュボード',icon:'🏠'},
-  {id:'tasks',label:'タスク管理',icon:'✅'},
-  {id:'performance',label:'達成率履歴',icon:'📈'},
-  {id:'projects',label:'案件管理',icon:'🎬'},
-  {id:'pipeline',label:'商談管理',icon:'🤝'},
-  {id:'teamgoals',label:'チームKGI/KPI',icon:'📈'},
-  {id:'posts',label:'投稿管理',icon:'📅'},
-  {id:'docs',label:'ドキュメント',icon:'📁'},
-  {id:'workers',label:'ワーカー管理',icon:'👥'},
-  {id:'habits',label:'習慣トラッカー',icon:'🔥'},
-  {id:'chores',label:'家事',icon:'🧹'},
-  {id:'goals',label:'目標・KPI管理',icon:'🎯'},
-  {id:'journal',label:'ジャーナル',icon:'📔'},
-  {id:'finance',label:'家計簿',icon:'¥'},
-  {id:'memo',label:'ブレインダンプ',icon:'🧠'},
-  {id:'aichat',label:'AIアシスタント',icon:'🤖'},
-  {id:'fitness',label:'フィットネス',icon:'💪'},
-  {id:'bizboard',label:'経営ボード',icon:'🏢'},
-  {id:'bizunits',label:'事業部ボード',icon:'🏬'},
-  {id:'minutes',label:'議事録',icon:'📝'},
-  {id:'salesleads',label:'営業リスト',icon:'📞'},
-  {id:'hpfee',label:'維持費',icon:'💴'},
-  {id:'salessites',label:'営業用サイト',icon:'🌐'},
-  {id:'templates',label:'テンプレ保管',icon:'🗂'},
+  {id:'today',label:'今日',icon:'i-today'},
+  {id:'plan',label:'予定',icon:'i-plan'},
+  {id:'life',label:'くらし',icon:'i-life'},
+  {id:'log',label:'記録',icon:'i-log'},
+  {id:'dashboard',label:'ダッシュボード',icon:'i-home'},
+  {id:'tasks',label:'タスク管理',icon:'i-check'},
+  {id:'performance',label:'達成率履歴',icon:'i-chart'},
+  {id:'projects',label:'案件管理',icon:'i-film'},
+  {id:'pipeline',label:'商談管理',icon:'i-handshake'},
+  {id:'teamgoals',label:'チームKGI/KPI',icon:'i-chart'},
+  {id:'posts',label:'投稿管理',icon:'i-calendar'},
+  {id:'docs',label:'ドキュメント',icon:'i-folder'},
+  {id:'workers',label:'ワーカー管理',icon:'i-users'},
+  {id:'habits',label:'習慣トラッカー',icon:'i-flame'},
+  {id:'chores',label:'家事',icon:'i-broom'},
+  {id:'goals',label:'目標・KPI管理',icon:'i-target'},
+  {id:'journal',label:'ジャーナル',icon:'i-book'},
+  {id:'finance',label:'家計簿',icon:'i-yen'},
+  {id:'memo',label:'ブレインダンプ',icon:'i-brain'},
+  {id:'aichat',label:'AIアシスタント',icon:'i-robot'},
+  {id:'fitness',label:'フィットネス',icon:'i-dumbbell'},
+  {id:'bizboard',label:'経営ボード',icon:'i-building'},
+  {id:'bizunits',label:'事業部ボード',icon:'i-store'},
+  {id:'minutes',label:'議事録',icon:'i-note'},
+  {id:'salesleads',label:'営業リスト',icon:'i-phone'},
+  {id:'hpfee',label:'維持費',icon:'i-yen'},
+  {id:'salessites',label:'営業用サイト',icon:'i-globe'},
+  {id:'templates',label:'テンプレ保管',icon:'i-archive'},
 ];
+// 個人アプリの初期表示から外すビュー（データは一切削除しない。カスタマイズ画面でいつでも再表示できる）
+const DEFAULT_HIDDEN_VIEWS=[
+  // 業務13タブ
+  'projects','pipeline','teamgoals','posts','docs','workers',
+  'bizboard','bizunits','minutes','salesleads','hpfee','salessites','templates',
+  // 新4ビューに統合済みの旧ビュー（機能はそのまま残る）
+  'dashboard','tasks','performance','habits','chores','journal','finance','memo','fitness',
+];
+// 旧ビュー名 → 新ビューへのエイリアス（sessionStorage ef_view に旧値が残っていても落とさない）
+const VIEW_ALIASES={dashboard:'today',kpi:'goals'};
+function resolveView(v){return VIEW_ALIASES[v]||v;}
+function iconSvg(name,cls){return`<svg class="ic${cls?' '+cls:''}" aria-hidden="true"><use href="#${name&&/^i-[a-z-]+$/.test(name)?name:'i-doc'}"></use></svg>`;}
 
 const DB_OLD='ef_v4';
 const PPM=1.5, SS=7*60, SE=24*60;
@@ -1103,7 +1259,7 @@ function fbSetupRealtimeSync(){
       _firstLoad=false;
       if(!fromCache&&localTs>cloudTs+1000){
         fbSave();
-        toast('☁️ ローカルデータをクラウドに同期中…');
+        toast('ローカルデータをクラウドに同期中…');
         return;
       }
       const remoteSignature=_personalSyncSignature(_decodePersonalState(raw)),formDraft=captureUnsavedFormDraft();_applyCloudData(raw);
@@ -1116,7 +1272,7 @@ function fbSetupRealtimeSync(){
         const remoteSignature=_personalSyncSignature(_decodePersonalState(raw)),formDraft=captureUnsavedFormDraft();_applyCloudData(raw);
         renderAfterCloudSync(formDraft);
         if(!fromCache&&_personalSyncSignature(_decodePersonalState(_packState()))!==remoteSignature)fbSave();
-        if(!fromCache)toast('📱 他のデバイスから同期しました');
+        if(!fromCache)toast('他のデバイスから同期しました');
       }
     }
   },e=>_handleFirestoreError(e,'Firestore snapshot error'));
@@ -1535,7 +1691,7 @@ function _gcalInitAndAuth(clientId,silent=false){
       _gcalToken=resp.access_token;
       if(S.settings)S.settings.gcalConnected=true;
       save();
-      if(!silent)toast('📅 Googleカレンダーと連携しました！');
+      if(!silent)toast('Googleカレンダーと連携しました！');
       gcalFetchCalendarList();
       gcalFetchUpcoming();
       startSheetsAutoSync();
@@ -1569,7 +1725,7 @@ async function gcalSync(){
   // アプリ→Gcal書き込みは無効（読み取り専用連携、重複防止）
   if(!_gcalToken){toast('先にGoogleカレンダーと連携してください','warn');return;}
   await gcalFetchUpcoming();
-  toast('📅 Googleカレンダーの予定を更新しました');
+  toast('Googleカレンダーの予定を更新しました');
 }
 
 async function gcalAddRecurringInvoice(j){
@@ -1586,7 +1742,7 @@ async function gcalAddRecurringInvoice(j){
       method:'POST',headers:{'Authorization':'Bearer '+_gcalToken,'Content-Type':'application/json'},
       body:JSON.stringify(event)
     });
-    toast('📅 請求書提出日を毎月のGoogleカレンダーに登録しました');
+    toast('請求書提出日を毎月のGoogleカレンダーに登録しました');
   }catch(e){console.error('gcal invoice error',e);}
 }
 async function gcalAddRecurringDelivery(j){
@@ -1603,7 +1759,7 @@ async function gcalAddRecurringDelivery(j){
       method:'POST',headers:{'Authorization':'Bearer '+_gcalToken,'Content-Type':'application/json'},
       body:JSON.stringify(event)
     });
-    toast('📅 提出日を毎月のGoogleカレンダーに登録しました');
+    toast('提出日を毎月のGoogleカレンダーに登録しました');
   }catch(e){console.error('gcal delivery error',e);}
 }
 async function gcalImportEvents(){
@@ -1637,7 +1793,7 @@ async function gcalImportEvents(){
     n++;
   }
   if(n>0){save();render();}
-  toast(`📅 ${n}件取り込み${nTimed?`（うち時刻付き ${nTimed}件）`:''}`);
+  toast(`${n}件取り込み${nTimed?`（うち時刻付き ${nTimed}件）`:''}`);
 }
 
 // ===GOOGLE SHEETS===
@@ -1730,9 +1886,9 @@ async function sheetsSyncAll(silent=false){
   if(!_gcalToken||!(S.settings?.sheetsId))return;
   const jobs=(S.jobs||[]).filter(j=>!j.deleted);
   if(!jobs.length)return;
-  if(!silent)toast('📊 スプレッドシートを同期中…');
+  if(!silent)toast('スプレッドシートを同期中…');
   for(const job of jobs)await sheetsWriteJob(job);
-  if(!silent)toast(`📊 ${jobs.length}件をスプレッドシートに同期しました`);
+  if(!silent)toast(`${jobs.length}件をスプレッドシートに同期しました`);
 }
 
 // 30分ごとの自動同期
@@ -1901,7 +2057,7 @@ function sheetsDoImport(allJobs){
     S.jobs.push(j);n++;
   }
   save();render();closeModal();
-  toast(`📊 ${n}件の案件を取り込みました`);
+  toast(`${n}件の案件を取り込みました`);
 }
 
 const LOG_TYPE_LBL={revenue:'💰 収益',sales:'📞 営業',hire:'👤 採用'};
@@ -1919,6 +2075,18 @@ const UNIFIED_HORIZONS=[
   {v:'year10',     l:'10年後', icon:'🌟', kpi:null,  goals:'year10'},
   {v:'tree',       l:'ツリー',  icon:'🌳', kpi:null,  goals:'tree'},
 ];
+// UI上は「今月 / 1年 / 長期」の3グループに集約する（データ側の9ホライズンは一切変更しない）
+const HORIZON_GROUPS=[
+  {v:'now', l:'今月', members:['1w','this_month','next_month'], def:'this_month'},
+  {v:'year',l:'1年',  members:['3m','6m','year1'],              def:'year1'},
+  {v:'long',l:'長期', members:['year5','year10','tree'],        def:'year5'},
+];
+function horizonGroupOf(gv){return HORIZON_GROUPS.find(g=>g.members.includes(gv))||HORIZON_GROUPS[0];}
+function setGVGroup(v){
+  const g=HORIZON_GROUPS.find(x=>x.v===v);if(!g)return;
+  if(!g.members.includes(GV))GV=g.def;
+  render();
+}
 // 時間軸の長さ順（短→長）
 const HORIZON_ORDER=['this_month','next_month','monthly','year1','year5','year10'];
 // 上位目標として選べるホライズン（自分より長い時間軸）
@@ -1960,7 +2128,8 @@ const DEFAULT_FS=[
 ];
 
 // ===STATE===
-let S=load(), V=sessionStorage.getItem('ef_view')||'dashboard', TV='today', HV='weekly', WO=0, MO=0, EID=null, PVM='board', JD=today();
+let S=load(), V=resolveView(sessionStorage.getItem('ef_view')||'today'), TV='today', HV='weekly', WO=0, MO=0, EID=null, PVM='board', JD=today();
+let PV='week'; // 「予定」タブのサブビュー: week / month / fixed
 if(window.AIBridge)_personalTaskBaseline=AIBridge.taskBaseline(S.tasks||[]);
 let KV=null; // 現在の事業部ID
 let KT='1w'; // KPIページ内タブ
@@ -2181,7 +2350,7 @@ function syncToSheet(manual){
   };
   try{
     fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)});
-    if(manual)toast('📊 スプレッドシートへ同期しました（反映まで数秒）');
+    if(manual)toast('スプレッドシートへ同期しました（反映まで数秒）');
   }catch(e){
     if(manual)toast('同期に失敗しました: '+e,'warn');
   }
@@ -2489,7 +2658,7 @@ function saveGoalReview(){
   if(!ref){toast('振り返りを入力してください','err');return;}
   if(!S.goalReviews)S.goalReviews={};
   S.goalReviews[today()]={reflection:ref,reviewedAt:new Date().toISOString()};
-  save();render();toast('🎯 目標の振り返りを保存しました');
+  save();render();toast('目標の振り返りを保存しました');
 }
 function getDraftJobsToday(){
   const td=today();
@@ -2568,7 +2737,7 @@ function rGcalReminder(){
   const td=today();
   if(sessionStorage.getItem('ef_gcal_remind_off_'+td))return'';
   return`<div id="gcal-remind-banner" style="background:linear-gradient(135deg,#f59e0b18,#ef444415);border:2px solid var(--amber);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:14px">
-  <span style="font-size:30px;flex-shrink:0">📅</span>
+  <span style="font-size:26px;flex-shrink:0;display:inline-flex;color:var(--amber)">${iconSvg('i-calendar')}</span>
   <div style="flex:1">
     <div style="font-weight:800;color:var(--amber);font-size:15px;letter-spacing:.3px">Googleカレンダーを確認してください</div>
     <div style="font-size:13px;color:var(--text);margin-top:3px;font-weight:500">面談の予定は入っていませんか？</div>
@@ -2593,34 +2762,41 @@ function checkKpiLock(){
     return h.updatedAt<mondayStr;
   });
 }
-function checkDailyLock(){
-  // タイムスケジュールロック（最優先）
-  if(checkTimeScheduleLock())return true;
-  // 目標振り返りロック
-  if(checkGoalLock())return true;
-  // 朝：当日の初稿・クライアント提出確認ロック
-  if(checkDraftMorningLock())return true;
-  const now=new Date();
-  const hour=now.getHours();
+// 旧「起動時ロック」は廃止（2026-09-05の個人アプリ再設計）。
+// タイムスケジュール／目標／初稿朝／初稿夜／朝ジャーナル／KPI の6系統は
+// 夜の締め（Today Review）1画面に統合した。関数は他所からの呼び出し互換のため残す。
+function checkDailyLock(){return false;}
+// 夜の締めゲート: 21時以降・当日未記録・このセッションで「あとで」を押していない場合だけ表示する。
+function needsTodayReview(){
   const td=today();
-  const morningLockOn=S.settings?.morningLockEnabled!==false;
-  const eveningLockOn=S.settings?.eveningLockEnabled!==false;
-  const hasMorning=S.journals.some(j=>j.date===td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
-  // 朝8時以降で朝のジャーナルが未完了 → 朝ロック（設定ON時のみ）
-  if(morningLockOn&&hour>=8&&hour<19&&!hasMorning&&!sessionStorage.getItem('ef_skip_morning_'+td))return true;
-  if(hour<19){
-    // 時間帯に関わらずKPIロックをチェック
-    return checkKpiLock();
-  }
-  // 夜：翌日（前日）の初稿・クライアント提出確認ロック
-  if(checkDraftEveLock())return true;
-  if(!eveningLockOn)return checkKpiLock();
-  const hasEvening=S.journals.some(j=>j.date===td&&j.type==='evening'&&(j.achievement||j.reflection||j.tomorrow));
-  const todayHabits=S.habits.filter(h=>!h.deleted);
-  const habitDone=todayHabits.length===0||todayHabits.every(h=>(h.completedDates||[]).includes(td)||(h.failedDates||[]).includes(td));
-  const gymOk=!S.settings?.gymCommit||gymDoneToday();
-  if(!hasMorning||!hasEvening||!habitDone||!gymOk)return true;
-  return checkKpiLock();
+  if(S.settings?.eveningLockEnabled===false)return false;
+  if(sessionStorage.getItem('ef_skip_review_'+td))return false;
+  if(todayReviewDone(td))return false;
+  return new Date().getHours()>=21;
+}
+function skipTodayReview(){
+  sessionStorage.setItem('ef_skip_review_'+today(),'1');
+  render();
+}
+function rTodayReviewGate(){
+  const td=today();
+  const p=dailyPerformance(td);
+  const j=(S.journals||[]).find(x=>x.date===td&&x.type==='evening')||{};
+  const habits=habitsForDate(td);
+  const chores=choresForDate(td);
+  const row=(label,x)=>`<div class="rv-metric"><span>${label}</span><b>${x.done}/${x.total}（${p.rate(x.done,x.total)}%）</b></div>`;
+  return`<section class="card" style="max-width:640px;margin:0 auto">
+  <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">${iconSvg('i-moon')}<div style="font-size:19px;font-weight:800">夜の締め</div></div>
+  <div style="font-size:12px;color:var(--t2);margin-bottom:14px">今日を1画面で締めます。達成率・習慣・家事・一言メモだけ。</div>
+  <div class="card card-sm" style="margin-bottom:14px">${row('タスク',p.tasks)}${row('予定',p.schedule)}${row('固定スケジュール',p.fixedSchedule)}${row('習慣',p.habits)}</div>
+  ${habits.length?`<div class="fg"><div class="fl">習慣（${habits.filter(h=>(h.completedDates||[]).includes(td)).length}/${habits.length}）</div><div class="rv-chips">${habits.map(h=>`<button class="rv-chip ${(h.completedDates||[]).includes(td)?'on':''}" onclick="toggleHabit('${h.id}','${td}')">${esc(h.title)}</button>`).join('')}</div></div>`:''}
+  ${chores.length?`<div class="fg"><div class="fl">家事（${chores.filter(c=>(c.completedDates||[]).includes(td)).length}/${chores.length}）</div><div class="rv-chips">${chores.map(c=>`<button class="rv-chip ${(c.completedDates||[]).includes(td)?'on':''}" onclick="toggleChoreDone('${c.id}','${td}')">${esc(c.name)}</button>`).join('')}</div></div>`:''}
+  <div class="fg"><div class="fl">今日の一言メモ</div><textarea id="rv-note" rows="3" placeholder="うまくいったこと / 明日に回すこと">${esc(j.reflection||'')}</textarea></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+    <button class="btn btn-p" style="min-height:48px;flex:1" onclick="submitTodayReview()">記録してアプリを開く</button>
+    <button class="btn btn-g" style="min-height:48px" onclick="skipTodayReview()">あとで</button>
+  </div>
+</section>`;
 }
 function gymDoneToday(){
   const td=today();
@@ -2632,7 +2808,7 @@ function markGymRest(date){
   let w=S.workouts.find(w=>w.date===date);
   if(!w){w={date,entries:[],exercises:[]};S.workouts.push(w);}
   if(w.isRest){w.isRest=false;save();render();toast('休みの記録を取り消しました');}
-  else{w.isRest=true;save();render();toast('❌ 休みとして記録しました');}
+  else{w.isRest=true;save();render();toast('休みとして記録しました');}
 }
 function rLockScreen(){
   const now=new Date();
@@ -2791,45 +2967,21 @@ function rLockScreen(){
 }
 function render(){
   try{
-    // ロックチェック（朝8時以降・朝ジャーナル未完了、または19時以降・夜の記録未完了）
-    if(checkDailyLock()){
-      const _lh=new Date().getHours();
-      const _td=today();
-      const _hasMorning=S.journals.some(j=>j.date===_td&&(j.type==='morning'||!j.type)&&(j.topPriority||j.focusBlock||j.notToDo||j.decisions||j.obstacle||j.commitment||j.mood||j.content||j.gratitude||j.win));
-      // タイムスケジュールロック中は全ページブロック
-      const _tsLock=checkTimeScheduleLock();
-      // 朝ロック中かどうか：時間帯だけでなく実際に朝ジャーナルが未完了かで判定
-      const _morningLock=(S.settings?.morningLockEnabled!==false)&&_lh>=8&&_lh<19&&!_hasMorning&&!sessionStorage.getItem('ef_skip_morning_'+_td);
-      // 朝ロック：ジャーナルのみ通過許可
-      // KPIロック：KPIページのみ通過許可
-      // 夜ロック：ジャーナル・習慣トラッカー・フィットネス・KPIのみ通過許可
-      const _kpiOnly=!_tsLock&&!_morningLock&&checkKpiLock()&&!(_lh>=19&&(S.settings?.eveningLockEnabled!==false));
-      const _goalLock=!_tsLock&&checkGoalLock();
-      const _draftMornLock=!_tsLock&&!_goalLock&&checkDraftMorningLock();
-      const _draftEveLock=!_tsLock&&!_goalLock&&!_draftMornLock&&checkDraftEveLock();
-      // 初稿確認ロック：案件管理ページへのアクセスを許可（確認後にボタンでアプリを開く）
-      const _pass=V==='finance'||(_tsLock?(V==='tasks'):_goalLock?(V==='goals'):_draftMornLock?(V==='projects'):_draftEveLock?(V==='projects'):_kpiOnly?(V==='goals'):_morningLock?(V==='journal'):(V==='journal'||V==='habits'||V==='fitness'||V==='goals'));
-      if(!_pass){
-        V='dashboard';
-        sessionStorage.setItem('ef_view','dashboard');
-        document.getElementById('view').innerHTML=rLockScreen();
-        renderNav();
-        return;
-      }
-    }
+    // 起動時ロックは「夜の締め（Today Review）」1画面へ統合済み。
+    // 旧6系統（タイムスケジュール/目標/初稿朝/初稿夜/朝ジャーナル/KPI + 家計簿ゲート）は廃止。
+    V=resolveView(V); // 旧ビュー名(dashboard/kpi)は新ビューへ寄せる。未知の値でも落ちない。
     sessionStorage.setItem('ef_view',V);
-    if(V==='kpi'){V='goals';} // KPI管理は目標・KPI統合ページにリダイレクト
-    if(!dailyOpenGatePassed()){
-      document.getElementById('view').innerHTML=V==='finance'?rFinance():rDailyOpenGate('EditFlow');
+    if(needsTodayReview()){
+      document.getElementById('view').innerHTML=rTodayReviewGate();
       renderNav();
       return;
     }
-    const views={dashboard:rDash,tasks:rTasks,performance:rPerformanceHistory,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,chores:rChores,goals:rGoals,journal:rJournal,finance:rFinance,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
+    const views={today:rToday,plan:rPlan,life:rLife,log:rLog,dashboard:rToday,tasks:rTasks,performance:rPerformanceHistory,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,chores:rChores,goals:rGoals,journal:rJournal,finance:rFinance,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
       html=page?rCustomPage(page):`<div class="empty"><div class="empty-icon">😕</div><div>ページが見つかりません</div></div>`;
-    }else{html=(views[V]||rDash)();}
+    }else{html=(views[V]||rToday)();}
     document.getElementById('view').innerHTML=rHpFeeReminder()+rGcalReminder()+rDraftReminder()+html;
     renderNav();
     renderGcalUI();
@@ -3023,7 +3175,7 @@ function rBizBoard(){
       ${extra?`<button class="btn btn-g btn-xs" onclick="event.stopPropagation();bizDelTask('${t.id}')">✕</button>`:''}
     </div>`;
   };
-  return`${secTitle('🏢 経営ボード — mono.create 3事業(HP/LINE・シフトさん・編集者派遣)')}
+  return`${secTitle('経営ボード — mono.create 3事業(HP/LINE・シフトさん・編集者派遣)')}
 <div class="card" style="margin-bottom:12px;border-left:3px solid var(--purple)">
   <div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:.05em;margin-bottom:4px">NORTH STAR</div>
   <div style="font-weight:700;font-size:14px;line-height:1.6">${esc(BIZ_BOARD.north)}</div>
@@ -3407,7 +3559,7 @@ function rBizUnits(){
     (u.recruits||[]).forEach(r=>{if(r.hiredDate&&buThisMonth(r.hiredDate)){mSasaki+=(r.commSasaki||0);mStaff+=(r.commStaff||0);}});
   });
   const pct=_pct(mSales,mTarget||1);
-  return`${secTitle('🏬 事業部ボード — 佐々木さんと共有(全アカウント同期)')}
+  return`${secTitle('事業部ボード — 佐々木さんと共有(全アカウント同期)')}
 <div style="font-size:11px;color:var(--t3);margin-bottom:12px">
   事業部ごとに目標・営業記録・採用記録・メモを共有します。<b>HP構築+編集者派遣で今月¥500,000が全社目標</b>。<br>
   報酬は事業部ごとの規程で自動計算(各カードに明記)。営業成約も採用も、スタッフ獲得時は佐々木さんに管理報酬が入ります。
@@ -3577,7 +3729,7 @@ function mtDel(id){
 function rMinutes(){
   mtSeed();
   const list=S.teamMeetings||[];
-  return`${secTitle('📝 議事録 — チーム共有(会長・楓芽さん共同編集)')}
+  return`${secTitle('議事録 — チーム共有(会長・楓芽さん共同編集)')}
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
   <div style="font-size:11px;color:var(--t3)">アジェンダは会議前にAIが用意。会議中は「議事メモ」に直接入力すれば全員に同期されます。</div>
   <button class="btn btn-p btn-sm" onclick="mtAdd()">＋ 会議を追加</button>
@@ -3706,7 +3858,7 @@ function rDashTeamSummary(){
   const td_=today();
   const posts=(S.teamPosts||[]).filter(p=>!p.deleted&&p.status!=='投稿済'&&(p.scheduledDate||'')>=td_).sort((a,b)=>((a.scheduledDate||'')+(a.scheduledTime||''))>((b.scheduledDate||'')+(b.scheduledTime||''))?1:-1).slice(0,3);
   if(!(deals.length||kgis.length||posts.length))return'';
-  let h=`${secTitle('📊 チームサマリー')}`;
+  let h=`${secTitle('チームサマリー')}`;
   if(deals.length){
     h+=`<div class="card card-sm" style="margin-bottom:8px;cursor:pointer" onclick="V='pipeline';render()">
       <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;font-size:13px">🤝 商談</span><span style="font-size:11px;color:var(--t2)">進行中 ${openDeals.length}件</span></div>
@@ -3822,7 +3974,7 @@ ${(()=>{
   const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);const tm=`${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')}`;
   const dueJobs=activeJ.filter(j=>j.deliveryDate===td||j.deliveryDate===tm);
   if(!dueJobs.length)return'';
-  return`${secTitle('📅 今日・明日の納品')}
+  return`${secTitle('今日・明日の納品')}
 ${dueJobs.map(item=>{
   const date=item.deliveryDate;
   return`<div class="card card-sm" style="margin-bottom:6px;border-color:${date===td?'var(--red)':'var(--amber)'}">
@@ -3871,7 +4023,7 @@ ${!ci?`<div class="checkin-banner">
   <div class="stat-card ${doneHabits===todayHabits.length&&todayHabits.length>0?'cg':''}"><div class="stat-val">${doneHabits}/${todayHabits.length}</div><div class="stat-lbl">🔥 今日の習慣</div></div>
 </div>
 
-${secTitle('🕐 今日のスケジュール')}
+${secTitle('今日のスケジュール')}
 ${rFixedScheduleList(true,false,undefined,false)}
 
 ${(()=>{
@@ -3883,7 +4035,7 @@ ${(()=>{
 })()}
 
 ${atRisk.length>0?`
-${secTitle('⚠️ ストリーク危機')}
+${secTitle('ストリーク危機')}
 ${atRisk.map(h=>`<div class="card card-sm" style="margin-bottom:6px;border-color:var(--red)">
   <div style="display:flex;align-items:center;justify-content:space-between">
     <span style="font-weight:600">${esc(h.title)}</span>
@@ -3893,7 +4045,7 @@ ${atRisk.map(h=>`<div class="card card-sm" style="margin-bottom:6px;border-color
 </div>`).join('')}`:''}
 
 ${pi.total>0?`
-${secTitle('🧠 先延ばし分析')}
+${secTitle('先延ばし分析')}
 <div class="procra-panel">
   <div class="procra-title">今月の後回し: ${pi.total}回${pi.top?` | 最多理由: 「${pi.top}」`:''}</div>
   ${pi.worst?`<div style="font-size:12px;color:var(--t2)">後回し常連: 「${esc(pi.worst.title)}」(${pi.worst.procCount}回)</div>`:''}
@@ -3945,7 +4097,7 @@ function saveCheckIn(){
   S.checkIns=S.checkIns.filter(c=>c.date!==today());
   S.checkIns.push({date:today(),mood:+mood||3,energy:+energy||3,win,grat,frogId});
   if(frogId){S.frogId=frogId;if(!S.settings)S.settings={};S.settings.nowTaskId=frogId;}
-  save();closeModal();render();toast('チェックイン完了！今日も頑張りましょう 💪');
+  save();closeModal();render();toast('チェックイン完了！今日も頑張りましょう ');
 }
 function editIdentity(){
   const v=prompt('あなたのアイデンティティ文を入力:\n例：私は毎日コンテンツを届けるクリエイターです',S.settings.identity||'');
@@ -3963,7 +4115,7 @@ function openFrogPicker(){
   </div>`).join('')}
 </div>`);
 }
-function setFrog(id){S.frogId=id;if(!S.settings)S.settings={};S.settings.nowTaskId=id;save();render();const t=S.tasks.find(t=>t.id===id);toast(`🐸「${t?.title}」をカエルに設定`);}
+function setFrog(id){S.frogId=id;if(!S.settings)S.settings={};S.settings.nowTaskId=id;save();render();const t=S.tasks.find(t=>t.id===id);toast(`「${t?.title}」をカエルに設定`);}
 function quickHabit(id){toggleHabit(id,today());}
 // ===TASKS===
 const TASK_SORT_OPTS=[['manual','手動順'],['deadline','期限順'],['priority','優先度順'],['created','作成順']];
@@ -4010,7 +4162,7 @@ function recordDailyPerformance(date=today()){
     S.dailyOpenReviews[date]={...review,date,taskPerformanceRecorded:true,taskPerformanceRate:performanceMetricRate(entry.tasks),taskPerformanceRecordedAt:entry.recordedAt};
     try{const key='mono_daily_open_gate_'+date,shared=JSON.parse(localStorage.getItem(key)||'{}');localStorage.setItem(key,JSON.stringify({...shared,...S.dailyOpenReviews[date]}));}catch(_){}
   }
-  save();render();toast('📈 今日の達成率を記録しました');
+  save();render();toast('今日の達成率を記録しました');
 }
 let PERF_MONTH='all';
 function performanceLogMetrics(entry){
@@ -4044,19 +4196,19 @@ function rPerformanceHistory(){
     const dateLabel=isNaN(d)?esc(entry.date||''):d.toLocaleDateString('ja-JP',{year:'numeric',month:'short',day:'numeric',weekday:'short'});
     return`<tr style="border-bottom:1px solid var(--border)"><td style="padding:12px 14px;font-weight:700;white-space:nowrap">${dateLabel}</td><td style="padding:10px 12px">${metricCell(m.tasks,'var(--green)')}</td><td style="padding:10px 12px">${metricCell(m.schedule,'var(--blue)')}</td><td style="padding:10px 12px">${metricCell(m.fixedSchedule,'var(--purple)')}</td><td style="padding:10px 12px">${metricCell(m.habits,'var(--amber)')}</td><td style="padding:10px 14px;text-align:center"><span class="badge ${overall>=80?'bg':overall>=50?'ba':'br'}" style="font-size:12px;padding:5px 10px">${overall}%</span></td></tr>`;
   }).join('');
-  return`<div class="ph"><div><div class="ph-title">📈 達成率履歴</div><div style="font-size:12px;color:var(--t2);margin-top:3px">タスク・スケジュール・固定スケジュール・習慣の日別記録</div></div><div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-g btn-sm" onclick="V='tasks';TV='today';render()">← 今日のタスク</button><button class="btn btn-p btn-sm" onclick="recordDailyPerformance(today())">今日を記録</button></div></div>
+  return`<div class="ph"><div><div class="ph-title">達成率履歴</div><div style="font-size:12px;color:var(--t2);margin-top:3px">タスク・スケジュール・固定スケジュール・習慣の日別記録</div></div><div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-g btn-sm" onclick="V='tasks';TV='today';render()">← 今日のタスク</button><button class="btn btn-p btn-sm" onclick="recordDailyPerformance(today())">今日を記録</button></div></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${summary('🗓','記録日数',filtered.length+'日','var(--text)')}${summary('◎','総合平均',overallAvg+'%','var(--purple)')}${summary('✅','タスク平均',avg('tasks')+'%','var(--green)')}${summary('📅','予定平均',avg('schedule')+'%','var(--blue)')}${summary('🕐','固定平均',avg('fixedSchedule')+'%','var(--purple)')}${summary('🔥','習慣平均',avg('habits')+'%','var(--amber)')}</div>
   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap"><div style="font-size:13px;font-weight:700">日別履歴 <span style="color:var(--t2);font-weight:500">${filtered.length}件</span></div><label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--t2)">期間<select aria-label="表示する月" onchange="PERF_MONTH=this.value;render()" style="width:auto;min-width:130px;padding:5px 9px"><option value="all" ${PERF_MONTH==='all'?'selected':''}>すべて</option>${months.map(m=>`<option value="${m}" ${PERF_MONTH===m?'selected':''}>${m.replace('-','年')}月</option>`).join('')}</select></label></div>
   ${filtered.length?`<div class="card" style="padding:0;overflow-x:auto"><table aria-label="達成率履歴" style="width:100%;min-width:780px;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--card2);color:var(--t2)"><th scope="col" style="padding:9px 14px;text-align:left">日付</th><th scope="col" style="padding:9px 12px;text-align:left">タスク</th><th scope="col" style="padding:9px 12px;text-align:left">スケジュール</th><th scope="col" style="padding:9px 12px;text-align:left">固定スケジュール</th><th scope="col" style="padding:9px 12px;text-align:left">習慣</th><th scope="col" style="padding:9px 14px;text-align:center">総合</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">達成率の記録がありません</div><div style="font-size:12px;color:var(--t3);margin-top:5px">「今日を記録」を押すと、ここに履歴が追加されます</div></div>`}`;
 }
 function rDailyPerformanceCard(date){
-  const p=dailyPerformance(date),item=(icon,label,x)=>`<div style="flex:1;min-width:92px;background:var(--card2);border-radius:8px;padding:8px"><div style="font-size:11px;color:var(--t2)">${icon} ${label}</div><b>${x.done}/${x.total} (${p.rate(x.done,x.total)}%)</b></div>`;
+  const p=dailyPerformance(date),item=(icon,label,x)=>`<div style="flex:1;min-width:92px;background:var(--card2);border-radius:8px;padding:8px"><div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t2)">${iconSvg(icon)} ${label}</div><b>${x.done}/${x.total} (${p.rate(x.done,x.total)}%)</b></div>`;
   const history=(S.performanceLogs||[]).filter(x=>x.date!==date).slice(0,5);
   const historyLine=x=>{
     const m=performanceLogMetrics(x);
     return`${x.date.slice(5).replace('-','/')} タスク${m.tasks.done}/${m.tasks.total}・予定${m.schedule.done}/${m.schedule.total}・固定${m.fixedSchedule.done}/${m.fixedSchedule.total}・習慣${m.habits.done}/${m.habits.total}`;
   };
-  return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b>📈 今日の達成率</b><div style="display:flex;gap:6px"><button class="btn btn-g btn-xs" onclick="V='performance';render()">履歴一覧</button><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('✅','タスク',p.tasks)}${item('📅','スケジュール',p.schedule)}${item('🕐','固定スケジュール',p.fixedSchedule)}${item('🔥','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(historyLine).join('　')}</div>`:''}</div>`;
+  return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b>今日の達成率</b><div style="display:flex;gap:6px"><button class="btn btn-g btn-xs" onclick="V='performance';render()">履歴一覧</button><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('i-check','タスク',p.tasks)}${item('i-calendar','スケジュール',p.schedule)}${item('i-clock','固定スケジュール',p.fixedSchedule)}${item('i-flame','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(historyLine).join('　')}</div>`:''}</div>`;
 }
 function rTasks(){
   const isDecisionView=TV==='decisions',isSessionView=TV==='sessions';
@@ -4227,6 +4379,335 @@ function rTasksLater(){
   return`${rFocusNowCard()}<div class="later-intro"><div><div style="font-size:15px;font-weight:800">後回しリスト</div><div style="font-size:12px;color:var(--t2);margin-top:3px">期限超過のタスクは、予定済み・「今やる」指定にかかわらず自動でここに表示します。</div></div><span class="badge ${overdueCount?'br':'bk'}">${tasks.length}件${overdueCount?`・期限超過 ${overdueCount}件`:''}</span></div>${tasks.length?tasks.map(rLaterTaskItem).join(''):`<div class="card card-sm" style="text-align:center;color:var(--t2);padding:28px">後回しのタスクはありません。</div>`}`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 個人運用の中核4ビュー: 今日(today) / 予定(plan) / くらし(life) / 記録(log)
+// 既存のビュー関数は削除せず再利用する。データ構造は一切変更しない。
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── 完了操作の一本化 ───────────────────────────────────────────────
+// タスク・習慣・家事・家事ルーティンの「完了」を1つの入口にまとめる。
+// 保存形式は既存のまま（toggleDone / toggleHabit / toggleChoreDone を呼ぶ）。
+function completeAny(kind,id,date){
+  const d=date||today();
+  if(kind==='task')return toggleDone(id);
+  if(kind==='habit')return toggleHabit(id,d);
+  if(kind==='chore')return toggleChoreDone(id,d);
+  if(kind==='routine'){
+    const r=(S.choreRoutines||[]).find(x=>x.id===id&&!x.deleted);if(!r)return;
+    const items=r.items||[];
+    const cur=routineDoneList(r,d);
+    if(!r.done)r.done={};
+    const allDone=items.length>0&&cur.length>=items.length;
+    r.done[d]=allDone?[]:items.map((_,i)=>i);
+    r.updatedAt=Date.now();
+    playCheckSound(!allDone);
+    save();render();
+    toast(allDone?'ルーティンを未完了に戻しました':'ルーティンを完了にしました');
+    return;
+  }
+}
+// 左スワイプ: 明日へ送る（タスクのみ）
+function sendToTomorrow(kind,id){
+  if(kind!=='task')return;
+  const t=(S.tasks||[]).find(x=>x.id===id&&!x.deleted);if(!t)return;
+  const d=new Date();d.setDate(d.getDate()+1);
+  t.dueDate=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  t.updatedAt=Date.now();
+  if(S.settings?.nowTaskId===id)S.settings.nowTaskId=null;
+  if(S.frogId===id)S.frogId=null;
+  save();render();toast('明日へ送りました');
+}
+
+// ─── スワイプ / 長押しドラッグ並べ替え（pointer events・スマホ対応）──────
+// 右スワイプ=完了 / 左スワイプ=明日へ（閾値80px・transformはtranslateXのみ）
+// 長押し(450ms)→ドラッグで並べ替え。既存の ▲▼ ボタンはそのまま残す。
+const SWIPE_THRESHOLD=80;
+const HOLD_MS=450;
+let _swipe=null,_holdTimer=null,_reorder=null;
+function _ptrInteractive(target){
+  return!!(target.closest&&target.closest('button,a,input,select,textarea,label,.chk,.sub-chk,.tact,.nav-drag-handle'));
+}
+function _ptrRow(e){
+  const el=e.target.closest&&e.target.closest('.task-item[data-kind]');
+  return el&&el.dataset.id?el:null;
+}
+function _swipeReset(){
+  if(!_swipe)return;
+  _swipe.el.style.transform='';
+  _swipe.el.classList.remove('swiping','swipe-right','swipe-left');
+}
+function _reorderList(el){return el.closest('[data-reorder-list]');}
+function _reorderStart(el){
+  const list=_reorderList(el);if(!list)return;
+  _swipeReset();
+  if(_swipe)_swipe.active=false;
+  _reorder={el,list};
+  el.classList.add('reordering');
+  try{navigator.vibrate&&navigator.vibrate(12);}catch(_){}
+}
+function _reorderMove(e){
+  const rows=[..._reorder.list.querySelectorAll('.task-item[data-kind="task"]')];
+  const over=rows.find(r=>{
+    if(r===_reorder.el)return false;
+    const b=r.getBoundingClientRect();
+    return e.clientY>=b.top&&e.clientY<=b.bottom;
+  });
+  if(!over)return;
+  const b=over.getBoundingClientRect();
+  const after=e.clientY>b.top+b.height/2;
+  over.parentNode.insertBefore(_reorder.el,after?over.nextSibling:over);
+}
+function _reorderCommit(){
+  if(!_reorder)return;
+  const list=_reorder.list;
+  _reorder.el.classList.remove('reordering');
+  _reorder=null;
+  const ids=[...list.querySelectorAll('.task-item[data-kind="task"]')].map(r=>r.dataset.id).filter(Boolean);
+  reorderTasksTo(ids);
+}
+// 対象タスクが S.tasks 内で占めていた位置はそのままに、その位置の中身だけ並べ替える。
+// （他のタスクの位置を動かさないので、他ビューの並びを壊さない）
+function reorderTasksTo(ids){
+  const slots=[];
+  ids.forEach(id=>{const i=(S.tasks||[]).findIndex(t=>t.id===id);if(i>=0)slots.push(i);});
+  const objs=ids.map(id=>(S.tasks||[]).find(t=>t.id===id)).filter(Boolean);
+  if(slots.length!==objs.length||!objs.length)return render();
+  slots.sort((a,b)=>a-b).forEach((pos,i)=>{S.tasks[pos]=objs[i];});
+  if(getTaskSort()!=='manual'){if(!S.settings)S.settings={};S.settings.taskSortOrder='manual';}
+  save();render();toast('並び順を変更しました');
+}
+document.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  const el=_ptrRow(e);if(!el)return;
+  if(_ptrInteractive(e.target))return;
+  _swipe={el,x:e.clientX,y:e.clientY,dx:0,active:false,pid:e.pointerId,
+    kind:el.dataset.kind,id:el.dataset.id,date:el.dataset.date||today()};
+  clearTimeout(_holdTimer);
+  if(el.dataset.kind==='task'&&_reorderList(el)){
+    _holdTimer=setTimeout(()=>{if(_swipe&&!_swipe.active)_reorderStart(el);},HOLD_MS);
+  }
+},{passive:true});
+document.addEventListener('pointermove',e=>{
+  if(_reorder){e.preventDefault&&e.cancelable&&e.preventDefault();_reorderMove(e);return;}
+  if(!_swipe||e.pointerId!==_swipe.pid)return;
+  const dx=e.clientX-_swipe.x,dy=e.clientY-_swipe.y;
+  if(!_swipe.active){
+    if(Math.abs(dx)>6||Math.abs(dy)>6)clearTimeout(_holdTimer);
+    if(Math.abs(dx)<12||Math.abs(dx)<=Math.abs(dy))return;
+    _swipe.active=true;_swipe.el.classList.add('swiping');
+  }
+  _swipe.dx=dx;
+  _swipe.el.style.transform=`translateX(${Math.max(-140,Math.min(140,dx))}px)`;
+  _swipe.el.classList.toggle('swipe-right',dx>=SWIPE_THRESHOLD);
+  _swipe.el.classList.toggle('swipe-left',dx<=-SWIPE_THRESHOLD&&_swipe.kind==='task');
+});
+function _ptrEnd(){
+  clearTimeout(_holdTimer);
+  if(_reorder){_reorderCommit();_swipe=null;return;}
+  if(!_swipe)return;
+  const s=_swipe;_swipeReset();_swipe=null;
+  if(!s.active)return;
+  if(s.dx>=SWIPE_THRESHOLD)completeAny(s.kind,s.id,s.date);
+  else if(s.dx<=-SWIPE_THRESHOLD)sendToTomorrow(s.kind,s.id);
+}
+document.addEventListener('pointerup',_ptrEnd);
+document.addEventListener('pointercancel',_ptrEnd);
+
+// ─── 「今日」ビュー ────────────────────────────────────────────────
+// 今日やる分だけを1画面に集約する。
+// 直近ブロック / 未完了タスク（期限切れ含む）/ 習慣 / 家事 / 完了済み（折りたたみ）
+function todayOpenTasks(){
+  const td=today();
+  // 「今日」= 期限が今日以前 or 期限なし。rTasksLater の“今日ぶん”をここへ統合。
+  return sortTaskList((S.tasks||[]).filter(t=>!t.deleted&&!t.done&&(!t.dueDate||t.dueDate<=td)));
+}
+function currentFsBlock(date){
+  const d=date||today();
+  const blocks=(fsBlocksForDate(d)||[]).filter(f=>f&&f.s);
+  if(!blocks.length)return null;
+  const n=new Date(),nowM=n.getHours()*60+n.getMinutes();
+  const norm=blocks.map((f,i)=>({f,i,s:tMin(f.s),e:f.e?tMin(f.e):tMin(f.s)+60})).sort((a,b)=>a.s-b.s);
+  const cur=norm.find(x=>nowM>=x.s&&nowM<x.e);
+  if(cur)return{...cur,isNow:true};
+  const next=norm.find(x=>x.s>nowM);
+  return next?{...next,isNow:false}:null;
+}
+function rNowBlockCard(){
+  const b=currentFsBlock();
+  if(!b)return'';
+  const t=(b.f.t||'（無題）'),d=(b.f.d||'');
+  return`<div class="now-block ${b.isNow?'is-now':''}">
+  <div class="now-block-head"><span class="badge ${b.isNow?'bp':'bb'}">${iconSvg('i-clock')} ${b.isNow?'いま':'つぎ'}</span><span class="now-block-time">${esc(b.f.s)}${b.f.e?'〜'+esc(b.f.e):''}</span></div>
+  <div class="now-block-ttl">${esc(t)}</div>
+  ${d?`<div class="now-block-desc">${esc(d)}</div>`:''}
+  <button class="btn btn-g btn-sm" style="margin-top:10px" onclick="V='plan';PV='fixed';render()">1日の流れを見る</button>
+</div>`;
+}
+function quickAddTask(e){
+  if(e&&e.key&&e.key!=='Enter')return;
+  const el=document.getElementById('quick-add-title');
+  const title=(el&&el.value||'').trim();
+  if(!title){el&&el.focus();return;}
+  if(!Array.isArray(S.tasks))S.tasks=[];
+  S.tasks.unshift({id:uid(),title,description:'',dueDate:today(),dueTime:null,priority:null,
+    startTime:null,endTime:null,timeSlots:[],estimatedMinutes:null,subtasks:[],
+    done:false,procCount:0,createdAt:new Date().toISOString(),updatedAt:Date.now()});
+  if(el)el.value='';
+  save();render();toast('タスクを追加しました');
+  const next=document.getElementById('quick-add-title');
+  if(next)next.focus();
+}
+function quickAddDetail(){
+  const el=document.getElementById('quick-add-title');
+  const title=(el&&el.value||'').trim();
+  openTaskModal(null,today());
+  if(title){const f=document.getElementById('t-ttl');if(f){f.value=title;_modalDirty=true;}}
+}
+function rToday(){
+  const td=today();
+  const now=new Date();
+  const focus=currentFocusTask();
+  const open=todayOpenTasks();
+  const list=open.filter(t=>t.id!==(focus&&focus.id));
+  const overdue=list.filter(isTaskOverdue).length;
+  const done=(S.tasks||[]).filter(t=>!t.deleted&&t.done&&t.doneDate===td);
+  const habits=habitsForDate(td).slice().sort((a,b)=>((a.time||'23:59')>(b.time||'23:59')?1:-1));
+  const habitDone=habits.filter(h=>(h.completedDates||[]).includes(td)).length;
+  const chores=choresForDate(td);
+  const choreDone=chores.filter(c=>(c.completedDates||[]).includes(td)).length;
+  const routines=routinesForDate(td);
+  return`
+<div class="ph">
+  <div class="ph-title">今日 <small>${now.toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'short'})}</small></div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap">
+    <button class="btn btn-g btn-sm" onclick="openTodayReview()">夜の締め</button>
+    <button class="btn btn-p btn-sm" onclick="openTaskModal(null,today())">＋ 詳しく追加</button>
+  </div>
+</div>
+<div class="today-sticky">${rFocusNowCard()}</div>
+<div class="quick-add">
+  <input id="quick-add-title" placeholder="やることを入力してEnter" aria-label="今日のタスクを追加" onkeydown="quickAddTask(event)" autocomplete="off">
+  <button class="btn btn-p" onclick="quickAddTask()">追加</button>
+  <button class="btn btn-g" onclick="quickAddDetail()">詳細</button>
+</div>
+${rNowBlockCard()}
+${secTitle(`${iconSvg('i-check','sec-ic')} 今日のタスク（${list.length}件${overdue?`・期限超過 ${overdue}件`:''}）`)}
+<div class="swipe-hint">右へスワイプ=完了 / 左へスワイプ=明日へ / 長押しで並べ替え</div>
+<div data-reorder-list="today">
+${list.length?list.map(t=>rTaskItem(t)).join(''):`<div class="card card-sm" style="text-align:center;color:var(--t2);padding:24px">今日のタスクはありません。</div>`}
+</div>
+${habits.length?`${secTitle(`${iconSvg('i-flame','sec-ic')} 習慣（${habitDone}/${habits.length}）`)}${habits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
+${chores.length?`${secTitle(`${iconSvg('i-broom','sec-ic')} 家事（${choreDone}/${chores.length}）`)}${chores.map(c=>rChoreInTaskView(c,td,true)).join('')}`:''}
+${routines.length?`${secTitle(`${iconSvg('i-broom','sec-ic')} 家事ルーティン（${routines.length}）`)}${routines.map(r=>rRoutineInTaskView(r,td,true)).join('')}`:''}
+${done.length?`<details class="done-fold"><summary>完了済み ${done.length}件</summary><div style="margin-top:10px">${done.map(t=>rTaskItem(t)).join('')}</div></details>`:''}`;
+}
+
+// ─── 「予定」ビュー ────────────────────────────────────────────────
+function setPV(v){PV=v;if(v==='week')WO=0;if(v==='month')MO=0;render();}
+function rPlan(){
+  if(!['week','month','fixed'].includes(PV))PV='week';
+  return`<div class="ph">
+  <div class="ph-title">予定</div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn btn-p btn-sm" onclick="openTaskModal(null,today())">＋ タスク追加</button></div>
+</div>
+${subTabs([['week','週間'],['month','月間'],['fixed','1日の流れ']],PV,'setPV')}
+${PV==='month'?rTasksMonthly():PV==='fixed'?rHabitsSchedule():rTasksWeekly()}`;
+}
+
+// ─── 「くらし」ビュー ──────────────────────────────────────────────
+function rLife(){
+  return`<div class="ph">
+  <div class="ph-title">くらし</div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap">
+    <button class="btn btn-g btn-sm" onclick="openHabitModal()">＋ 習慣</button>
+    <button class="btn btn-p btn-sm" onclick="openChoreModal()">＋ 家事</button>
+  </div>
+</div>
+${secTitle(`${iconSvg('i-flame','sec-ic')} 習慣`)}
+${rHabitsWeekly()}
+<div style="height:18px"></div>
+${rChores()}`;
+}
+
+// ─── 「記録」ビュー ────────────────────────────────────────────────
+const LOG_CARDS=[
+  {view:'journal',    icon:'i-book',    label:'ジャーナル', desc:'朝と夜の書き出し'},
+  {view:'performance',icon:'i-chart',   label:'達成率',     desc:'日別の達成率履歴'},
+  {view:'finance',    icon:'i-yen',     label:'家計簿',     desc:'収入・支出・予算'},
+  {view:'fitness',    icon:'i-dumbbell',label:'筋トレ',     desc:'トレーニング記録'},
+  {view:'memo',       icon:'i-brain',   label:'メモ',       desc:'思いつきの書き出し'},
+];
+function rLog(){
+  const td=today();
+  const reviewed=todayReviewDone(td);
+  return`<div class="ph">
+  <div class="ph-title">記録</div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn ${reviewed?'btn-g':'btn-p'} btn-sm" onclick="openTodayReview()">${reviewed?'夜の締め（記録済み）':'夜の締めをする'}</button></div>
+</div>
+${rDailyPerformanceCard(td)}
+<div class="log-grid">
+${LOG_CARDS.map(c=>`<button class="log-card" onclick="setV('${c.view}')">
+  <span class="log-card-ic">${iconSvg(c.icon)}</span>
+  <span class="log-card-body"><span class="log-card-ttl">${c.label}</span><span class="log-card-desc">${c.desc}</span></span>
+</button>`).join('')}
+</div>`;
+}
+
+// ─── 夜の締め（Today Review）: 起動時ロック6系統をこの1画面に統合 ─────────
+// 書き込み先は既存形式のまま: S.performanceLogs / S.journals / S.dailyOpenReviews
+function todayReviewRecord(date){
+  const d=date||today();
+  const local=(S.dailyOpenReviews||{})[d];
+  let shared=null;try{shared=JSON.parse(localStorage.getItem('mono_daily_open_gate_'+d)||'null');}catch(_){}
+  return local||shared||null;
+}
+function todayReviewDone(date){
+  const d=date||today();
+  const r=todayReviewRecord(d);
+  return!!(r&&(r.eveningReviewed||r.goalConfirmed));
+}
+function openTodayReview(){
+  const td=today();
+  const p=dailyPerformance(td);
+  const j=(S.journals||[]).find(x=>x.date===td&&x.type==='evening')||{};
+  const habits=habitsForDate(td);
+  const chores=choresForDate(td);
+  const row=(label,x)=>`<div class="rv-metric"><span>${label}</span><b>${x.done}/${x.total}（${p.rate(x.done,x.total)}%）</b></div>`;
+  openModal(`<div class="mhdr"><div><div class="mtitle">夜の締め</div><div style="font-size:12px;color:var(--t2);margin-top:4px">今日を1画面で締める（達成率・習慣・家事・一言メモ）</div></div><button class="mclose" onclick="closeModal()">✕</button></div>
+<div class="card card-sm" style="margin-bottom:12px">
+  ${row('タスク',p.tasks)}${row('予定',p.schedule)}${row('固定スケジュール',p.fixedSchedule)}${row('習慣',p.habits)}
+</div>
+${habits.length?`<div class="fg"><div class="fl">習慣（${habits.filter(h=>(h.completedDates||[]).includes(td)).length}/${habits.length}）</div><div class="rv-chips">${habits.map(h=>`<button class="rv-chip ${(h.completedDates||[]).includes(td)?'on':''}" onclick="toggleHabit('${h.id}','${td}');openTodayReview()">${esc(h.title)}</button>`).join('')}</div></div>`:''}
+${chores.length?`<div class="fg"><div class="fl">家事（${chores.filter(c=>(c.completedDates||[]).includes(td)).length}/${chores.length}）</div><div class="rv-chips">${chores.map(c=>`<button class="rv-chip ${(c.completedDates||[]).includes(td)?'on':''}" onclick="toggleChoreDone('${c.id}','${td}');openTodayReview()">${esc(c.name)}</button>`).join('')}</div></div>`:''}
+<div class="fg"><div class="fl">今日の一言メモ</div><textarea id="rv-note" rows="3" placeholder="うまくいったこと / 明日に回すこと" onchange="markModalDirty()">${esc(j.reflection||'')}</textarea></div>
+<div class="mfooter"><button class="btn btn-g" onclick="closeModal()">閉じる</button><button class="btn btn-p" onclick="submitTodayReview()">記録して閉じる</button></div>`);
+}
+function submitTodayReview(){
+  const td=today();
+  const note=(document.getElementById('rv-note')||{}).value||'';
+  // 1) 達成率: 既存の performanceLogs 形式で保存（recordDailyPerformance と同一形式）
+  const entry={...dailyPerformance(td),recordedAt:new Date().toISOString(),updatedAt:Date.now()};
+  if(!Array.isArray(S.performanceLogs))S.performanceLogs=[];
+  const pi=S.performanceLogs.findIndex(x=>x.date===td);
+  if(pi>=0)S.performanceLogs[pi]=entry;else S.performanceLogs.unshift(entry);
+  // 2) 一言メモ: 既存の夜ジャーナル形式（type:'evening'）で保存
+  const text=note.trim();
+  const prev=(S.journals||[]).find(x=>x.date===td&&x.type==='evening')||{};
+  S.journals=(S.journals||[]).filter(x=>!(x.date===td&&x.type==='evening'));
+  if(text||prev.achievement||prev.tomorrow){
+    S.journals.push({date:td,type:'evening',achievement:prev.achievement||'',tomorrow:prev.tomorrow||'',reflection:text,updatedAt:Date.now()});
+  }
+  // 3) 締めの記録: 既存の dailyOpenReviews 形式（読み取り互換のため旧キーも維持）
+  if(!S.dailyOpenReviews)S.dailyOpenReviews={};
+  const old=S.dailyOpenReviews[td]||todayReviewRecord(td)||{};
+  const rec={...old,date:td,eveningReviewed:true,eveningReviewedAt:Date.now(),
+    taskPerformanceRecorded:true,taskPerformanceRate:performanceMetricRate(entry.tasks),taskPerformanceRecordedAt:entry.recordedAt};
+  S.dailyOpenReviews[td]=rec;
+  try{const key='mono_daily_open_gate_'+td,shared=JSON.parse(localStorage.getItem(key)||'{}');localStorage.setItem(key,JSON.stringify({...shared,...rec}));}catch(_){}
+  save();closeModal();render();toast('今日を記録しました');
+}
+
+
 function rTasksToday(){
   const td=today();
   const done=S.tasks.filter(t=>!t.deleted&&t.done&&t.doneDate===td);
@@ -4237,12 +4718,12 @@ function rTasksToday(){
   return`
 ${rDailyPerformanceCard(td)}
 ${rFocusNowCard()}
-${hasFs?`${secTitle('🕐 固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${rFsDashPanel()}`:''}
+${hasFs?`${secTitle('固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${rFsDashPanel()}`:''}
 ${gcalToday.length?`${secTitle(`カレンダー予定 (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
-${todayHabits.length?`${secTitle(`🔥 今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
-${(()=>{const tc=choresForDate(td);return tc.length?`${secTitle(`🧹 今日の家事 (${tc.filter(c=>(c.completedDates||[]).includes(td)).length}/${tc.length}件)`)}${tc.map(c=>rChoreInTaskView(c,td,true)).join('')}`:'';})()}
-${(()=>{const tr=routinesForDate(td);return tr.length?`${secTitle(`🔁 家事ルーティン (${tr.length}件)`)}${tr.map(r=>rRoutineInTaskView(r,td,true)).join('')}`:'';})()}
-${done.length?`${secTitle(`✅ 今日完了 (${done.length}件)`)}${done.map(t=>rTaskItem(t)).join('')}`:''}`;
+${todayHabits.length?`${secTitle(`今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
+${(()=>{const tc=choresForDate(td);return tc.length?`${secTitle(`今日の家事 (${tc.filter(c=>(c.completedDates||[]).includes(td)).length}/${tc.length}件)`)}${tc.map(c=>rChoreInTaskView(c,td,true)).join('')}`:'';})()}
+${(()=>{const tr=routinesForDate(td);return tr.length?`${secTitle(`家事ルーティン (${tr.length}件)`)}${tr.map(r=>rRoutineInTaskView(r,td,true)).join('')}`:'';})()}
+${done.length?`${secTitle(`今日完了 (${done.length}件)`)}${done.map(t=>rTaskItem(t)).join('')}`:''}`;
 }
 
 function rTasksTomorrow(){
@@ -4257,8 +4738,8 @@ function rTasksTomorrow(){
   const hasFs=S.fs&&S.fs.length>0;
   return`
 <div style="font-size:12px;color:var(--t2);margin-bottom:8px;font-weight:600">${dateLbl}</div>
-${hasFs?`${secTitle('🕐 固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${rFsDashPanel(tm)}`:''}
-${secTitle(`📋 明日のタスク (${tmTotal}件)`)}
+${hasFs?`${secTitle('固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${rFsDashPanel(tm)}`:''}
+${secTitle(`明日のタスク (${tmTotal}件)`)}
 <div style="display:flex;gap:8px;margin-bottom:8px">
   <button class="btn btn-g btn-sm" onclick="openTaskModal(null,'${tm}')">＋ 明日のタスクを追加</button>
 </div>
@@ -4267,7 +4748,7 @@ ${isDraggable?`<div style="font-size:11px;color:var(--t3);margin-bottom:6px">☰
 ${gcalTm.map(e=>rGcalEventItem(e)).join('')}
 ${tasks.length?tasks.map(t=>rTaskItem(t,isDraggable)).join(''):(gcalTm.length?'':`<div class="card card-sm" style="color:var(--t2);text-align:center;margin-bottom:8px">明日のタスクはまだありません</div>`)}
 </div>
-${tmHabits.length?`${secTitle(`🔥 明日の習慣 (${tmHabits.length}件)`)}${tmHabits.map(h=>rHabitInTaskView(h,tm,false)).join('')}`:''}`;
+${tmHabits.length?`${secTitle(`明日の習慣 (${tmHabits.length}件)`)}${tmHabits.map(h=>rHabitInTaskView(h,tm,false)).join('')}`:''}`;
 }
 
 // 固定スケジュール左側タスクパネル（日付指定可能・今日・明日共通）
@@ -4741,16 +5222,16 @@ function rHabitInTaskView(h,date,interactive){
   const streak=calcStreak(h.completedDates||[]);
   const lv=habitLevel(h);const st=habitLevelStyle(lv.level);
   const stateClass=done||fail?'done-item':'';
-  return`<div class="task-item ${stateClass}" style="border-left:3px solid var(--amber)">
+  return`<div class="task-item ${stateClass}" style="border-left:3px solid var(--amber)" ${interactive?`data-kind="habit" data-id="${h.id}" data-date="${date}"`:''}>
   ${interactive
-    ?`<div class="chk ${done?'done':fail?'fail':''}" onclick="toggleHabit('${h.id}','${date}')"></div>`
-    :`<span style="font-size:18px;flex-shrink:0">🔥</span>`}
+    ?`<div class="chk ${done?'done':fail?'fail':''}" onclick="completeAny('habit','${h.id}','${date}')" role="button" tabindex="0" aria-label="${esc(h.title)}を記録"></div>`
+    :iconSvg('i-flame','row-ic')}
   <div class="task-body">
     <div class="task-ttl ${done?'done':''}">${done?'✓ ':fail?'✕ ':''}${esc(h.title)}</div>
     <div class="task-meta">
       <span class="habit-level-mini" style="color:${st.c};border-color:${st.c};background:${st.bg}">Lv.${lv.level}</span>
-      ${h.time?`<span class="badge bb">🕐 ${h.time}</span>`:''}
-      ${streak>0?`<span class="badge ba">🔥 ${streak}日</span>`:''}
+      ${h.time?`<span class="badge bb">${iconSvg('i-clock')} ${h.time}</span>`:''}
+      ${streak>0?`<span class="badge ba">${streak}日連続</span>`:''}
       ${h.description?`<span class="badge bk">${esc(h.description)}</span>`:''}
     </div>
   </div>
@@ -4831,12 +5312,12 @@ function rRoutineInTaskView(r,date,interactive){
   const doneIdx=routineDoneList(r,date);
   const total=(r.items||[]).length;
   const allDone=total>0&&doneIdx.length>=total;
-  return`<div class="task-item" style="border-left:3px solid var(--teal,#0d9488);flex-direction:column;align-items:stretch;gap:0;padding:9px 12px">
+  return`<div class="task-item" style="border-left:3px solid var(--blue);flex-direction:column;align-items:stretch;gap:0;padding:9px 12px" ${interactive?`data-kind="routine" data-id="${r.id}" data-date="${date}"`:''}>
   <div style="display:flex;align-items:center;gap:8px">
-    <span style="font-size:16px;flex-shrink:0">🧹</span>
+    ${iconSvg('i-broom','row-ic')}
     <div style="flex:1;min-width:0">
       <div style="font-size:13px;font-weight:700;${allDone?'color:var(--t3);text-decoration:line-through':''}">${esc(r.name)} <span style="color:var(--t2);font-weight:500;font-size:11px">${doneIdx.length}/${total}</span></div>
-      <div class="task-meta">${r.time?`<span class="badge bb">🕐 ${r.time}</span>`:''}<span class="badge bk">🔁 ${esc(choreFreqLabel(r))}</span></div>
+      <div class="task-meta">${r.time?`<span class="badge bb">${iconSvg('i-clock')} ${r.time}</span>`:''}<span class="badge bk">${esc(choreFreqLabel(r))}</span></div>
     </div>
   </div>
   <div style="margin:6px 0 0 24px;display:flex;flex-direction:column;gap:2px">
@@ -4908,15 +5389,15 @@ function saveRoutine(id){
 // 家事をタスク/スケジュールビュー内で表示（interactive=trueでその日チェック可）
 function rChoreInTaskView(c,date,interactive){
   const done=(c.completedDates||[]).includes(date);
-  return`<div class="task-item ${done?'done-item':''}" draggable="true" ondragstart="choreDragStart(event,'${c.id}')" ondragend="choreDragEnd(event)" style="border-left:3px solid var(--teal,#0d9488);cursor:grab">
+  return`<div class="task-item ${done?'done-item':''}" draggable="true" ondragstart="choreDragStart(event,'${c.id}')" ondragend="choreDragEnd(event)" style="border-left:3px solid var(--blue);cursor:grab" ${interactive?`data-kind="chore" data-id="${c.id}" data-date="${date}"`:''}>
   ${interactive
-    ?`<div class="chk ${done?'done':''}" onclick="toggleChoreDone('${c.id}','${date}')"></div>`
-    :`<span style="font-size:18px;flex-shrink:0">🧹</span>`}
+    ?`<div class="chk ${done?'done':''}" onclick="completeAny('chore','${c.id}','${date}')" role="button" tabindex="0" aria-label="${esc(c.name)}を完了"></div>`
+    :iconSvg('i-broom','row-ic')}
   <div class="task-body">
     <div class="task-ttl ${done?'done':''}">${done?'✓ ':''}${esc(c.name)}</div>
     <div class="task-meta">
-      ${c.time?`<span class="badge bb">🕐 ${c.time}</span>`:''}
-      <span class="badge bk">🧹 ${esc(choreFreqLabel(c))}</span>
+      ${c.time?`<span class="badge bb">${iconSvg('i-clock')} ${c.time}</span>`:''}
+      <span class="badge bk">${esc(choreFreqLabel(c))}</span>
     </div>
   </div>
 </div>`;
@@ -4926,7 +5407,7 @@ function toggleChoreDone(id,date){
   if(!c.completedDates)c.completedDates=[];
   const i=c.completedDates.indexOf(date);
   let nowDone;
-  if(i>=0){c.completedDates.splice(i,1);nowDone=false;}else{c.completedDates.push(date);nowDone=true;toast('✅ 家事を記録しました');}
+  if(i>=0){c.completedDates.splice(i,1);nowDone=false;}else{c.completedDates.push(date);nowDone=true;toast('家事を記録しました');}
   playCheckSound(nowDone);
   save();render();
 }
@@ -4997,7 +5478,7 @@ function rChores(){
   const td=today();
   const todayChores=choresForDate(td);
   const todayRoutines=routinesForDate(td);
-  return`${secTitle('🧹 家事')}
+  return`${secTitle('家事')}
 <div style="font-size:12px;color:var(--t2);margin-bottom:12px">曜日ごと・月1・年1などで家事を登録すると、スケジュールに自動で反映されます（曜日固定で毎週組み込み）。ルーティンで複数の家事をまとめて管理できます。</div>
 <div class="card" style="margin-bottom:14px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -5007,7 +5488,7 @@ function rChores(){
   ${todayRoutines.map(r=>rRoutineInTaskView(r,td,true)).join('')}
   ${todayChores.length?todayChores.map(c=>rChoreInTaskView(c,td,true)).join(''):(todayRoutines.length?'':`<div style="color:var(--t3);font-size:12px;text-align:center;padding:10px 0">今日予定の家事はありません</div>`)}
 </div>
-${secTitle('🔁 家事ルーティン')}
+${secTitle('家事ルーティン')}
 <div class="card" style="margin-bottom:14px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <div style="font-size:12px;color:var(--t2)">いくつかの家事をまとめて、頻度・時刻でスケジュールに反映</div>
@@ -5033,7 +5514,7 @@ ${secTitle('🔁 家事ルーティン')}
     ${CHORE_PRESETS.map(p=>`<div style="padding:6px 13px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;background:var(--card2);color:var(--t2);border:1px solid var(--border)" onclick="openChoreModal(null,'${p}')">＋ ${p}</div>`).join('')}
   </div>
 </div>
-${secTitle(`📋 登録済みの家事（${chores.length}件）`)}
+${secTitle(`登録済みの家事（${chores.length}件）`)}
 <div style="font-size:11px;color:var(--t2);margin:-4px 0 8px">▲▼ で並び順を変更できます。この順番が、スケジュールの同じ時刻内での表示順になります。</div>
 <div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:6px">
   ${chores.length?chores.map((c,i)=>`<div style="display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;${c.active===false?'opacity:.55':''}">
@@ -5071,33 +5552,33 @@ function rTaskItem(t,draggable=false){
   const isOver=t.dueDate&&t.dueDate<today()&&!t.done;
   const isFrog=t.id===S.frogId;
   const pmap={high:'br',medium:'ba',low:'bk'};
-  const plbl={high:'❗高',medium:'⚠中',low:'🔵低'};
+  const plbl={high:'優先度 高',medium:'優先度 中',low:'優先度 低'};
   const sdone=(t.subtasks||[]).filter(s=>s.done).length,stot=(t.subtasks||[]).length;
   return`<div class="task-item ${isOver?'overdue':''} ${isFrog?'frog':''} ${t.done?'done-item':''} ${(t.procCount||0)>=3?'high-proc':''}" id="ti-${t.id}"
+  data-kind="task" data-id="${t.id}"
   ${draggable?`draggable="true" ondragstart="taskDragStart(event,'${t.id}')" ondragend="taskDragEnd(event)" style="cursor:grab"`:''}>
-  <div class="chk ${t.done?'done':''}" onclick="toggleDone('${t.id}')"></div>
-  <div class="task-body">
+  <div class="chk ${t.done?'done':''}" onclick="completeAny('task','${t.id}')" role="button" tabindex="0" aria-label="${esc(t.title)}を完了"></div>
+  <div class="task-body" onclick="openTaskModal('${t.id}')">
     <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-      ${isFrog?'<span>🐸</span>':''}
+      ${isFrog?`<span class="badge bp">今の1件</span>`:''}
       <div class="task-ttl ${t.done?'done':''}">${esc(t.title)}</div>
     </div>
     ${t.description?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(t.description)}</div>`:''}
     <div class="task-meta">
-      ${t.dueDate?`<span class="badge ${isOver?'br':urgCls(t.dueDate)==='soon'?'ba':'bk'}">📅 ${fmt(t.dueDate,t.dueTime)}</span>`:''}
-      ${t.startTime?`<span class="badge bb">🕐 ${t.startTime}${t.endTime?'〜'+t.endTime:''}${(t.timeSlots?.length)?` <span style="font-size:9px;opacity:.7">1/${t.timeSlots.length+1}</span>`:''}</span>`:''}
-      ${(t.timeSlots||[]).map((sl,i)=>sl.s?`<span class="badge bb">🕐 ${sl.s}${sl.e?'〜'+sl.e:''} <span style="font-size:9px;opacity:.7">${i+2}/${t.timeSlots.length+1}</span></span>`:'').join('')}
+      ${t.dueDate?`<span class="badge ${isOver?'br':urgCls(t.dueDate)==='soon'?'ba':'bk'}">${iconSvg('i-calendar')} ${fmt(t.dueDate,t.dueTime)}</span>`:''}
+      ${t.startTime?`<span class="badge bb">${iconSvg('i-clock')} ${t.startTime}${t.endTime?'〜'+t.endTime:''}${(t.timeSlots?.length)?` <span style="font-size:9px;opacity:.7">1/${t.timeSlots.length+1}</span>`:''}</span>`:''}
+      ${(t.timeSlots||[]).map((sl,i)=>sl.s?`<span class="badge bb">${iconSvg('i-clock')} ${sl.s}${sl.e?'〜'+sl.e:''} <span style="font-size:9px;opacity:.7">${i+2}/${t.timeSlots.length+1}</span></span>`:'').join('')}
       ${t.priority?`<span class="badge ${pmap[t.priority]}">${plbl[t.priority]}</span>`:''}
-      ${stot?`<span class="badge bb">☑ ${sdone}/${stot}</span>`:''}
-      ${(t.procCount||0)>0?`<span class="proc-count">⏭ ${t.procCount}回後回し</span>`:''}
+      ${stot?`<span class="badge bb">サブ ${sdone}/${stot}</span>`:''}
+      ${(t.procCount||0)>0?`<span class="proc-count">${t.procCount}回後回し</span>`:''}
     </div>
     ${stot?`<div class="subtask-list">${(t.subtasks||[]).map((s,i)=>`<div class="sub-item"><div class="sub-chk ${s.done?'done':''}" onclick="toggleSub('${t.id}',${i})"></div><span style="${s.done?'text-decoration:line-through;color:var(--t3)':''}">${esc(s.title)}</span></div>`).join('')}</div>`:''}
   </div>
   <div class="task-acts">
-    ${!t.done?`<button class="tact" title="集中" onclick="startPomoFor('${t.id}')">🍅</button>`:''}
-    ${!t.done?`<button class="tact" title="後回し" onclick="procrastinate('${t.id}')">⏭</button>`:''}
-    ${!t.done&&!isFrog?`<button class="tact" title="カエル設定" onclick="setFrog('${t.id}');render()">🐸</button>`:''}
-    <button class="tact" onclick="openTaskModal('${t.id}')">✏️</button>
-    <button class="tact del" onclick="delTask('${t.id}')">🗑</button>
+    ${!t.done?`<button class="tact" title="集中して取りかかる" aria-label="集中" onclick="startPomoFor('${t.id}')">${iconSvg('i-clock')}</button>`:''}
+    ${!t.done&&!isFrog?`<button class="tact" title="今やる1件にする" aria-label="今やる" onclick="taskSetNow('${t.id}')">${iconSvg('i-target')}</button>`:''}
+    <button class="tact" title="編集" aria-label="編集" onclick="openTaskModal('${t.id}')">${iconSvg('i-note')}</button>
+    <button class="tact del" title="削除" aria-label="削除" onclick="delTask('${t.id}')">✕</button>
   </div>
 </div>`;
 }
@@ -5242,9 +5723,9 @@ function rTasksSchedule(){
   </div>
 </div>
 ${hasFs?rFsDashPanel(d):`<div class="card card-sm" style="color:var(--t2);text-align:center">固定スケジュールが未設定です。<button class="btn btn-g btn-xs" style="margin-left:8px" onclick="V='habits';HV='schedule';render()">設定する →</button></div>`}
-${dayHabits.length?`${secTitle(`🔥 習慣 (${dayHabits.length}件)`)}${dayHabits.map(h=>rHabitInTaskView(h,d,isToday)).join('')}`:''}
-${dayChores.length?`${secTitle(`🧹 家事 (${dayChores.filter(c=>(c.completedDates||[]).includes(d)).length}/${dayChores.length}件)`)}${dayChores.map(c=>rChoreInTaskView(c,d,true)).join('')}`:''}
-${dayRoutines.length?`${secTitle(`🔁 家事ルーティン (${dayRoutines.length}件)`)}${dayRoutines.map(r=>rRoutineInTaskView(r,d,true)).join('')}`:''}`;
+${dayHabits.length?`${secTitle(`習慣 (${dayHabits.length}件)`)}${dayHabits.map(h=>rHabitInTaskView(h,d,isToday)).join('')}`:''}
+${dayChores.length?`${secTitle(`家事 (${dayChores.filter(c=>(c.completedDates||[]).includes(d)).length}/${dayChores.length}件)`)}${dayChores.map(c=>rChoreInTaskView(c,d,true)).join('')}`:''}
+${dayRoutines.length?`${secTitle(`家事ルーティン (${dayRoutines.length}件)`)}${dayRoutines.map(r=>rRoutineInTaskView(r,d,true)).join('')}`:''}`;
 }
 
 function rDayModalBody(d){
@@ -5398,7 +5879,7 @@ function fsBlockDragLeave(e,i){e.currentTarget?.classList.remove('fs-drag-over')
 function fsBlockDrop(e,startTime,blockId,i,date){
   e.preventDefault();e.stopPropagation();
   document.getElementById('fs-block-'+i)?.classList.remove('fs-drag-over');
-  if(_choreDragId){const c=(S.chores||[]).find(x=>x.id===_choreDragId);if(c&&startTime&&startTime!=='-1'){c.time=startTime;save();render();toast(`🧹 ${esc(c.name)} を ${startTime} に移動しました`);} _choreDragId=null;return;}
+  if(_choreDragId){const c=(S.chores||[]).find(x=>x.id===_choreDragId);if(c&&startTime&&startTime!=='-1'){c.time=startTime;save();render();toast(`${esc(c.name)} を ${startTime} に移動しました`);} _choreDragId=null;return;}
   const id=_taskDragId||_wdayDragId;
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
@@ -5971,7 +6452,7 @@ function jobMainProfit(j){return jobMainIn(j)-jobMainOut(j);}
 function markJobPaid(id){
   const j=S.jobs.find(j=>j.id===id);if(!j)return;
   j.paymentDate=today();
-  save();render();toast('💰 入金済みにしました');
+  save();render();toast('入金済みにしました');
 }
 function unmarkJobPaid(id){
   const j=S.jobs.find(j=>j.id===id);if(!j)return;
@@ -5982,7 +6463,7 @@ function unmarkJobPaid(id){
 function markJobPayout(id){
   const j=S.jobs.find(j=>j.id===id);if(!j)return;
   j.payoutDate=today();
-  save();render();toast('💳 支払い済みにしました');
+  save();render();toast('支払い済みにしました');
 }
 function rProjCard(j){
   const cl=S.clients.find(c=>c.id===j.clientId);
@@ -6095,7 +6576,7 @@ function rProjInvoice(){
   const clientName=cid=>cid?(S.clients.find(c=>c.id===cid)?.name||'不明'):'クライアント未設定';
   const iss=_issuer();
   const grand=jobs.reduce((s,j)=>s+_invAmt(j),0);
-  return`${secTitle('🧾 請求書')}
+  return`${secTitle('請求書')}
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
   <select style="width:190px" onchange="window._invMonth=this.value;render()"><option value="" ${curM===''?'selected':''}>すべての期間</option>${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m} 提出予定</option>`).join('')}</select>
   <button class="btn btn-g btn-sm" onclick="openInvoiceInfo()">✏️ 請求元情報</button>
@@ -6148,7 +6629,7 @@ function openInvoiceEditorFromSelection(cid,m){
 function markDraftInvoiced(){
   const d=window._invDraft;if(!d)return;
   (d.jobIds||[]).forEach(id=>{const j=S.jobs.find(x=>x.id===id);if(j){j.invoicedAt=today();j.updatedAt=Date.now();}});
-  save();closeInvoiceEditor();render();toast('🧾 請求済みにしました');
+  save();closeInvoiceEditor();render();toast('請求済みにしました');
 }
 function _invItemRow(it){
   return `<tr data-item style="border-bottom:1px solid #ddd">
@@ -6311,7 +6792,7 @@ function genInvoiceText(cid,m){
 }
 function copyInvoiceText(cid,m){
   const t=genInvoiceText(cid,m);
-  const ok=()=>toast('📋 請求書テキストをコピーしました');
+  const ok=()=>toast('請求書テキストをコピーしました');
   const fb=()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ok();}catch(e){toast('コピーに失敗しました','warn');}ta.remove();};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok).catch(fb);}else{fb();}
 }
@@ -6438,7 +6919,7 @@ function rProjProfit(){
   // 入金待ち: 完了済みだが入金日未設定の案件
   const pendingJobs=S.jobs.filter(j=>!j.deleted&&j.status==='完了'&&!j.paymentDate&&jobMainIn(j)>0);
   const pendingTotal=pendingJobs.reduce((s,j)=>s+jobMainIn(j),0);
-  return`${secTitle('💰 月別利益')}
+  return`${secTitle('月別利益')}
 ${pendingJobs.length?`<div class="card" style="margin-bottom:14px;border:1px solid var(--adim)">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
     <div>
@@ -6548,7 +7029,7 @@ function rProjPayment(){
       </div>`).join('')}
     </div>`:`<div style="font-size:12px;color:var(--t3);margin-bottom:14px">${curM} の${title}なし</div>`}`;
   };
-  return`${secTitle('💳 編集費用の支払い')}
+  return`${secTitle('編集費用の支払い')}
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
   <select style="width:160px" onchange="window._payMonth=this.value;render()">
     ${months.map(m=>`<option value="${m}" ${m===curM?'selected':''}>${m}</option>`).join('')}
@@ -6760,7 +7241,7 @@ function setHV(v){HV=v;render();}
 function rHabitsWeekly(){
   const td=today();
   const habits=S.habits.filter(h=>!h.deleted);
-  if(!habits.length)return`<div class="empty"><div class="empty-icon">🔥</div><div class="empty-title">習慣を設定しよう</div><div style="color:var(--t2)">毎日継続することで後回し癖が改善されます</div></div>`;
+  if(!habits.length)return`<div class="empty"><div class="empty-icon" style="color:var(--t3)">${iconSvg('i-flame')}</div><div class="empty-title">習慣を設定しよう</div><div style="color:var(--t2)">毎日継続することで後回し癖が改善されます</div></div>`;
   const week=[...Array(7)].map((_,i)=>{
     const d=new Date();d.setDate(d.getDate()-6+i);
     return{date:d.toLocalYmd(),label:DAYS[d.getDay()],isToday:d.toLocalYmd()===td,isFuture:d>new Date()};
@@ -6899,7 +7380,7 @@ function saveWorkoutEntry(id){
   };
   if(id){const i=w.entries.findIndex(e=>e.id===id);if(i>=0)w.entries[i]=entry;else w.entries.push(entry);}
   else w.entries.push(entry);
-  save();closeModal();render();toast('トレーニングを記録しました 💪');
+  save();closeModal();render();toast('トレーニングを記録しました ');
 }
 function delWorkoutEntry(id){
   const w=getWorkout(today());
@@ -6931,7 +7412,7 @@ function rHabitsSchedule(){
 
   return`<div style="font-size:12px;color:var(--t2);margin-bottom:12px">時間帯順に習慣を表示しています。今日の分はチェックしましょう。</div>
 ${habitsHtml}
-${secTitle('💪 今日の筋トレメニュー')}
+${secTitle('今日の筋トレメニュー')}
 <div class="card" style="margin-bottom:12px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <div style="font-size:12px;color:var(--t2)">種目を追加して記録しましょう</div>
@@ -7025,7 +7506,7 @@ function rPosts(){
       ${p.url?`<a class="btn btn-g btn-xs" href="${esc(p.url)}" target="_blank" rel="noopener">🔗 開く</a>`:''}
     </div>
   </div>`;
-  return`${secTitle('📅 投稿管理')}
+  return`${secTitle('投稿管理')}
 <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
   <button class="btn btn-p btn-sm" onclick="tpOpenPost()">＋ 投稿を追加</button>
   <span style="font-size:13px;color:var(--t2);align-self:center">予定 ${upcoming.length}件・投稿済 ${done.length}件</span>
@@ -7035,7 +7516,7 @@ ${!posts.length?`<div class="empty"><div class="empty-icon">📅</div><div class
 ${upcoming.length?`<div style="font-weight:800;font-size:14px;color:var(--purple);margin-bottom:6px">🗓 予定・下書き</div>${upcoming.map(card).join('')}`:''}
 ${done.length?`<div style="font-weight:800;font-size:14px;color:var(--t2);margin:14px 0 6px">✅ 投稿済み</div>${done.map(card).join('')}`:''}`}`;
 }
-function tpMarkPosted(id){const p=(S.teamPosts||[]).find(x=>x.id===id);if(!p)return;p.status='投稿済';p.updatedAt=Date.now();save();render();toast('投稿済みにしました ✅');}
+function tpMarkPosted(id){const p=(S.teamPosts||[]).find(x=>x.id===id);if(!p)return;p.status='投稿済';p.updatedAt=Date.now();save();render();toast('投稿済みにしました ');}
 function tpOpenPost(id){
   const p=id?(S.teamPosts||[]).find(x=>x.id===id):null;
   openModalLg(`<div class="mhdr"><div class="mtitle">${p?'投稿を編集':'投稿を追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
@@ -7061,7 +7542,7 @@ function tpSavePost(){
   if(!S.teamPosts)S.teamPosts=[];
   if(id){const p=S.teamPosts.find(x=>x.id===id);if(p)Object.assign(p,data,{updatedAt:Date.now()});}
   else{S.teamPosts.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
-  save();closeModal();render();toast('投稿を保存しました 📅');
+  save();closeModal();render();toast('投稿を保存しました ');
 }
 function tpDelPost(id){const p=(S.teamPosts||[]).find(x=>x.id===id);if(!p)return;p.deleted=true;p.updatedAt=Date.now();save();closeModal();render();toast('投稿を削除しました');}
 // ===ドキュメント管理（チーム共有）===
@@ -7069,7 +7550,7 @@ function _teamDocs(){return (S.teamDocs||[]).filter(d=>!d.deleted);}
 function rDocs(){
   const docs=_teamDocs();
   const cats={};docs.forEach(d=>{const c=d.category||'未分類';(cats[c]=cats[c]||[]).push(d);});
-  return`${secTitle('📁 ドキュメント')}
+  return`${secTitle('ドキュメント')}
 <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
   <button class="btn btn-p btn-sm" onclick="tdOpenDoc()">＋ ドキュメントを追加</button>
   <span style="font-size:13px;color:var(--t2);align-self:center">${docs.length}件</span>
@@ -7104,7 +7585,7 @@ function tdSaveDoc(){
   if(!S.teamDocs)S.teamDocs=[];
   if(id){const d=S.teamDocs.find(x=>x.id===id);if(d)Object.assign(d,data,{updatedAt:Date.now()});}
   else{S.teamDocs.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
-  save();closeModal();render();toast('ドキュメントを保存しました 📁');
+  save();closeModal();render();toast('ドキュメントを保存しました ');
 }
 function tdDelDoc(id){const d=(S.teamDocs||[]).find(x=>x.id===id);if(!d)return;d.deleted=true;d.updatedAt=Date.now();save();closeModal();render();toast('ドキュメントを削除しました');}
 // ===チームKGI/KPI（全アカウント共有・個人目標とは別）===
@@ -7113,7 +7594,7 @@ function rTeamGoals(){
   const kgis=(S.teamKgis||[]).filter(k=>!k.deleted);
   const kpis=(S.teamKpis||[]).filter(k=>!k.deleted);
   const kgiName=id=>kgis.find(k=>k.id===id)?.title||'';
-  return`${secTitle('📈 チーム KGI / KPI')}
+  return`${secTitle('チーム KGI / KPI')}
 <div style="font-size:11px;color:var(--t3);margin-bottom:12px">チーム全体の重要目標（KGI）と、それを動かす指標（KPI）。全アカウントで共有されます。<b>個人の目標とは別</b>です。</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 8px">
   <div style="font-weight:800;font-size:15px;color:var(--purple)">🎯 KGI（重要目標）</div>
@@ -7171,7 +7652,7 @@ function tgSaveKgi(){
   if(!S.teamKgis)S.teamKgis=[];
   if(id){const k=S.teamKgis.find(x=>x.id===id);if(k)Object.assign(k,data,{updatedAt:Date.now()});}
   else{S.teamKgis.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
-  save();closeModal();render();toast('KGIを保存しました 🎯');
+  save();closeModal();render();toast('KGIを保存しました ');
 }
 function tgDelKgi(id){const k=(S.teamKgis||[]).find(x=>x.id===id);if(!k)return;k.deleted=true;k.updatedAt=Date.now();save();closeModal();render();toast('KGIを削除しました');}
 function tgOpenKpi(id){
@@ -7201,7 +7682,7 @@ function tgSaveKpi(){
   if(!S.teamKpis)S.teamKpis=[];
   if(id){const k=S.teamKpis.find(x=>x.id===id);if(k)Object.assign(k,data,{updatedAt:Date.now()});}
   else{S.teamKpis.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
-  save();closeModal();render();toast('KPIを保存しました 📊');
+  save();closeModal();render();toast('KPIを保存しました ');
 }
 function tgDelKpi(id){const k=(S.teamKpis||[]).find(x=>x.id===id);if(!k)return;k.deleted=true;k.updatedAt=Date.now();save();closeModal();render();toast('KPIを削除しました');}
 function bumpKpi(id){
@@ -7209,7 +7690,7 @@ function bumpKpi(id){
   const v=prompt('現在の実績値を入力',(k.current||0));
   if(v===null)return;
   k.current=parseFloat(v)||0;k.updatedAt=Date.now();
-  save();render();toast('実績を更新しました 📊');
+  save();render();toast('実績を更新しました ');
 }
 // ===商談管理（パイプライン）チーム共有===
 const PIPE_STAGES=['リード','商談中','提案中','受注','失注'];
@@ -7221,7 +7702,7 @@ function rPipeline(){
   const pipelineSum=open.reduce((s,d)=>s+(d.amount||0),0);
   const wonSum=deals.filter(d=>d.stage==='受注').reduce((s,d)=>s+(d.amount||0),0);
   const cname=d=>d.clientId?(S.clients.find(c=>c.id===d.clientId)?.name||d.clientName||''):(d.clientName||'');
-  return`${secTitle('🤝 商談管理')}
+  return`${secTitle('商談管理')}
 <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
   <button class="btn btn-p btn-sm" onclick="openDealModal()">＋ 商談を追加</button>
   <span style="font-size:13px;color:var(--t2);align-self:center">見込み ¥${pipelineSum.toLocaleString()}・受注 ¥${wonSum.toLocaleString()}・進行中 ${open.length}件</span>
@@ -7301,7 +7782,7 @@ function saveDeal(){
   if(!S.pipeline)S.pipeline=[];
   if(id){const d=S.pipeline.find(x=>x.id===id);if(d)Object.assign(d,data,{updatedAt:Date.now()});}
   else{S.pipeline.push(Object.assign({id:uid(),createdAt:today(),updatedAt:Date.now()},data));}
-  save();closeModal();render();toast('商談を保存しました 🤝');
+  save();closeModal();render();toast('商談を保存しました ');
 }
 function delDeal(id){
   const d=(S.pipeline||[]).find(x=>x.id===id);if(!d)return;
@@ -7331,7 +7812,7 @@ function rGoals(){
   }
 
   return`<div class="ph">
-  <div class="ph-title">🎯 目標・KPI管理</div>
+  <div class="ph-title">目標・KPI管理</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     ${tabDef.goals?`<button class="btn btn-p btn-sm" onclick="openGoalModal(null,'${tabDef.goals}','${div?.id||''}')">＋ 目標追加</button>`:''}
     <button class="btn btn-g btn-sm" onclick="openDivModal(null)">＋ 事業部</button>
@@ -7340,7 +7821,8 @@ function rGoals(){
   </div>
 </div>
 ${divTabs}
-${subTabs(UNIFIED_HORIZONS.map(h=>[h.v,h.icon+' '+h.l]),GV,'setGV')}
+${subTabs(HORIZON_GROUPS.map(g=>[g.v,g.l]),horizonGroupOf(GV).v,'setGVGroup')}
+<div class="hz-chips">${horizonGroupOf(GV).members.map(m=>{const h=UNIFIED_HORIZONS.find(x=>x.v===m);return h?`<button class="hz-chip${GV===h.v?' on':''}" onclick="setGV('${h.v}')">${h.l}</button>`:'';}).join('')}</div>
 ${content}`;
 }
 
@@ -8015,7 +8497,7 @@ function saveJournalEntry(){
     S.journals=S.journals.filter(j=>!(j.date===JD&&j.type==='evening'));
     if(Object.values(entry).some(v=>v&&v!==JD&&v!=='evening'))S.journals.push(entry);
   }
-  save();render();toast('ジャーナルを保存しました 📔');
+  save();render();toast('ジャーナルを保存しました ');
 }
 // ===REVENUE===
 function rRevenue(){
@@ -8129,7 +8611,7 @@ function rLogItem(l){
 function rMemo(){
   const memos=(S.memos||[]).slice().reverse();
   return`<div class="ph">
-  <div class="ph-title">🧠 ブレインダンプ <small>頭の中を空にして集中</small></div>
+  <div class="ph-title">ブレインダンプ <small>頭の中を空にして集中</small></div>
 </div>
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:13px;color:var(--t2);margin-bottom:10px">突発的な考えを素早くキャプチャ。後で整理 — 今は集中に戻ろう。</div>
@@ -8182,7 +8664,7 @@ function rFitness(){
   const td=today();
   const tabs=[['overview','📊 概要'],['training','🏋️ 筋トレ'],['meal','🥗 食事'],['goals','🎯 目標']];
   return`<div class="ph">
-  <div class="ph-title">💪 フィットネス</div>
+  <div class="ph-title">フィットネス</div>
   <div style="display:flex;gap:7px;flex-wrap:wrap">
     ${tabs.map(([k,l])=>`<button class="btn btn-g btn-sm ${FTV===k?'btn-p':''}" onclick="FTV='${k}';render()">${l}</button>`).join('')}
   </div>
@@ -8258,7 +8740,7 @@ function rFitnessTraining(){
       ${(w.exercises||[]).map(ex=>`<div style="font-size:11px;color:var(--t2);padding:2px 0">✓ ${esc(exName(ex))}${ex&&ex.sets?` ${ex.sets}セット`:''}${ex&&ex.reps?` ${esc(ex.reps)}`:''}</div>`).join('')}
     </div>`;}).join('');
   const todayRest=workout.isRest&&!todayDone;
-  return`${secTitle('💪 今日の筋トレ記録 '+(todayDone?'<span class="badge bg">✓ 完了</span>':todayRest?'<span class="badge br">❌ 休み</span>':'<span class="badge br">未記録</span>'))}
+  return`${secTitle('今日の筋トレ記録 '+(todayDone?'<span class="badge bg">✓ 完了</span>':todayRest?'<span class="badge br">❌ 休み</span>':'<span class="badge br">未記録</span>'))}
 <div style="display:flex;gap:8px;margin-bottom:10px">
   <button class="btn ${todayRest?'btn-red':'btn-g'} btn-sm" onclick="markGymRest()">❌ ${todayRest?'休みを取り消す':'今日は休みにする'}</button>
 </div>
@@ -8282,7 +8764,7 @@ function rFitnessTraining(){
 <div class="card" style="margin-bottom:16px">
   ${rQuickSelect(workout)}
 </div>
-${pastHtml?`${secTitle('📅 過去の記録')}<div>${pastHtml}</div>`:''}`;
+${pastHtml?`${secTitle('過去の記録')}<div>${pastHtml}</div>`:''}`;
 }
 
 function rFitnessMeal(){
@@ -8325,7 +8807,7 @@ function rFitnessGoals(){
   // 今月の筋トレ実績
   const thisM=today().slice(0,7);
   const monthWorkouts=S.workouts.filter(w=>w.date?.startsWith(thisM)&&((w.entries||[]).length>0||(w.exercises||[]).length>0)).length;
-  return`${secTitle('🎯 フィットネス目標設定')}
+  return`${secTitle('フィットネス目標設定')}
 <div class="card" style="margin-bottom:14px">
   <div class="frow">
     <div class="fg">
@@ -8348,7 +8830,7 @@ function rFitnessGoals(){
   </div>
   <button class="btn btn-p btn-sm" style="margin-top:12px" onclick="saveFitnessGoals()">保存</button>
 </div>
-${secTitle('📊 今月の実績')}
+${secTitle('今月の実績')}
 <div class="card">
   <div style="display:flex;gap:20px;flex-wrap:wrap">
     <div><div style="font-size:11px;color:var(--t2)">今月の筋トレ</div><div style="font-size:24px;font-weight:700;color:var(--purple)">${monthWorkouts}回</div></div>
@@ -8416,7 +8898,7 @@ function rKpi(){
   }
 
   return`<div class="ph">
-  <div class="ph-title">📊 KPI管理</div>
+  <div class="ph-title">KPI管理</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn btn-p btn-sm" onclick="openDivModal(null)">＋ 事業部追加</button>
     ${div?`<button class="btn btn-g btn-sm" onclick="openDivModal('${div.id}')">✏️ 編集</button>
@@ -8548,7 +9030,7 @@ ${weeklyContextSection}
   </div>
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-  ${secTitle('📈 KPI指標')}
+  ${secTitle('KPI指標')}
   <button class="btn btn-p btn-sm" onclick="addHorizonKpi('${div.id}','${period}')">＋ KPI追加</button>
 </div>
 ${kpiRows}
@@ -8578,7 +9060,7 @@ function saveHorizonGoal(divId,period){
   div.horizons[period].goal=goalEl.value;
   div.horizons[period].updatedAt=today();
   save();
-  toast('💾 ビジョンを保存しました');
+  toast('ビジョンを保存しました');
   const indicator=document.getElementById('hz-goal-saved-'+divId+'-'+period);
   if(indicator){indicator.style.opacity='1';setTimeout(()=>indicator.style.opacity='0',2000);}
 }
@@ -8595,7 +9077,7 @@ function saveHorizon(divId,period){
   });
   div.horizons[period].updatedAt=today();
   save();
-  toast('✅ 振り返りを保存しました');
+  toast('振り返りを保存しました');
   render();
 }
 
@@ -8670,7 +9152,7 @@ function rKgiTab(div){
 </div>`;
     }).join('');
   return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-  ${secTitle('🎯 KGI一覧')}
+  ${secTitle('KGI一覧')}
   <button class="btn btn-p btn-sm" onclick="openKgiModal('${div.id}',null)">＋ KGI追加</button>
 </div>
 ${cards}`;
@@ -8710,7 +9192,7 @@ function rKpiTab(div){
 </div>`;
     }).join('');
   return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-  ${secTitle('📈 KPI一覧')}
+  ${secTitle('KPI一覧')}
   <button class="btn btn-p btn-sm" onclick="openKpiModal('${div.id}',null)">＋ KPI追加</button>
 </div>
 ${cards}`;
@@ -8750,7 +9232,7 @@ function rIssueTab(div){
 </div>`;
     }).join('');
   return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-  ${secTitle('⚠️ イシュー一覧')}
+  ${secTitle('イシュー一覧')}
   <button class="btn btn-p btn-sm" onclick="openIssueModal('${div.id}',null)">＋ イシュー追加</button>
 </div>
 ${cards}`;
@@ -8764,7 +9246,7 @@ function rDivTaskTab(div){
     ?`<div class="card" style="text-align:center;padding:24px;color:var(--t2)">この事業部のタスクはまだありません</div>`
     :[...undone.map(t=>rTaskItem(t)),...done.map(t=>rTaskItem(t))].join('');
   return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-  ${secTitle('✅ この事業部のタスク')}
+  ${secTitle('この事業部のタスク')}
   <button class="btn btn-p btn-sm" onclick="openKpiTaskModal('${div.id}')">＋ タスク追加</button>
 </div>
 ${tasksHtml}`;
@@ -8982,13 +9464,13 @@ function efResetPersonalData(){
   keep._uid=S._uid;keep.bizBoard=S.bizBoard;
   S=Object.assign(def,keep);
   save();
-  toast('👤 個人データを初期化しました(クラウドにも反映されます)','ok');
+  toast('個人データを初期化しました(クラウドにも反映されます)','ok');
   render();
 }
 function rSettings(){
   return`<div class="ph"><div class="ph-title">設定</div></div>
 
-${secTitle('👤 アカウントとデータ管理')}
+${secTitle('アカウントとデータ管理')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:10px">
     <b>データの分かれ方</b>: 案件・クライアント・ワーカー・商談・チームKGI/KPI・投稿・ドキュメントの8種は<b>チーム共有</b>(どのアカウントでも同じ表示が仕様)。
@@ -9002,7 +9484,7 @@ ${secTitle('👤 アカウントとデータ管理')}
   <button class="btn btn-g btn-sm" onclick="efResetPersonalData()" ${typeof FB_USER!=='undefined'&&FB_USER?'':'disabled'}>👤 このアカウントの個人データを初期化(端末+クラウド)</button>
 </div>
 
-${secTitle('🍅 ポモドーロタイマー')}
+${secTitle('ポモドーロタイマー')}
 <div class="card" style="margin-bottom:16px">
   <div class="frow">
     <div class="fg">
@@ -9017,7 +9499,7 @@ ${secTitle('🍅 ポモドーロタイマー')}
   <button class="btn btn-p btn-sm" onclick="savePomoSettings()">保存</button>
 </div>
 
-${secTitle('💰 月間収益目標')}
+${secTitle('月間収益目標')}
 <div class="card" style="margin-bottom:16px">
   <div class="fg">
     <div class="fl">月間目標（円）</div>
@@ -9026,7 +9508,7 @@ ${secTitle('💰 月間収益目標')}
   <button class="btn btn-p btn-sm" onclick="saveTarget()">保存</button>
 </div>
 
-${secTitle('📊 目標データ一括登録')}
+${secTitle('目標データ一括登録')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:10px">既存のワーカー・クライアント・完了案件を目標達成記録に一括登録します。重複は自動スキップされます。</div>
   <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--t2);margin-bottom:10px">
@@ -9037,7 +9519,7 @@ ${secTitle('📊 目標データ一括登録')}
   <button class="btn btn-p btn-sm" onclick="backfillGoalsData()">📥 過去データを目標に一括登録</button>
 </div>
 
-${secTitle('🧠 アイデンティティ')}
+${secTitle('アイデンティティ')}
 <div class="card" style="margin-bottom:16px">
   <div class="fg">
     <div class="fl">私は〇〇です</div>
@@ -9047,7 +9529,7 @@ ${secTitle('🧠 アイデンティティ')}
   <button class="btn btn-p btn-sm" onclick="saveIdentity()">保存</button>
 </div>
 
-${secTitle('🔒 ジャーナルロック設定')}
+${secTitle('ジャーナルロック設定')}
 <div class="card" style="margin-bottom:16px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
     <div>
@@ -9087,7 +9569,7 @@ ${secTitle('🔒 ジャーナルロック設定')}
   </div>
 </div>
 
-${secTitle('💪 筋トレコミットメント')}
+${secTitle('筋トレコミットメント')}
 <div class="card" style="margin-bottom:16px">
   <div style="display:flex;align-items:center;justify-content:space-between">
     <div>
@@ -9101,7 +9583,7 @@ ${secTitle('💪 筋トレコミットメント')}
   <button class="btn btn-p btn-sm" style="margin-top:10px" onclick="V='fitness';render()">💪 フィットネスページへ</button>
 </div>
 
-${secTitle('📅 固定タイムスケジュール')}
+${secTitle('固定タイムスケジュール')}
 <div class="card">
   <div style="font-size:12px;color:var(--t2);margin-bottom:12px">タスク管理のスケジュール表示に使われる固定の時間割です</div>
   <div style="display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:12px;margin-bottom:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">
@@ -9142,7 +9624,7 @@ ${secTitle('📅 固定タイムスケジュール')}
   </div>
 </div>
 
-${secTitle('📊 Googleスプレッドシート連携')}
+${secTitle('Googleスプレッドシート連携')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:10px">案件の追加・変更時に自動でスプレッドシートに書き込みます。30分ごとに自動同期。GoogleカレンダーのGoogle連携が必要です。</div>
   <div class="fg" style="margin-bottom:10px">
@@ -9160,7 +9642,7 @@ ${secTitle('📊 Googleスプレッドシート連携')}
   </div>
 </div>
 
-${secTitle('👤 担当者管理')}
+${secTitle('担当者管理')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:10px">案件管理の担当者選択に使われます</div>
   <div id="workers-list">
@@ -9175,7 +9657,7 @@ ${secTitle('👤 担当者管理')}
   </div>
 </div>
 
-${secTitle('💪 カスタム筋トレメニュー')}
+${secTitle('カスタム筋トレメニュー')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:10px">種目名・参考動画・基本の回数/セット数を登録できます（フィットネスのクイック選択に表示）</div>
   <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
@@ -9199,7 +9681,7 @@ ${secTitle('💪 カスタム筋トレメニュー')}
   <button class="btn btn-p btn-sm" onclick="addCustomEx()">＋ 種目を追加</button>
 </div>
 
-${secTitle('🔁 セットメニュー（ワンタップまとめ追加）')}
+${secTitle('セットメニュー（ワンタップまとめ追加）')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:10px">腹筋メニュー・腕立てメニューなど、いつもの種目をまとめて登録。フィットネス画面でワンタップ追加できます。</div>
   <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
@@ -9213,13 +9695,13 @@ ${secTitle('🔁 セットメニュー（ワンタップまとめ追加）')}
   <button class="btn btn-p btn-sm" onclick="openExSetModal()">＋ セットメニューを作成</button>
 </div>
 
-${secTitle('📅 固定タイムスケジュール（再掲）')}
+${secTitle('固定タイムスケジュール（再掲）')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:8px">スケジュール表示に使われる固定の時間割です</div>
   <button class="btn btn-g btn-sm" onclick="V='tasks';TV='schedule';render()">スケジュール表示を開く</button>
 </div>
 
-${secTitle('🔄 アプリのアップデート')}
+${secTitle('アプリのアップデート')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:13px;color:var(--t2);margin-bottom:10px">スマホで古いバージョンが表示される場合はこちらで強制更新できます。</div>
   <div style="font-size:12px;color:var(--t3);margin-bottom:10px">現在のバージョン: ${APP_VERSION}</div>
@@ -9233,7 +9715,7 @@ ${secTitle('同期バックアップ')}
   <button class="btn btn-g btn-sm" onclick="restoreLatestSyncBackup()">最新の同期前バックアップを復元</button>
 </div>
 
-${secTitle('🤖 AI APIキー設定')}
+${secTitle('AI APIキー設定')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:12px">AIアシスタント機能で使用するAPIキーを登録します。キーはFirebaseに暗号化保存されます。</div>
   <div class="frow">
@@ -9253,7 +9735,7 @@ ${secTitle('🤖 AI APIキー設定')}
   </div>
 </div>
 
-${secTitle('📅 Googleカレンダー連携')}
+${secTitle('Googleカレンダー連携')}
 <div class="card" id="gcal-settings-card">
   ${_gcalToken?`
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
@@ -9299,7 +9781,7 @@ ${secTitle('📅 Googleカレンダー連携')}
 function promoteWorkerToTrial(id){
   const w=S.workers.find(w=>w.id===id);if(!w)return;
   w.employStatus='trial';
-  save();render();toast(`🎬 ${w.name} のトライアルを開始しました`);
+  save();render();toast(`${w.name} のトライアルを開始しました`);
 }
 function promoteWorkerToHired(id){
   const w=S.workers.find(w=>w.id===id);if(!w)return;
@@ -9307,7 +9789,7 @@ function promoteWorkerToHired(id){
   w.employStatus='hired';
   if(!S.logs)S.logs=[];
   S.logs.push({id:uid(),type:'hire',date:today(),title:w.name,result:'内定',note:'本採用に昇格',createdAt:new Date().toISOString()});
-  save();render();toast(`👤 ${w.name} を本採用にしました`);
+  save();render();toast(`${w.name} を本採用にしました`);
 }
 function rWorkers(){
   const workers=S.workers||[];
@@ -9471,11 +9953,11 @@ function saveWorkerModal(id){
     const prevStatus=w?.employStatus||'trial';
     if(w)Object.assign(w,{name,skills,contact,affiliation,minFee,workConditions,employStatus});
     // 採用予定→トライアル昇格トースト
-    if(prevStatus==='prospect'&&employStatus==='trial'){toast(`🎬 ${name} のトライアルを開始しました`);}
+    if(prevStatus==='prospect'&&employStatus==='trial'){toast(`${name} のトライアルを開始しました`);}
     // トライアル→本採用に変わった瞬間に採用自動記帳（result:'内定' で目標達成確認にカウント）
     if(prevStatus!=='hired'&&employStatus==='hired'){
       S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'内定',note:'本採用に変更時に自動記帳',createdAt:new Date().toISOString()});
-      toast(`👤 ${name} の本採用を目標達成確認に記帳しました`);
+      toast(`${name} の本採用を目標達成確認に記帳しました`);
     }
   }else{
     if(!S.workers)S.workers=[];
@@ -9484,7 +9966,7 @@ function saveWorkerModal(id){
     // 本採用で追加した場合のみ採用目標に記帳（トライアルは記帳しない）
     if(employStatus==='hired'){
       S.logs.push({id:uid(),type:'hire',date:today(),title:name,result:'内定',note:'本採用で追加時に自動記帳',sourceWorkerId:wid2,createdAt:new Date().toISOString()});
-      toast(`👤 ${name} の本採用を目標に記帳しました`);
+      toast(`${name} の本採用を目標に記帳しました`);
     }
   }
   save();closeModal();render();toast('ワーカー情報を保存しました');
@@ -9547,7 +10029,7 @@ function backfillGoalsData(){
   });
 
   save();render();
-  toast(`✅ 採用 ${hireN}件・営業 ${salesN}件・収益 ${revN}件 を登録${cleanN?`・${cleanN}件の誤ログを削除`:''}しました`);
+  toast(`採用 ${hireN}件・営業 ${salesN}件・収益 ${revN}件 を登録${cleanN?`・${cleanN}件の誤ログを削除`:''}しました`);
 }
 function addCustomEx(){
   const n=document.getElementById('new-ex-name')?.value.trim();
@@ -9618,7 +10100,7 @@ function savePomoSettings(){
   save();resetPomo();toast('ポモドーロ設定を保存しました');
 }
 function saveTarget(){S.settings.target=parseInt(document.getElementById('set-target').value)||0;save();toast('目標を保存しました');}
-function saveSheetsId(){const v=document.getElementById('set-sheets-id')?.value.trim();if(!v){toast('スプレッドシートIDを入力してください','err');return;}S.settings.sheetsId=v;S.settings.sheetsTab=(document.getElementById('set-sheets-tab')?.value||'').trim();save();toast('📊 スプレッドシート設定を保存しました');}
+function saveSheetsId(){const v=document.getElementById('set-sheets-id')?.value.trim();if(!v){toast('スプレッドシートIDを入力してください','err');return;}S.settings.sheetsId=v;S.settings.sheetsTab=(document.getElementById('set-sheets-tab')?.value||'').trim();save();toast('スプレッドシート設定を保存しました');}
 function saveIdentity(){S.settings.identity=document.getElementById('set-identity').value.trim();save();toast('アイデンティティを保存しました');}
 function saveFS(){save();toast('スケジュールを保存しました');}
 function fsActiveSchedule(){
@@ -9970,7 +10452,7 @@ function rAIChat(){
   const isOAuth=rawKey==='__oauth__';
   const isGcalConnected=!!_gcalToken;
   return`<div class="ph">
-  <div class="ph-title">🤖 AIアシスタント</div>
+  <div class="ph-title">AIアシスタント</div>
   <button class="btn btn-g btn-sm" onclick="clearAIChat()">🗑 クリア</button>
 </div>
 <div class="ai-model-tabs">
@@ -10101,7 +10583,7 @@ async function callClaude(history,apiKey,system,ctx){
 function saveAIKeys(){
   S.settings.geminiKey=document.getElementById('set-gemini-key')?.value.trim()||'';
   S.settings.claudeKey=document.getElementById('set-claude-key')?.value.trim()||'';
-  save();toast('APIキーを保存しました ✅');
+  save();toast('APIキーを保存しました ');
 }
 
 // ===MODALS===
@@ -10122,9 +10604,9 @@ function openTaskModal(id,preDate,withTime){
   <div class="fg"><div class="fl">優先度</div>
     <select id="t-pri">
       <option value="">なし</option>
-      <option value="high" ${t?.priority==='high'?'selected':''}>❗ 高</option>
-      <option value="medium" ${t?.priority==='medium'?'selected':''}>⚠️ 中</option>
-      <option value="low" ${t?.priority==='low'?'selected':''}>🔵 低</option>
+      <option value="high" ${t?.priority==='high'?'selected':''}>高</option>
+      <option value="medium" ${t?.priority==='medium'?'selected':''}>中</option>
+      <option value="low" ${t?.priority==='low'?'selected':''}>低</option>
     </select>
   </div>
 </div>
@@ -10223,7 +10705,7 @@ function saveTask(){
       window._fsPendingBlockId=undefined;window._fsPendingSlot=undefined;
     }
     S.tasks.unshift(t);
-    if(mins&&mins<=2)toast('⚡ 2分以内！今すぐやりましょう！','warn');
+    if(mins&&mins<=2)toast('2分以内！今すぐやりましょう！','warn');
     else toast('タスクを追加しました');
   }
   save();closeModal();render();
@@ -10238,7 +10720,7 @@ function openFsTaskModal(blockId,slot,startTime,date){
 function fsInternalDrop(e,blockId,slot,date,startTime){
   e.preventDefault();e.stopPropagation();
   e.currentTarget?.classList.remove('fs-dz-over');
-  if(_choreDragId){const c=(S.chores||[]).find(x=>x.id===_choreDragId);if(c&&startTime&&startTime!=='-1'){c.time=startTime;save();render();toast(`🧹 ${esc(c.name)} を ${startTime} に移動しました`);} _choreDragId=null;return;}
+  if(_choreDragId){const c=(S.chores||[]).find(x=>x.id===_choreDragId);if(c&&startTime&&startTime!=='-1'){c.time=startTime;save();render();toast(`${esc(c.name)} を ${startTime} に移動しました`);} _choreDragId=null;return;}
   const id=_taskDragId;
   if(!id)return;
   const t=S.tasks.find(t=>t.id===id);
@@ -10251,7 +10733,7 @@ function fsInternalDrop(e,blockId,slot,date,startTime){
     // パネルからの新規割り当て: 日付とstartTimeを設定
     if(date)t.dueDate=date;
     if(startTime&&startTime!=='-1')t.startTime=startTime;
-    toast(`📌 ${esc(t.title)} をスケジュールに割り当てました`);
+    toast(`${esc(t.title)} をスケジュールに割り当てました`);
   } else if(isSameBlock){
     // 同ブロック内並び替え: S.tasks内の順序も更新
     const from=S.tasks.findIndex(t2=>t2.id===id);
@@ -10275,7 +10757,7 @@ function fsInternalDrop(e,blockId,slot,date,startTime){
   } else {
     // 別ブロックへの移動: 時間帯も移動先ブロックに合わせる（dueDateは保持）
     if(startTime&&startTime!=='-1'&&startTime!=='')t.startTime=startTime;
-    toast(`🔀 ${esc(t.title)} を移動しました`);
+    toast(`${esc(t.title)} を移動しました`);
   }
   save();render();
   _taskDragId=null;
@@ -10329,7 +10811,7 @@ function saveClient(){
       if(wasTrialBefore&&!isTrial){
         if(!S.logs)S.logs=[];
         S.logs.push({id:uid(),type:'sales',date:today(),title:name,result:'成約',note:'トライアル→成約に変更時に自動記帳',sourceClientId:c.id,createdAt:new Date().toISOString()});
-        toast(`🎉 ${name} の成約を営業目標に記帳しました`);
+        toast(`${name} の成約を営業目標に記帳しました`);
       }
     }
   }else{
@@ -10637,7 +11119,7 @@ function saveJob(){
   }
   else S.jobs.unshift({id:uid(),...data,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('案件を保存しました');
-  if(_gcalToken&&S.settings?.sheetsId){const _sj=EID?S.jobs.find(j=>j.id===EID):S.jobs[0];if(_sj)sheetsWriteJob(_sj).then(()=>toast('📊 スプレッドシートを更新しました'));}
+  if(_gcalToken&&S.settings?.sheetsId){const _sj=EID?S.jobs.find(j=>j.id===EID):S.jobs[0];if(_sj)sheetsWriteJob(_sj).then(()=>toast('スプレッドシートを更新しました'));}
   // ※ GcalへのアプリデータWriteは行わない（読み戻し重複防止）
 }
 
@@ -10685,7 +11167,7 @@ function saveHabit(){
   const data={title:name,description:document.getElementById('h-desc').value.trim(),time:document.getElementById('h-time').value||null,daysOfWeek:days,intention:document.getElementById('h-intent').value.trim()};
   if(EID){const h=S.habits.find(h=>h.id===EID);if(h)Object.assign(h,data);}
   else S.habits.push({id:uid(),...data,completedDates:[],createdAt:new Date().toISOString()});
-  save();closeModal();render();toast('習慣を保存しました 🔥');
+  save();closeModal();render();toast('習慣を保存しました ');
 }
 
 function openGoalModal(id,defaultHorizon,defaultDivId){
@@ -10794,7 +11276,7 @@ function saveGoal(){
   const data={title,horizon:hz,targetMonth:hz==='monthly'?(document.getElementById('g-target-month')?.value||today().slice(0,7)):null,category:document.getElementById('g-cat').value,deadline:document.getElementById('g-dl').value||null,targetAmount:parseInt(document.getElementById('g-amt')?.value)||0,targetSalesCount:parseInt(document.getElementById('g-sales-cnt')?.value)||0,targetHireCount:parseInt(document.getElementById('g-hire-cnt')?.value)||0,description:document.getElementById('g-desc').value.trim(),woop,milestones:ms,parentGoalId,divisionId};
   if(EID){const g=S.goals.find(g=>g.id===EID);if(g){const oldMs=g.milestones||[];data.milestones=ms.map((m,i)=>({...m,done:oldMs[i]?.done||false}));Object.assign(g,data);}}
   else S.goals.push({id:uid(),...data,progress:0,createdAt:new Date().toISOString()});
-  save();closeModal();render();toast('目標を保存しました 🎯');
+  save();closeModal();render();toast('目標を保存しました ');
 }
 
 function openLogModal(preType){
@@ -10863,7 +11345,7 @@ function toggleDone(id){
   t.done=!t.done;t.doneDate=t.done?today():null;t.updatedAt=Date.now();
   playCheckSound(t.done);
   if(t.done&&S.settings?.nowTaskId===id)S.settings.nowTaskId=null;
-  if(t.done&&id===S.frogId){S.frogId=null;toast('🐸 カエルを食べました！お疲れ様！');}
+  if(t.done&&id===S.frogId){S.frogId=null;toast('カエルを食べました！お疲れ様！');}
   else toast(t.done?'✅ 完了！':'↩ 未完了に戻しました');
   save();render();
   if(dayModalDate)refreshDayModal(dayModalDate);
@@ -10913,7 +11395,7 @@ function confirmSplitTask(id){
   const newTask={...t,id:uid(),title:t.title+' (後半)',startTime:splitAt,endTime:endT,createdAt:new Date().toISOString()};
   t.endTime=splitAt;
   S.tasks.push(newTask);
-  save();closeModal();render();toast('タスクを分割しました ✂');
+  save();closeModal();render();toast('タスクを分割しました ');
 }
 function delTask(id){
   const dayModalDate=currentDayModalDate();
@@ -10957,7 +11439,7 @@ function toggleHabit(id,date){
     // なし→✓
     h.completedDates.push(date);
     const s=calcStreak(h.completedDates);
-    if(s%7===0&&s>0)toast(`🔥 ${s}日連続達成！素晴らしい！`);else toast('✅ 習慣を記録しました！');
+    if(s%7===0&&s>0)toast(`${s}日連続達成！素晴らしい！`);else toast('習慣を記録しました！');
   }else if(done){
     // ✓→✗
     h.completedDates=h.completedDates.filter(d=>d!==date);
@@ -10969,7 +11451,7 @@ function toggleHabit(id,date){
   }
   // レベル変化フィードバック（既存の連続達成toastは残しつつ上書き通知）
   const afterLv=habitLevel(h).level;
-  if(afterLv>beforeLv)toast(`🎉 レベルアップ！Lv.${afterLv} ${habitTitle(afterLv)}`);
+  if(afterLv>beforeLv)toast(`レベルアップ！Lv.${afterLv} ${habitTitle(afterLv)}`);
   else if(afterLv<beforeLv)toast('レベルダウン… また積み上げよう','warn');
   save();render();
 }
@@ -10977,7 +11459,7 @@ function delHabit(id){const h=S.habits.find(h=>h.id===id);if(h)h.deleted=true;sa
 function toggleMs(gid,idx){
   const g=S.goals.find(g=>g.id===gid);if(!g?.milestones)return;
   g.milestones[idx].done=!g.milestones[idx].done;save();render();
-  if(g.milestones[idx].done)toast('✅ マイルストーン達成！');
+  if(g.milestones[idx].done)toast('マイルストーン達成！');
 }
 function moveMs(gid,idx,dir){
   const g=S.goals.find(g=>g.id===gid);if(!g?.milestones)return;
@@ -11029,12 +11511,12 @@ function togglePomo(){
         S.pomodoroSessions.push({date:today(),taskId:_pomoTaskId,dur:S.settings.workMin||25});
         save();updSessionCount();
         _pomoMode='break';_pomoSec=(S.settings.breakMin||5)*60;
-        toast('🍅 ポモドーロ完了！休憩しましょう');
+        toast('ポモドーロ完了！休憩しましょう');
         if(typeof Notification!=='undefined'&&Notification.permission==='granted')new Notification('EditFlow',{body:'🍅 集中セッション完了！休憩してください'});
       }else{
         _pomoMode='work';_pomoSec=(S.settings.workMin||25)*60;
         const tn=document.getElementById('pomo-task-name');if(tn){tn.style.display='none';tn.textContent='';}
-        _pomoTaskId=null;toast('☕ 休憩終了！次のセッションを始めましょう');
+        _pomoTaskId=null;toast('休憩終了！次のセッションを始めましょう');
       }
       updPomoDisp();
     }
@@ -11052,7 +11534,7 @@ function startPomoFor(id){
   _pomoTaskId=id;_pomoMode='work';_pomoSec=(S.settings.workMin||25)*60;
   const tn=document.getElementById('pomo-task-name');if(tn){tn.textContent=t.title;tn.style.display='block';}
   if(!_pomoRunning)togglePomo();
-  toast(`🍅 「${t.title}」で集中開始！`);
+  toast(`「${t.title}」で集中開始！`);
 }
 function updSessionCount(){
   const td=today(),cnt=(S.pomodoroSessions||[]).filter(p=>p.date===td).length;
@@ -11060,20 +11542,28 @@ function updSessionCount(){
 }
 
 // ===NO-CODE CUSTOMIZE===
-const CP_ICONS=['📄','📊','💡','📌','🔖','📝','🗒','🧩','⭐','🎨','🔑','📂','📋','🗓','🎯','💼','🔔','🌟','🛠','🔥','✅','🎬','💰','🧠','📔'];
+// カスタムページ用アイコン（SVGシンボルID。絵文字は使わない）
+const CP_ICONS=['i-doc','i-chart','i-bulb','i-pin','i-star','i-note','i-clip','i-palette','i-key','i-folder','i-calendar','i-target','i-briefcase','i-bell','i-tools','i-flame','i-check','i-film','i-yen','i-brain','i-book','i-globe','i-users','i-archive','i-building'];
 
 function getNavCfg(){
-  if(!S.navConfig)S.navConfig=BUILTIN_VIEWS.map(v=>({id:v.id,hidden:false}));
+  // hidden は「初期値としてのみ」設定する。既に S.navConfig にある項目の表示/非表示は絶対に上書きしない。
+  if(!S.navConfig)S.navConfig=BUILTIN_VIEWS.map(v=>({id:v.id,hidden:DEFAULT_HIDDEN_VIEWS.includes(v.id)}));
   // 削除済みページをnavConfigから除去（kpi→goalsに統合、revenue→削除）
   S.navConfig=S.navConfig.filter(c=>c.id!=='kpi'&&c.id!=='revenue');
-  BUILTIN_VIEWS.forEach(v=>{if(!S.navConfig.find(c=>c.id===v.id))S.navConfig.push({id:v.id,hidden:false});});
+  // 中核4ビューが未登録なら先頭へ（既存の並び順・表示設定はそのまま）
+  CORE_VIEWS.slice().reverse().forEach(id=>{
+    if(!S.navConfig.find(c=>c.id===id))S.navConfig.unshift({id,hidden:false});
+  });
+  BUILTIN_VIEWS.forEach(v=>{if(!S.navConfig.find(c=>c.id===v.id))S.navConfig.push({id:v.id,hidden:DEFAULT_HIDDEN_VIEWS.includes(v.id)});});
   (S.customPages||[]).forEach(p=>{if(!S.navConfig.find(c=>c.id===`cp_${p.id}`))S.navConfig.push({id:`cp_${p.id}`,hidden:false});});
   return S.navConfig;
 }
 function navMeta(id){
   const bv=BUILTIN_VIEWS.find(v=>v.id===id);if(bv)return{label:bv.label,icon:bv.icon};
-  if(id.startsWith('cp_')){const p=(S.customPages||[]).find(p=>`cp_${p.id}`===id);if(p)return{label:p.title,icon:p.icon||'📄'};}
-  return{label:id,icon:'📄'};
+  if(id.startsWith('cp_')){const p=(S.customPages||[]).find(p=>`cp_${p.id}`===id);if(p)return{label:p.title,icon:p.icon||'i-doc'};}
+  if(id==='customize')return{label:'カスタマイズ',icon:'i-tools'};
+  if(id==='settings')return{label:'設定',icon:'i-gear'};
+  return{label:id,icon:'i-doc'};
 }
 let _navRenderSignature='';
 function renderNav(){
@@ -11091,17 +11581,17 @@ function renderNav(){
         ondragover="sideNavDragOver(event)"
         ondragleave="sideNavDragLeave(event)"
         ondrop="sideNavDrop(event,${idx})">
-        <span class="nav-drag-handle" title="ドラッグで並び替え">⠿</span><span class="nav-icon">${icon}</span>${label}</div>`;
+        <span class="nav-drag-handle" title="ドラッグで並び替え">${iconSvg('i-drag')}</span><span class="nav-icon">${iconSvg(icon)}</span>${label}</div>`;
     }
-    return`<div class="nav-item${V===c.id?' active':''}" data-view="${c.id}"><span class="nav-icon">${icon}</span>${label}</div>`;
+    return`<div class="nav-item${V===c.id?' active':''}" data-view="${c.id}"><span class="nav-icon">${iconSvg(icon)}</span>${label}</div>`;
   };
   const dr=document.getElementById('mob-drawer-nav');if(!dr)return;
   const signature=visible.map(c=>{const m=navMeta(c.id);return`${c.id}:${m.label}:${m.icon}`;}).join('|');
   if(signature!==_navRenderSignature||!el.childElementCount||!dr.childElementCount){
     el.innerHTML=visible.map(c=>navItemHTML(c,true)).join('');
     dr.innerHTML=visible.map(c=>navItemHTML(c,false)).join('')+`<div class="nav-sep"></div>
-    <div class="nav-item" data-view="customize"><span class="nav-icon">🛠</span>カスタマイズ</div>
-    <div class="nav-item" data-view="settings"><span class="nav-icon">⚙️</span>設定</div>`;
+    <div class="nav-item" data-view="customize"><span class="nav-icon">${iconSvg('i-tools')}</span>カスタマイズ</div>
+    <div class="nav-item" data-view="settings"><span class="nav-icon">${iconSvg('i-gear')}</span>設定</div>`;
     _navRenderSignature=signature;
   }
   document.querySelectorAll('.nav-item,.mnav-item').forEach(item=>item.classList.toggle('active',item.dataset.view===V));
@@ -11110,7 +11600,7 @@ function renderNav(){
 function renderMobileTopbar(){
   const meta=navMeta(V),title=document.getElementById('mob-title'),subtitle=document.getElementById('mob-subtitle');
   if(title)title.textContent=meta.label;
-  if(subtitle){const n=(S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.dueDate===today()).length;subtitle.textContent=({dashboard:'今日の流れを確認',tasks:n?`今日の未完了 ${n}件`:'今日のタスクは完了',projects:'案件の進捗を確認',aichat:'相談内容を入力',habits:'今日の記録をつける'})[V]||'作業を進める';}
+  if(subtitle){const n=(S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.dueDate===today()).length;subtitle.textContent=({today:n?`今日の未完了 ${n}件`:'今日のタスクは完了',plan:'週間・月間の予定',life:'習慣と家事',log:'記録をふりかえる',dashboard:'今日の流れを確認',tasks:n?`今日の未完了 ${n}件`:'今日のタスクは完了',projects:'案件の進捗を確認',aichat:'相談内容を入力',habits:'今日の記録をつける'})[V]||'作業を進める';}
 }
 function setV(view){V=view;CP_EDIT_MODE=false;render();}
 function toggleDrawer(){
@@ -11172,10 +11662,10 @@ function sideNavDrop(e,toIdx){
 function rCustomize(){
   const cfg=getNavCfg(),cps=S.customPages||[];
   return`<div class="ph">
-  <div class="ph-title">🛠 カスタマイズ</div>
+  <div class="ph-title">カスタマイズ</div>
   <button class="btn btn-p" onclick="openNewPageModal()">＋ 新しいページ</button>
 </div>
-${secTitle('📋 ナビゲーション管理')}
+${secTitle('ナビゲーション管理')}
 <div style="font-size:12px;color:var(--t2);margin-bottom:10px">⠿ でドラッグして順番変更 ／ スイッチで表示・非表示</div>
 <div id="nav-cfg-list">
 ${cfg.map((c,i)=>{
@@ -11192,9 +11682,9 @@ ${cfg.map((c,i)=>{
   </div>`;
 }).join('')}
 </div>
-${secTitle('📄 カスタムページ')}
+${secTitle('カスタムページ')}
 ${cps.length?cps.map(p=>`<div class="cp-card" onclick="V='cp_${p.id}';render()">
-  <span style="font-size:26px">${p.icon||'📄'}</span>
+  <span style="font-size:26px;display:inline-flex;color:var(--purple)">${iconSvg(p.icon||'i-doc')}</span>
   <div style="flex:1">
     <div style="font-size:14px;font-weight:600">${esc(p.title)}</div>
     <div style="font-size:11px;color:var(--t3)">${(p.blocks||[]).length}ブロック</div>
@@ -11214,9 +11704,9 @@ function openNewPageModal(){
 <div class="fg"><div class="fl">ページタイトル *</div><input id="cp-ttl" placeholder="例：アイデアボード・進捗メモ"></div>
 <div class="fg"><div class="fl">アイコン</div>
   <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px" id="cp-icon-row">
-    ${CP_ICONS.map((ic,i)=>`<span class="icon-pick${i===0?' sel':''}" onclick="pickIcon('${ic}',this)">${ic}</span>`).join('')}
+    ${CP_ICONS.map((ic,i)=>`<span class="icon-pick${i===0?' sel':''}" onclick="pickIcon('${ic}',this)" role="button" tabindex="0" aria-label="${ic}">${iconSvg(ic)}</span>`).join('')}
   </div>
-  <input type="hidden" id="cp-icon-val" value="📄">
+  <input type="hidden" id="cp-icon-val" value="i-doc">
 </div>
 <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="createCustomPage()">作成</button></div>`);
   document.getElementById('cp-ttl')?.focus();
@@ -11228,7 +11718,7 @@ function pickIcon(ic,el){
 function createCustomPage(){
   const title=document.getElementById('cp-ttl')?.value.trim();
   if(!title){toast('タイトルを入力してください','err');return;}
-  const icon=document.getElementById('cp-icon-val')?.value||'📄';
+  const icon=document.getElementById('cp-icon-val')?.value||'i-doc';
   const page={id:uid(),title,icon,blocks:[]};
   if(!S.customPages)S.customPages=[];
   S.customPages.push(page);
@@ -11282,10 +11772,10 @@ const SLASH_COMMANDS=[
 function editCustomPage(id){
   _editPageId=id;
   const page=(S.customPages||[]).find(p=>p.id===id);if(!page)return;
-  openModalLg(`<div class="mhdr"><div class="mtitle">${page.icon} ${esc(page.title)} — 編集</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  openModalLg(`<div class="mhdr"><div class="mtitle">${iconSvg(page.icon||'i-doc')} ${esc(page.title)} — 編集</div><button class="mclose" onclick="closeModal()">✕</button></div>
 <div class="frow" style="margin-bottom:10px">
   <div class="fg"><div class="fl">タイトル</div><input id="cpe-ttl" value="${esc(page.title)}" oninput="updPageMeta('${id}')"></div>
-  <div class="fg" style="max-width:100px"><div class="fl">アイコン</div><input id="cpe-icon" value="${page.icon||'📄'}" style="text-align:center;font-size:18px;padding:6px" oninput="updPageMeta('${id}')"></div>
+  <div class="fg" style="max-width:150px"><div class="fl">アイコン</div><select id="cpe-icon" onchange="updPageMeta('${id}')">${CP_ICONS.map(ic=>`<option value="${ic}" ${(page.icon||'i-doc')===ic?'selected':''}>${ic.slice(2)}</option>`).join('')}</select></div>
 </div>
 <div id="cpe-blocks">${(page.blocks||[]).map((b,i)=>rBlockEd(b,i,id,page.blocks.length)).join('')}</div>
 <div class="block-add-row">${BLOCK_TYPES.map(bt=>`<button class="btn btn-g btn-sm" onclick="addBlock('${id}','${bt.t}')">${bt.l}</button>`).join('')}</div>
@@ -11421,7 +11911,7 @@ function rCustomPage(page){
   if(CP_EDIT_MODE){
     return`<div class="ph" style="flex-wrap:wrap;gap:8px;align-items:center">
   <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:180px">
-    <input id="cpe-icon" value="${esc(page.icon||'📄')}" style="width:38px;text-align:center;font-size:18px;padding:4px;flex-shrink:0" oninput="updPageMeta('${pid}')">
+    <select id="cpe-icon" style="width:118px;padding:4px;flex-shrink:0" onchange="updPageMeta('${pid}')">${CP_ICONS.map(ic=>`<option value="${ic}" ${(page.icon||'i-doc')===ic?'selected':''}>${ic.slice(2)}</option>`).join('')}</select>
     <input id="cpe-ttl" value="${esc(page.title)}" style="font-size:17px;font-weight:700;flex:1;padding:4px 8px" oninput="updPageMeta('${pid}')">
   </div>
   <button class="btn btn-p btn-sm" onclick="CP_EDIT_MODE=false;render()">✓ 完了</button>
@@ -11430,7 +11920,7 @@ ${blocks.map((b,i)=>rBlockEd(b,i,pid,blocks.length)).join('')}
 ${addBtns()}`;
   }
   return`<div class="ph">
-  <div class="ph-title">${esc(page.icon||'📄')} ${esc(page.title)}</div>
+  <div class="ph-title">${iconSvg(page.icon||'i-doc')} ${esc(page.title)}</div>
   <div style="display:flex;gap:6px">
     <span style="font-size:11px;color:var(--t3);align-self:center">テキストで / を入力してブロック追加</span>
     <button class="btn btn-g btn-sm" onclick="CP_EDIT_MODE=true;render()">✏️ 編集</button>
@@ -11854,7 +12344,7 @@ function checkClientDraftTasks(){
       changed.push(j.title+'（サムネイル）');
     }
   });
-  if(changed.length){save();toast(`📋 ${changed.length}件の案件をタスクに自動追加しました`);}
+  if(changed.length){save();toast(`${changed.length}件の案件をタスクに自動追加しました`);}
 }
 
 function checkDeadlineReminders(){
@@ -12376,7 +12866,7 @@ function rSalesLeads(){
     <div id="sl-import-progress" style="font-size:11px;color:var(--t2);margin-top:6px"></div>
   </div>`;
 
-  return`<div class="ph"><div class="ph-title">📞 営業リスト</div>
+  return`<div class="ph"><div class="ph-title">営業リスト</div>
     <button class="btn btn-g btn-sm" onclick="slAddManual()">＋ 手動追加</button>
   </div>
   ${summaryHtml}
@@ -12444,7 +12934,7 @@ function slClearAll(){
   if(!confirm('営業リストを全件削除しますか？この操作は元に戻せません。'))return;
   S.salesLeads=[];
   save();render();
-  toast('🗑 全件削除しました');
+  toast('全件削除しました');
 }
 
 function _slParseCSV(text){
@@ -12500,7 +12990,7 @@ async function _slSaveChunked(leads){
   save();
   if(prog)prog.textContent=`完了: ${newLeads.length}件追加 (重複スキップ: ${leads.length-newLeads.length}件)`;
   render();
-  toast(`📥 ${newLeads.length}件インポートしました`);
+  toast(`${newLeads.length}件インポートしました`);
 }
 
 function slImportCSV(){
@@ -12545,7 +13035,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260905-01';
+const APP_VERSION='20260905-02';
 
 render();
 renderSyncGate();
