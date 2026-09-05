@@ -10633,16 +10633,7 @@ function saveJob(){
     const j=S.jobs.find(j=>j.id===EID);
     const prevStatus=j?.status;
     if(j)Object.assign(j,data);
-    // 完了に変更された瞬間に収益自動記帳
-    if(prevStatus!=='完了'&&data.status==='完了'&&data.unitPrice>0){
-      const profit=data.unitPrice-(data.workerPay||0);
-      if(!S.logs)S.logs=[];
-      const already=S.logs.find(l=>!l.deleted&&l.sourceJobId===EID&&l.type==='revenue');
-      if(!already){
-        S.logs.push({id:uid(),type:'revenue',date:today(),title:data.title,clientId:data.clientId||null,amount:profit,sourceJobId:EID,createdAt:new Date().toISOString()});
-        toast(`💰 収益 ¥${profit.toLocaleString()} を目標達成確認に自動記帳しました`);
-      }
-    }
+    // 完了時の収益自動記帳は2026-09-05に停止（会長指示）。収益は目標達成確認から手動で記録する。
   }
   else S.jobs.unshift({id:uid(),...data,createdAt:new Date().toISOString()});
   save();closeModal();render();toast('案件を保存しました');
@@ -12554,7 +12545,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260903-07';
+const APP_VERSION='20260905-01';
 
 render();
 renderSyncGate();
