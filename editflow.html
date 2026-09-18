@@ -634,7 +634,12 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
   .fs-tl-daynav{align-items:stretch}.fs-tl-daynav>div{max-width:100%;min-width:0}.fs-tl-daynav select{max-width:100%!important}
   .fs-tl-wrap{min-width:0;width:100%}.sched-wrap{max-width:100%}
   .week-grid{gap:3px}.wday-col{min-width:0;padding:8px 3px}
-  .month-nav span{font-size:16px}.month-scroll{margin:0 -14px;border-left:0;border-right:0;border-radius:0;scroll-snap-type:x proximity}.month-grid{min-width:980px}.mday{scroll-snap-align:start}
+  .month-nav span{font-size:16px}.month-scroll{margin:0 -14px;border-left:0;border-right:0;border-radius:0}.month-grid{min-width:0}.mday{min-height:118px;padding:8px 4px}.mday-num{font-size:11px;margin:0 1px 5px}.mday-today-badge{top:4px;right:3px;padding:1px 4px;font-size:8px}.mday-task{font-size:9px;padding:4px 3px 3px;margin-bottom:3px;line-height:1.2;border-left-width:2px}.mday-time{font-size:8px}
+  .ph-title{font-size:18px}.ph-title small{font-size:10px}
+  .ph .btn{flex:0 1 auto;min-width:0;white-space:normal}
+  .actions{gap:6px}.actions .btn{flex:1 1 130px;min-width:0}
+  .card,.task-item,.proj-card,.habit-item,.modal{overflow-wrap:anywhere}
+  .board-wrap{margin-right:-14px;padding-right:14px}
 }
 #mob-topbar{display:none}
 #mob-nav{
@@ -646,7 +651,8 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .mnav-item{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 3px 5px;font-size:10px;color:var(--t2);cursor:pointer;gap:2px;border-radius:12px;min-height:60px}
 .mnav-item.active{color:var(--pl)}
 .mnav-item .nav-icon{font-size:17px;line-height:1}.mnav-add{color:#fff;background:linear-gradient(135deg,var(--purple),#4f46e5);box-shadow:0 5px 14px rgba(109,40,217,.32);margin:-20px 2px 0;min-height:58px;border:3px solid var(--bg);font-weight:700}.mnav-add .nav-icon{font-size:23px;font-weight:400}.mnav-add:active,.mnav-item:active{transform:scale(.96)}
-@media(max-width:700px){#mob-nav{display:flex}#mob-topbar{display:flex;position:fixed;z-index:95;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 56px);padding:calc(env(safe-area-inset-top) + 9px) 14px 8px 62px;align-items:center;justify-content:space-between;background:var(--surface);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.mob-title{font-size:14px;font-weight:800;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mob-subtitle{font-size:10px;color:var(--t2);line-height:1.2;margin-top:1px}.mob-quick{width:36px;height:36px;border-radius:10px;background:var(--pdim);color:var(--purple);display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}}
+@media(max-width:700px){#mob-nav{display:flex}#mob-topbar{display:flex;position:fixed;z-index:95;top:0;left:0;right:0;height:calc(env(safe-area-inset-top) + 56px);padding:calc(env(safe-area-inset-top) + 9px) 14px 8px 62px;align-items:center;justify-content:space-between;background:var(--surface);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.mob-title{font-size:15px;font-weight:800;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mob-subtitle{display:none}.mob-quick{width:36px;height:36px;border-radius:10px;background:var(--pdim);color:var(--purple);display:inline-flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}}
+@media(max-width:700px){.mnav-item:not(.active):not(.mnav-add)>span:last-child,.mnav-add>span:last-child{display:none}.mnav-item .nav-icon{font-size:21px}.mnav-item{min-height:58px;padding:7px 3px}.mnav-item.active>span:last-child{font-size:9px;font-weight:700}.mnav-add .nav-icon{font-size:25px}}
 #mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;opacity:0;transition:opacity .2s}
 #mob-overlay.open{display:block;opacity:1}
 #mob-drawer{
@@ -1095,7 +1101,11 @@ let _lastPersonalSyncSignature='';
 let _lastTeamSaveSignature='';
 let _fbQuotaBlockedUntil=(()=>{try{return Number(sessionStorage.getItem('ef_sync_quota_until')||0);}catch(_){return 0;}})();
 let _fbQuotaResumeTimer=null;
-const FB_SAVE_DEBOUNCE_MS=12000;
+let _firestoreReconnectTimer=null;
+let _firestoreReconnectAttempt=0;
+let _firestoreReconnectInFlight=false;
+let _lastFirestoreErrorCode='';
+const FB_SAVE_DEBOUNCE_MS=3000;
 
 function _personalSyncSignature(value){const clean={...(value||{})};delete clean._savedAt;return JSON.stringify(clean);}
 function _setPersonalRemoteBaseline(raw){_lastPersonalSyncSignature=_personalSyncSignature(_decodePersonalState(raw));}
@@ -1107,7 +1117,33 @@ function _nextFirestoreQuotaResumeAt(now=Date.now()){const p=_pacificParts(now),
 function _isFirestoreQuotaBlocked(){if(!_fbQuotaBlockedUntil)return false;if(Date.now()<_fbQuotaBlockedUntil)return true;_fbQuotaBlockedUntil=0;try{sessionStorage.removeItem('ef_sync_quota_until');}catch(_){}return false;}
 function _scheduleQuotaResume(){clearTimeout(_fbQuotaResumeTimer);if(!_isFirestoreQuotaBlocked()||!FB_USER)return;_fbQuotaResumeTimer=setTimeout(()=>{_fbQuotaBlockedUntil=0;try{sessionStorage.removeItem('ef_sync_quota_until');}catch(_){}if(!FB_USER)return;_setPersonalSyncState('checking');fbSetupRealtimeSync();fbSetupTeamSync();},Math.max(1000,_fbQuotaBlockedUntil-Date.now()));}
 function _pauseFirestoreForQuota(){_fbQuotaBlockedUntil=_nextFirestoreQuotaResumeAt();try{sessionStorage.setItem('ef_sync_quota_until',String(_fbQuotaBlockedUntil));}catch(_){}clearTimeout(_fbSaveTimer);if(_fbUnsubscribe){_fbUnsubscribe();_fbUnsubscribe=null;}if(_teamUnsub){_teamUnsub();_teamUnsub=null;}TEAM_SHARE_OK=null;_setPersonalSyncState('quota');_scheduleQuotaResume();try{toast('クラウド無料枠の回復待ちです。入力内容はこの端末に保存します','warn');}catch(_){}}
-function _handleFirestoreError(e,source){const code=_firestoreErrorCode(e);if(code==='resource-exhausted'||/quota exceeded/i.test(String(e&&e.message||''))){_pauseFirestoreForQuota();return true;}if(code==='unavailable'||code==='deadline-exceeded'||code==='network-request-failed'){_setPersonalSyncState('offline');return false;}_setPersonalSyncState('error');console.warn(source+':',code||e);return false;}
+function _clearFirestoreReconnect(){if(_firestoreReconnectTimer){clearTimeout(_firestoreReconnectTimer);_firestoreReconnectTimer=null;}}
+function _scheduleFirestoreReconnect(){
+  if(!FB_USER||_isFirestoreQuotaBlocked()||_firestoreReconnectTimer||_firestoreReconnectInFlight)return;
+  const delay=Math.min(60000,Math.max(5000,5000*2**Math.min(_firestoreReconnectAttempt,3)));
+  _firestoreReconnectAttempt=Math.min(_firestoreReconnectAttempt+1,4);
+  _firestoreReconnectTimer=setTimeout(()=>{_firestoreReconnectTimer=null;retryFirestoreSync(true);},delay);
+}
+async function retryFirestoreSync(auto=false){
+  if(!FB_USER||_isFirestoreQuotaBlocked()||_firestoreReconnectInFlight)return;
+  _clearFirestoreReconnect();_firestoreReconnectInFlight=true;_setPersonalSyncState('checking');
+  try{
+    if(typeof fbDb.enableNetwork==='function')await fbDb.enableNetwork();
+    fbSetupRealtimeSync();fbSetupTeamSync();
+  }catch(e){_handleFirestoreError(e,auto?'Firestore automatic reconnect':'Firestore reconnect');}
+  finally{_firestoreReconnectInFlight=false;}
+}
+function _markFirestoreConfirmed(){_lastFirestoreErrorCode='';_firestoreReconnectAttempt=0;_clearFirestoreReconnect();}
+function _handleFirestoreError(e,source){
+  const code=_firestoreErrorCode(e),message=String(e&&e.message||'');
+  _lastFirestoreErrorCode=code||'unknown';
+  if(code==='resource-exhausted'||/quota exceeded/i.test(message)){_pauseFirestoreForQuota();return true;}
+  if(['unavailable','deadline-exceeded','network-request-failed','aborted','cancelled','internal','unauthenticated'].includes(code)){
+    _setPersonalSyncState('offline');_scheduleFirestoreReconnect();
+  }else _setPersonalSyncState('error');
+  console.warn(source+':',code||e);return false;
+}
+window.addEventListener('online',()=>{if(FB_USER&&!_isFirestoreQuotaBlocked())retryFirestoreSync(false);});
 
 async function _flushFirebaseSave(){
   if(!FB_USER||_isFirestoreQuotaBlocked())return;
@@ -1125,7 +1161,7 @@ async function _flushFirebaseSave(){
       if(window.AIBridge)_personalTaskBaseline=AIBridge.taskBaseline(local.tasks||[]);
     }
     await _teamSave();
-    if(!_isFirestoreQuotaBlocked())_setPersonalSyncState('synced');
+    if(!_isFirestoreQuotaBlocked()){_markFirestoreConfirmed();_setPersonalSyncState('synced');}
   }catch(e){_handleFirestoreError(e,'Firestore save error');}
   finally{
     _fbSaveInFlight=false;
@@ -1247,8 +1283,8 @@ function fbSetupRealtimeSync(){
   _fbUnsubscribe=fbDb.collection('users').doc(FB_USER.uid).onSnapshot(doc=>{
     const fromCache=doc.metadata?.fromCache===true,pending=doc.metadata?.hasPendingWrites===true,data=doc.data()||{},raw=data.json||'';
     if(!fromCache&&!pending&&raw)_setPersonalRemoteBaseline(raw);
-    if(fromCache&&!pending)_setPersonalSyncState('offline');
-    else if(!pending)_setPersonalSyncState('synced');
+    if(fromCache&&!pending){_setPersonalSyncState('offline');_scheduleFirestoreReconnect();}
+    else if(!pending){_markFirestoreConfirmed();_setPersonalSyncState('synced');}
     if(!doc.exists||!raw){
       if(_firstLoad){_firstLoad=false;if(!fromCache)fbSave();}
       return;
@@ -1432,8 +1468,9 @@ function personalSyncStatusHtml(){
   if(PERSONAL_SYNC_STATE==='synced')return'<div style="font-size:10px;color:var(--green)">☁️ スマホ・PC同期 ON</div>';
   if(PERSONAL_SYNC_STATE==='saving'||PERSONAL_SYNC_STATE==='pending')return'<div style="font-size:10px;color:var(--amber)">☁️ クラウドへ保存中</div>';
   if(PERSONAL_SYNC_STATE==='quota'){const t=_fbQuotaBlockedUntil?new Date(_fbQuotaBlockedUntil).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'';return`<div style="font-size:10px;line-height:1.55;color:var(--red)">⚠️ 同期停止・無料枠回復待ち${t?'（'+t+'頃に再開）':''}<br>入力はこの端末に保存中</div>`;}
-  if(PERSONAL_SYNC_STATE==='offline')return'<div style="font-size:10px;line-height:1.55;color:var(--amber)">⚠️ クラウド確認待ち・端末内に保存中</div>';
-  if(PERSONAL_SYNC_STATE==='error')return'<div style="font-size:10px;color:var(--red)">⚠️ クラウド同期エラー</div>';
+  const retry='<button type="button" onclick="retryFirestoreSync(false)" style="margin-top:3px;border:1px solid currentColor;border-radius:5px;background:transparent;color:inherit;padding:1px 5px;font-size:10px;cursor:pointer">再接続</button>';
+  if(PERSONAL_SYNC_STATE==='offline')return`<div style="font-size:10px;line-height:1.55;color:var(--amber)">⚠️ クラウド確認待ち・端末内に保存中${retry}</div>`;
+  if(PERSONAL_SYNC_STATE==='error')return`<div style="font-size:10px;line-height:1.55;color:var(--red)">⚠️ クラウド同期エラー${_lastFirestoreErrorCode?`（${esc(_lastFirestoreErrorCode)}）`:''}${retry}</div>`;
   return'<div style="font-size:10px;color:var(--t3)">☁️ 同期状態を確認中</div>';
 }
 
@@ -1464,10 +1501,12 @@ fbAuth.onAuthStateChanged(async user=>{
   _authSettled=true;
   _lastPersonalSyncSignature='';_lastTeamSaveSignature='';
   if(user){
+    _firestoreReconnectAttempt=0;_lastFirestoreErrorCode='';_clearFirestoreReconnect();
     await _fbPersistenceReady;
     if(_isFirestoreQuotaBlocked()){_setPersonalSyncState('quota');_scheduleQuotaResume();}
     else{_setPersonalSyncState('checking');fbSetupRealtimeSync();fbSetupTeamSync();}
   } else {
+    _clearFirestoreReconnect();_firestoreReconnectAttempt=0;_lastFirestoreErrorCode='';
     if(_fbUnsubscribe){_fbUnsubscribe();_fbUnsubscribe=null;}
     if(_teamUnsub){_teamUnsub();_teamUnsub=null;}
     TEAM_SHARE_OK=null;
@@ -13035,7 +13074,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260905-02';
+const APP_VERSION='20260918-01';
 
 render();
 renderSyncGate();
