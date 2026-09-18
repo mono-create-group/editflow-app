@@ -1178,6 +1178,9 @@ let _firestoreReconnectTimer=null;
 let _firestoreReconnectAttempt=0;
 let _firestoreReconnectInFlight=false;
 let _lastFirestoreErrorCode='';
+let _cloudSyncDraft=null;
+let _imeComposing=false;
+let _cloudSyncFlushTimer=null;
 const FB_SAVE_DEBOUNCE_MS=3000;
 
 function _openInLocalModeAfterAuthWait(){
@@ -1289,6 +1292,25 @@ function restoreUnsavedFormDraft(draft){
   const root=document.getElementById('view');if(!root)return;const fields=[...root.querySelectorAll('input,textarea,select')].filter(el=>!['button','submit','file','password','hidden'].includes(el.type)&&!el.readOnly),counts={},byKey=new Map();fields.forEach(el=>{const base=el.id?`id:${el.id}`:`${el.tagName}|${el.type||''}|${el.className||''}|${el.getAttribute('aria-label')||''}`,index=counts[base]||0;counts[base]=index+1;byKey.set(`${base}#${index}`,el);});draft.fields.forEach(item=>{const el=byKey.get(`${item.base}#${item.index}`);if(!el)return;if(el.type==='checkbox'||el.type==='radio')el.checked=!!item.checked;else el.value=item.value;});
 }
 function renderAfterCloudSync(draft){render();restoreUnsavedFormDraft(draft);}
+function _isEditableTextElement(el=document.activeElement){
+  if(!el||el.disabled||el.readOnly||!['INPUT','TEXTAREA'].includes(el.tagName))return false;
+  return !['checkbox','radio','button','submit','file','color','date','time','number','range'].includes(el.type);
+}
+function _isCloudSyncEditing(){return _imeComposing||_isEditableTextElement();}
+function _queueCloudSync(raw,cloudTs,fromCache){_cloudSyncDraft={raw,cloudTs,fromCache};}
+function _flushQueuedCloudSync(){
+  clearTimeout(_cloudSyncFlushTimer);_cloudSyncFlushTimer=null;
+  if(_isCloudSyncEditing()||!_cloudSyncDraft)return;
+  const queued=_cloudSyncDraft;_cloudSyncDraft=null;
+  if(queued.cloudTs<=(S._savedAt||0)+2000)return;
+  const remoteSignature=_personalSyncSignature(_decodePersonalState(queued.raw)),formDraft=captureUnsavedFormDraft();
+  _applyCloudData(queued.raw);renderAfterCloudSync(formDraft);
+  if(!queued.fromCache&&_personalSyncSignature(_decodePersonalState(_packState()))!==remoteSignature)fbSave();
+  if(!queued.fromCache)toast('他のデバイスから同期しました');
+}
+document.addEventListener('compositionstart',()=>{_imeComposing=true;},{capture:true});
+document.addEventListener('compositionend',()=>{_imeComposing=false;setTimeout(_flushQueuedCloudSync,0);},{capture:true});
+document.addEventListener('blur',e=>{if(_isEditableTextElement(e.target))setTimeout(_flushQueuedCloudSync,0);},{capture:true});
 function syncBackupKeys(){try{return Object.keys(localStorage).filter(k=>k.startsWith('ef_sync_backup_')||k.startsWith('ef_v5_backup_')).sort((a,b)=>(Number(b.match(/(\d+)$/)?.[1])||0)-(Number(a.match(/(\d+)$/)?.[1])||0));}catch(_){return[];}}
 function backupLocalState(reason='cloud-sync'){
   try{const existing=syncBackupKeys();if(existing.length>=3)return existing[0];const key=`ef_sync_backup_${S._uid||'local'}_${Date.now()}`,personal={..._decodePersonalState(_packState()),_backupReason:reason,_backupAt:Date.now()},json=JSON.stringify(personal),stored=window.LZString?'LZ1:'+LZString.compressToUTF16(json):json;localStorage.setItem(key,stored);return key;}catch(e){console.warn('sync backup skipped',e&&e.name||e);return null;}
@@ -1411,6 +1433,10 @@ function fbSetupRealtimeSync(){
     } else {
       // リアルタイム更新 — クラウドが明らかに新しい場合のみ適用
       if(!pending&&cloudTs>localTs+2000){
+        if(_isCloudSyncEditing()){
+          _queueCloudSync(raw,cloudTs,fromCache);
+          return;
+        }
         const remoteSignature=_personalSyncSignature(_decodePersonalState(raw)),formDraft=captureUnsavedFormDraft();_applyCloudData(raw);
         renderAfterCloudSync(formDraft);
         if(!fromCache&&_personalSyncSignature(_decodePersonalState(_packState()))!==remoteSignature)fbSave();
@@ -9919,7 +9945,7 @@ ${secTitle('固定タイムスケジュール')}
       <span style="color:var(--t2)">〜</span>
       <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.e)}" oninput="fsStageBlockTime(${i},'e',this.value)" onkeydown="fsCommitBlockTime(event,${i},'e')" placeholder="${f.e==='24:00'?'24:00(終日)':'終了'}">
       <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.e?'0.7':'0.2'}" onclick="fsSetBlockTime(${i},'e','')" title="終了時間をクリア">✕</button>
-      <input style="flex:1;padding:4px 8px;font-size:12px" value="${esc(f.t)}" onchange="S.fs[${i}].t=this.value" placeholder="内容（→区切りで複数項目）">
+      <input style="flex:1;padding:4px 8px;font-size:12px" value="${esc(f.t)}" onchange="fsCommitBlockText(${i},this.value)" placeholder="内容（→区切りで複数項目）">
       <input type="color" value="${f.c}" style="width:32px;height:32px;padding:2px;border-radius:6px;cursor:pointer;background:none;border:1px solid var(--border)" onchange="S.fs[${i}].c=this.value">
       ${f.t.includes('→')?`<button class="btn btn-xs" style="background:${f.c}12;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;flex-shrink:0" onclick="save();openFsDetailModal('${f.id||('b'+i)}')" title="項目ごとの時刻・チェックを編集">項目時刻</button>`:''}
       <button class="tact del" onclick="S.fs.splice(${i},1);save();render()">✕</button>
@@ -10677,6 +10703,12 @@ function fsSetBlockTime(i,key,value){
 function fsStageBlockTime(i,key,value){
   if(!S.fs[i]||(key!=='s'&&key!=='e'))return;
   S.fs[i][key]=value;
+}
+function fsCommitBlockText(i,value){
+  if(!S.fs[i])return;
+  S.fs[i].t=value;
+  syncActiveFsSchedule();
+  save();
 }
 function fsCommitBlockTime(e,i,key){
   if(e.key!=='Enter')return;
@@ -13346,7 +13378,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260918-07';
+const APP_VERSION='20260918-08';
 
 render();
 renderSyncGate();
@@ -13359,7 +13391,7 @@ renderSyncGate();
 
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/editflow-app/sw.js?v=20260918-07',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('/editflow-app/sw.js?v=20260918-08',{updateViaCache:'none'}).then(reg=>{
     reg.update();
   }).catch(e=>console.warn('SW:',e));
 }
