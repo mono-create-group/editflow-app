@@ -689,7 +689,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
   .ph-title{font-size:18px}.ph-title small{font-size:10px}
   .ph .btn{flex:0 1 auto;min-width:0;white-space:normal}
   .actions{gap:6px}.actions .btn{flex:1 1 130px;min-width:0}
-  .card,.task-item,.proj-card,.habit-item,.modal{overflow-wrap:anywhere}
+  .card,.task-item,.proj-card,.habit-item,.modal{overflow-wrap:anywhere}.edit-counter-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.edit-counter-monthbar{flex-direction:column;gap:2px}.record-skip-form>*{flex:1 1 100%}.record-skip-form .btn{width:100%}
   .board-wrap{margin-right:-14px;padding-right:14px}
   .abstinence-legend{grid-template-columns:1fr}
   .abstinence-calendar-card{padding:9px 6px}
@@ -789,6 +789,13 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .log-card-body{display:flex;flex-direction:column;min-width:0}
 .log-card-ttl{font-size:14px;font-weight:800}
 .log-card-desc{font-size:11px;color:var(--t2);margin-top:2px}
+.record-skip-card{margin:14px 0 16px;padding:16px;border:1.5px solid var(--amber);border-radius:var(--r);background:linear-gradient(135deg,var(--card),var(--adim));box-shadow:var(--shadow-sm)}
+.record-skip-card.is-skipped{border-color:var(--green);background:linear-gradient(135deg,var(--card),var(--gdim))}
+.record-skip-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:13px}.record-skip-kicker,.record-calendar-kicker{font-size:10px;letter-spacing:.12em;font-weight:800;color:var(--amber)}.record-skip-card.is-skipped .record-skip-kicker{color:var(--green)}
+.record-skip-head h3,.record-calendar-head h3{margin:3px 0 3px;font-size:17px}.record-skip-head p,.record-calendar-head p{margin:0;color:var(--t2);font-size:12px;line-height:1.6}.record-skip-icon{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--adim);color:var(--amber);font-size:21px;font-weight:800;flex-shrink:0}.is-skipped .record-skip-icon{background:var(--gdim);color:var(--green)}
+.record-skip-form{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}.record-skip-form label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--t2);font-weight:700}.record-skip-form input{min-height:40px;padding:7px 9px}.record-skip-form .btn{min-height:40px}.record-skip-note{margin-top:10px;font-size:11px;color:var(--t3)}
+.record-calendar-card{margin-top:14px}.record-calendar-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}.record-calendar-range{font-size:11px;color:var(--t2);background:var(--card2);padding:5px 8px;border-radius:999px;white-space:nowrap}.record-calendar-scroll{overflow-x:auto;padding-bottom:3px}.record-calendar-grid{display:grid;grid-template-columns:150px repeat(var(--record-cols),34px);min-width:max-content;gap:3px;align-items:center}.record-calendar-label{height:30px;display:flex;align-items:center;justify-content:space-between;gap:5px;padding:0 7px;background:var(--card2);border-radius:6px;font-size:11px;min-width:0}.record-calendar-label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.record-calendar-label b{font-size:9px;color:var(--purple);white-space:nowrap}.record-calendar-date{height:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--t3);font-size:10px;font-weight:700}.record-calendar-date small{font-size:8px;font-weight:500}.record-calendar-date.today{color:var(--purple)}.record-calendar-cell{width:34px;height:30px;border:1px solid transparent;border-radius:6px;background:var(--card2);color:var(--t3);font-size:14px;cursor:pointer;padding:0}.record-calendar-cell.kept{background:var(--gdim);border-color:var(--green);color:var(--green);font-weight:800}.record-calendar-cell.failed{background:var(--rdim);border-color:var(--red);color:var(--red);font-weight:800}.record-calendar-cell.skip{background:var(--adim);border-color:var(--amber);color:var(--amber);cursor:default;font-size:10px}.record-calendar-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;color:var(--t3);font-size:10px}.record-calendar-empty{font-size:12px;color:var(--t3)}
+.edit-counter-card{margin:14px 0 16px;border-color:rgba(31,95,208,.35);background:linear-gradient(135deg,var(--card),rgba(31,95,208,.06))}.edit-counter-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.edit-counter-kicker{font-size:10px;letter-spacing:.12em;font-weight:800;color:#2563eb}.edit-counter-head h3{margin:3px 0;font-size:17px}.edit-counter-head p{margin:0;color:var(--t2);font-size:12px}.edit-counter-cloud{font-size:10px;color:#2563eb;background:rgba(37,99,235,.1);padding:5px 8px;border-radius:999px;white-space:nowrap}.edit-counter-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:14px 0 10px}.edit-counter-stats>div{background:var(--card2);border-radius:8px;padding:9px 8px;min-width:0}.edit-counter-stats small{display:block;color:var(--t2);font-size:10px;white-space:nowrap}.edit-counter-stats b{display:block;margin-top:3px;font-size:15px;white-space:nowrap}.edit-counter-stats i{font-size:10px;color:var(--t2);font-style:normal;font-weight:500}.edit-counter-monthbar{display:flex;justify-content:space-between;gap:8px;color:var(--t2);font-size:11px;margin-bottom:8px}.edit-counter-calendar{overflow:hidden}.edit-counter-weekdays,.edit-counter-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.edit-counter-weekdays{color:var(--t3);font-size:10px;text-align:center;margin-bottom:4px}.edit-counter-day{min-height:54px;border:1px solid var(--border);border-radius:7px;background:var(--card2);padding:4px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0}.edit-counter-day.today{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12)}.edit-counter-day.empty{background:transparent;border-color:transparent}.edit-counter-day b{font-size:10px;color:var(--t2)}.edit-counter-day strong{font-size:12px;color:var(--text);line-height:1.35}.edit-counter-day small{font-size:9px;color:var(--t3);white-space:nowrap}.edit-counter-foot{margin-top:9px;color:var(--t3);font-size:10px}
 
 /* ─── 目標ホライズンの絞り込みチップ ─── */
 .hz-chips{display:flex;flex-wrap:wrap;gap:6px;margin:-8px 0 14px}
@@ -1130,7 +1137,7 @@ const SCOLBG={'案件掲載中':'bc','未着手':'bk','進行中':'bb','編集�
 const DAYS=['日','月','火','水','木','金','土'];
 const LOG_TYPES=['revenue','sales','hire'];
 const ABSTINENCE_ITEMS=[
-  {key:'masturbation',label:'おナニ禁止',short:'おナニ',icon:'○'},
+  {key:'masturbation',label:'禁欲',short:'禁欲',icon:'○'},
   {key:'junkFood',label:'ジャンクフード禁止',short:'ジャンク',icon:'🍔'},
   {key:'snacks',label:'おやつ・ジュース禁止',short:'おやつ・ジュース',icon:'🍭'},
 ];
@@ -1157,6 +1164,8 @@ let _fbSaveTimer=null;
 let _fbUnsubscribe=null;
 let _personalTaskBaseline=new Map();
 let _authSettled=false;
+let _authFallback=false;
+let _authSettleTimer=null;
 let PERSONAL_SYNC_STATE='checking';
 let _fbSaveInFlight=false;
 let _fbSaveQueued=false;
@@ -1169,6 +1178,14 @@ let _firestoreReconnectAttempt=0;
 let _firestoreReconnectInFlight=false;
 let _lastFirestoreErrorCode='';
 const FB_SAVE_DEBOUNCE_MS=3000;
+
+function _openInLocalModeAfterAuthWait(){
+  if(_authSettled)return;
+  _authSettled=true;_authFallback=true;PERSONAL_SYNC_STATE='offline';
+  renderAuthUI();renderSyncGate();render();
+  try{toast('クラウド確認に時間がかかるため、端末内モードで開きました','warn');}catch(_){ }
+}
+_authSettleTimer=setTimeout(_openInLocalModeAfterAuthWait,8000);
 
 function _personalSyncSignature(value){const clean={...(value||{})};delete clean._savedAt;return JSON.stringify(clean);}
 function _setPersonalRemoteBaseline(raw){_lastPersonalSyncSignature=_personalSyncSignature(_decodePersonalState(raw));}
@@ -1300,11 +1317,23 @@ function mergeAbstinenceState(localAbstinence,remoteAbstinence){
   });
   return{...r,...l,records};
 }
+function mergeDateSkipState(local,remote){
+  const l=local||{},r=remote||{},merged={...r};
+  Object.entries(l).forEach(([date,item])=>{
+    const remoteItem=merged[date];
+    if(!remoteItem||Number(item?.updatedAt||0)>=Number(remoteItem?.updatedAt||0))merged[date]=item;
+  });
+  return merged;
+}
+function mergeEditCounterState(local,remote){
+  const l=local||{},r=remote||{},days={...(r.days||{}),...(l.days||{})};
+  return{...r,...l,days};
+}
 function mergeCloudStateWithLocal(local,remote){
   remote={...remote,decisions:mergeRecordArrays(local.decisions,remote.decisions),sessionTasks:mergeRecordArrays(local.sessionTasks,remote.sessionTasks)};
   const merged={...remote};const arrays=['habits','jobs','logs','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','choreRoutines','meals','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];arrays.forEach(k=>merged[k]=mergeRecordArrays(local[k],remote[k]));
   ['journals','performanceLogs','workouts'].forEach(k=>merged[k]=compactHistoryRecords([...(remote[k]||[]),...(local[k]||[])],k));
-  merged.finance=mergeFinanceState(local.finance,remote.finance);merged.abstinence=mergeAbstinenceState(local.abstinence,remote.abstinence);merged.dailyOpenReviews={...(remote.dailyOpenReviews||{}),...(local.dailyOpenReviews||{})};merged.goalReviews={...(remote.goalReviews||{}),...(local.goalReviews||{})};merged.dailySchedules={...(remote.dailySchedules||{}),...(local.dailySchedules||{})};merged.fsChecked={...(remote.fsChecked||{}),...(local.fsChecked||{})};return merged;
+  merged.finance=mergeFinanceState(local.finance,remote.finance);merged.abstinence=mergeAbstinenceState(local.abstinence,remote.abstinence);merged.recordSkipDays=mergeDateSkipState(local.recordSkipDays,remote.recordSkipDays);merged.editCounter=mergeEditCounterState(local.editCounter,remote.editCounter);merged.dailyOpenReviews={...(remote.dailyOpenReviews||{}),...(local.dailyOpenReviews||{})};merged.goalReviews={...(remote.goalReviews||{}),...(local.goalReviews||{})};merged.dailySchedules={...(remote.dailySchedules||{}),...(local.dailySchedules||{})};merged.fsChecked={...(remote.fsChecked||{}),...(local.fsChecked||{})};return merged;
 }
 function _applyCloudData(json){
   if(typeof json==='string'&&json.slice(0,3)==='LZ:'){
@@ -1325,6 +1354,9 @@ function _applyCloudData(json){
   ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','chores','choreRoutines','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(!S.abstinence||typeof S.abstinence!=='object')S.abstinence={records:{}};
   if(!S.abstinence.records||typeof S.abstinence.records!=='object')S.abstinence.records={};
+  if(!S.recordSkipDays||typeof S.recordSkipDays!=='object')S.recordSkipDays={};
+  if(!S.editCounter||typeof S.editCounter!=='object')S.editCounter={days:{}};
+  if(!S.editCounter.days||typeof S.editCounter.days!=='object')S.editCounter.days={};
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -1525,6 +1557,7 @@ function renderSyncGate(){
     el.innerHTML='<div style="width:min(420px,100%);background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;box-sizing:border-box;text-align:center;box-shadow:0 12px 36px rgba(15,23,42,.08)"><div style="font-size:18px;font-weight:800;color:#111827">同期状態を確認中…</div><div style="margin-top:10px;font-size:13px;line-height:1.7;color:#6b7280">EditFlowのデータを安全に読み込んでいます。</div></div>';
     return;
   }
+  if(_authFallback){el.style.display='none';el.innerHTML='';return;}
   if(FB_USER){el.style.display='none';el.innerHTML='';return;}
   const embedded=_isEmbeddedWebview();
   el.style.display='flex';
@@ -1570,6 +1603,8 @@ function renderAuthUI(){
 fbAuth.getRedirectResult().catch(e=>{console.warn('getRedirectResult:',e&&e.code||e);});
 
 fbAuth.onAuthStateChanged(async user=>{
+  if(_authSettleTimer){clearTimeout(_authSettleTimer);_authSettleTimer=null;}
+  _authFallback=false;
   FB_USER=user;
   _authSettled=true;
   _lastPersonalSyncSignature='';_lastTeamSaveSignature='';
@@ -2241,6 +2276,7 @@ const DEFAULT_FS=[
 
 // ===STATE===
 let S=load(), V=resolveView(sessionStorage.getItem('ef_view')||'today'), TV='today', HV='weekly', WO=0, MO=0, EID=null, PVM='board', JD=today();
+let RECORD_SKIP_DATE=today();
 let PV='week'; // 「予定」タブのサブビュー: week / month / fixed
 if(window.AIBridge)_personalTaskBaseline=AIBridge.taskBaseline(S.tasks||[]);
 let KV=null; // 現在の事業部ID
@@ -2279,6 +2315,8 @@ function defState(){return{
   activeFsScheduleId:null,
   finance:{monthlyBudgets:{},fixedExpenses:[],payments:[],incomes:[],savings:{monthlyTarget:0,saved:0},debts:[],rewards:[]},
   dailyOpenReviews:{},
+  recordSkipDays:{},
+  editCounter:{sourceHash:'',importedAt:0,monthTarget:0,days:{}},
   abstinence:{records:{}},
 };}
 function migrate(d){
@@ -2302,6 +2340,9 @@ function migrate(d){
   ['fixedExpenses','payments','incomes','debts','rewards'].forEach(k=>{if(!Array.isArray(d.finance[k]))d.finance[k]=[];});
   if(!d.finance.savings)d.finance.savings={monthlyTarget:0,saved:0};
   if(!d.dailyOpenReviews||typeof d.dailyOpenReviews!=='object')d.dailyOpenReviews={};
+  if(!d.recordSkipDays||typeof d.recordSkipDays!=='object')d.recordSkipDays={};
+  if(!d.editCounter||typeof d.editCounter!=='object')d.editCounter={};
+  if(!d.editCounter.days||typeof d.editCounter.days!=='object')d.editCounter.days={};
   if(!d.abstinence||typeof d.abstinence!=='object')d.abstinence={};
   if(!d.abstinence.records||typeof d.abstinence.records!=='object')d.abstinence.records={};
   if(Array.isArray(d.customEx))d.customEx=d.customEx.map(x=>typeof x==='string'?{name:x}:x);
@@ -2883,11 +2924,61 @@ function checkKpiLock(){
 // 夜の締め（Today Review）1画面に統合した。関数は他所からの呼び出し互換のため残す。
 function checkDailyLock(){return false;}
 function previousDay(){const d=new Date();d.setDate(d.getDate()-1);return d.toLocalYmd();}
+function isRecordSkipDay(date){return!!(S.recordSkipDays&&S.recordSkipDays[date]?.skipped);}
+function setRecordSkipDay(date,skipped){
+  if(!date)return;
+  if(!S.recordSkipDays||typeof S.recordSkipDays!=='object')S.recordSkipDays={};
+  S.recordSkipDays[date]={skipped:!!skipped,updatedAt:Date.now()};
+  save();render();toast(skipped?`${date}を「記録しない日」にしました`:'記録する日に戻しました');
+}
+function editCounterHash(value){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619);}return(h>>>0).toString(16);}
+function syncEditCounterFromLocal(){
+  let raw='',timerRaw='';try{raw=localStorage.getItem('mc_edit_counter_v1')||'';timerRaw=localStorage.getItem('mc_timer_v1')||'';}catch(_){return false;}
+  if(!raw)return false;
+  const sourceHash=editCounterHash(raw+'|'+timerRaw);
+  if(S.editCounter?.sourceHash===sourceHash)return false;
+  let src,timer;try{src=JSON.parse(raw);timer=timerRaw?JSON.parse(timerRaw):{};}catch(_){return false;}
+  if(!src||typeof src!=='object')return false;
+  const days={},sourceDays=src.days&&typeof src.days==='object'?src.days:{};
+  Object.keys(sourceDays).forEach(date=>{
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
+    const events=Array.isArray(sourceDays[date])?sourceDays[date]:[],durations=events.map(e=>Number(e?.dur)).filter(n=>Number.isFinite(n)&&n>0);
+    const manual=src.manualCounts&&Object.prototype.hasOwnProperty.call(src.manualCounts,date)?Number(src.manualCounts[date]):null;
+    days[date]={count:Number.isFinite(manual)&&manual>=0?Math.floor(manual):events.length,totalMinutes:durations.reduce((a,n)=>a+n,0)/60000,averageMinutes:durations.length?durations.reduce((a,n)=>a+n,0)/durations.length/60000:null,records:durations.length,pomodoroSets:Number(timer?.pomo?.sets?.[date]||0),updatedAt:Date.now()};
+  });
+  Object.keys(src.manualCounts||{}).forEach(date=>{if(!days[date]&&/^\d{4}-\d{2}-\d{2}$/.test(date))days[date]={count:Math.max(0,Math.floor(Number(src.manualCounts[date])||0)),totalMinutes:0,averageMinutes:null,records:0,pomodoroSets:Number(timer?.pomo?.sets?.[date]||0),updatedAt:Date.now()};});
+  Object.keys(timer?.pomo?.sets||{}).forEach(date=>{if(!days[date]&&/^\d{4}-\d{2}-\d{2}$/.test(date))days[date]={count:0,totalMinutes:0,averageMinutes:null,records:0,pomodoroSets:Number(timer.pomo.sets[date]||0),updatedAt:Date.now()};else if(days[date])days[date].pomodoroSets=Number(timer.pomo.sets[date]||0);});
+  S.editCounter={...(S.editCounter||{}),sourceHash,importedAt:Date.now(),monthTarget:Number(src.monthTarget||0),days};
+  save();
+  return true;
+}
+window.addEventListener('storage',e=>{if(e.key==='mc_edit_counter_v1'||e.key==='mc_timer_v1'){if(syncEditCounterFromLocal())render();}});
+window.addEventListener('focus',()=>{if(typeof S!=='undefined'&&syncEditCounterFromLocal())render();});
 function previousDayGateState(date=previousDay()){
+  const skip=isRecordSkipDay(date);
   const habits=habitsForDate(date),habitDone=habits.every(h=>(h.completedDates||[]).includes(date)||(h.failedDates||[]).includes(date));
   const w=S.workouts.find(x=>x.date===date),hasWorkout=!!(w&&((w.entries||[]).length>0||(w.exercises||[]).length>0)),fitnessDone=hasWorkout||!!w?.isRest;
   const abstinence=ABSTINENCE_ITEMS.map(item=>({...item,status:abstinenceStatus(date,item.key)}));
-  return{date,habits,habitDone,fitnessDone,abstinence,abstinenceDone:abstinence.every(item=>item.status)};
+  return{date,skip,habits,habitDone:skip||habitDone,fitnessDone:skip||fitnessDone,abstinence,abstinenceDone:skip||abstinence.every(item=>item.status)};
+}
+function recordCalendarStreak(statusFn){
+  let d=new Date(today()+'T00:00:00'),status=statusFn(d.toLocalYmd());
+  if(!status){d.setDate(d.getDate()-1);status=statusFn(d.toLocalYmd());}
+  let n=0;
+  for(let i=0;i<366&&status==='kept';i++){n++;d.setDate(d.getDate()-1);status=statusFn(d.toLocalYmd());}
+  return n;
+}
+function rHabitRecordCalendar(){
+  const td=today(),end=new Date(td+'T00:00:00'),dates=[];
+  for(let i=20;i>=0;i--){const d=new Date(end);d.setDate(end.getDate()-i);dates.push(d.toLocalYmd());}
+  const habits=habitsForDate(td);
+  const rows=[...habits.map(h=>({id:h.id,label:h.title,type:'habit',status:d=>(h.completedDates||[]).includes(d)?'kept':(h.failedDates||[]).includes(d)?'failed':isRecordSkipDay(d)?'skip':''})),...ABSTINENCE_ITEMS.map(item=>({id:item.key,label:item.label,type:'abstinence',status:d=>{const s=abstinenceStatus(d,item.key);return s|| (isRecordSkipDay(d)?'skip':'');}}))];
+  const cell=(row,d)=>{const s=row.status(d),mark=s==='kept'?'○':s==='failed'?'×':s==='skip'?'休':'·';const action=row.type==='habit'?`toggleHabit('${row.id}','${d}')`:`toggleAbstinence('${d}','${row.id}')`;return`<button type="button" class="record-calendar-cell ${s}" onclick="${s==='skip'?'':action}" title="${d}">${mark}</button>`;};
+  return`<section class="card record-calendar-card">
+  <div class="record-calendar-head"><div><div class="record-calendar-kicker">CONTINUITY</div><h3>記録カレンダー</h3><p>○達成、×できなかった、休は「記録しない日」です。</p></div><span class="record-calendar-range">直近21日</span></div>
+  ${rows.length?`<div class="record-calendar-scroll"><div class="record-calendar-grid" style="--record-cols:${dates.length}"><div class="record-calendar-label"></div>${dates.map(d=>`<div class="record-calendar-date ${d===td?'today':''}">${Number(d.slice(8))}<small>${DAYS[new Date(d+'T00:00:00').getDay()]}</small></div>`).join('')}${rows.map(row=>`<div class="record-calendar-label" title="${esc(row.label)}"><span>${esc(row.label)}</span><b>${recordCalendarStreak(row.status)}日</b></div>${dates.map(d=>cell(row,d)).join('')}`).join('')}</div></div>`:'<div class="record-calendar-empty">習慣や禁欲項目がまだありません。</div>'}
+  <div class="record-calendar-legend"><span>○ 達成</span><span>× できなかった</span><span>· 未記録</span><span>休 記録しない日</span></div>
+</section>`;
 }
 function needsPreviousDayCheck(){const g=previousDayGateState();return!(g.habitDone&&g.fitnessDone&&g.abstinenceDone);}
 function rPreviousDayGate(){
@@ -2904,7 +2995,7 @@ function rPreviousDayGate(){
   <div class="previous-day-gate-section ${g.fitnessDone?'is-done':''}">
     <div class="previous-day-gate-title"><span>2</span><b>フィットネス</b><em>${g.fitnessDone?'✓ 完了':'未完了'}</em></div>
     <div class="previous-day-gate-note">${g.fitnessDone?'休み、または種目の記録があります。':'休みの記録か、種目の記録が必要です。'}</div>
-    ${g.fitnessDone?'':`<div class="previous-day-gate-actions"><button class="btn btn-g btn-sm" onclick="markGymRest('${g.date}')">今日は休みにする</button><button class="btn btn-p btn-sm" onclick="FIT_DATE='${g.date}';FTV='training';render()">種目を追加する</button></div>`}
+    ${g.fitnessDone?'':`<div class="previous-day-gate-actions"><button class="btn btn-g btn-sm" onclick="markGymRest('${g.date}')">昨日を休みにする</button><button class="btn btn-p btn-sm" onclick="FIT_DATE='${g.date}';FTV='training';render()">昨日の種目を追加する</button></div>`}
   </div>
   <div class="previous-day-gate-section ${g.abstinenceDone?'is-done':''}">
     <div class="previous-day-gate-title"><span>3</span><b>禁欲カレンダー</b><em>${g.abstinenceDone?'✓ 完了':'未完了'}</em></div>
@@ -2912,11 +3003,12 @@ function rPreviousDayGate(){
     <div class="previous-day-gate-items">${g.abstinence.map(item=>`<button type="button" class="previous-day-chip abstinence-gate-chip ${item.status}" onclick="toggleAbstinence('${g.date}','${item.key}')"><span>${item.status==='kept'?'✓':item.status==='failed'?'✕':item.icon}</span>${item.label}</button>`).join('')}</div>
   </div>
   <div class="previous-day-gate-foot">昨日の記録がそろうと、自動的に通常画面へ戻ります。</div>
-</section>`;
+</section>${rHabitRecordCalendar()}`;
 }
 // 夜の締めゲート: 21時以降・当日未記録・このセッションで「あとで」を押していない場合だけ表示する。
 function needsTodayReview(){
   const td=today();
+  if(isRecordSkipDay(td))return false;
   if(S.settings?.eveningLockEnabled===false)return false;
   if(sessionStorage.getItem('ef_skip_review_'+td))return false;
   if(todayReviewDone(td))return false;
@@ -3115,6 +3207,7 @@ function rLockScreen(){
 }
 function render(){
   try{
+    syncEditCounterFromLocal();
     // 起動時ロックは「夜の締め（Today Review）」1画面へ統合済み。
     // 旧6系統（タイムスケジュール/目標/初稿朝/初稿夜/朝ジャーナル/KPI + 家計簿ゲート）は廃止。
     V=resolveView(V); // 旧ビュー名(dashboard/kpi)は新ビューへ寄せる。未知の値でも落ちない。
@@ -4792,18 +4885,42 @@ const LOG_CARDS=[
 ];
 function rLog(){
   const td=today();
-  const reviewed=todayReviewDone(td);
+  const skipped=isRecordSkipDay(td);
   return`<div class="ph">
   <div class="ph-title">記録</div>
-  <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn ${reviewed?'btn-g':'btn-p'} btn-sm" onclick="openTodayReview()">${reviewed?'夜の締め（記録済み）':'夜の締めをする'}</button></div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap">${skipped?'<span class="btn btn-g btn-sm" style="cursor:default">記録しない日（設定済み）</span>':'<button class="btn btn-p btn-sm" onclick="openTodayReview()">夜の締めをする</button>'}</div>
 </div>
 ${rDailyPerformanceCard(td)}
+${rRecordSkipDayCard()}
+${rEditCounterCard()}
 <div class="log-grid">
 ${LOG_CARDS.map(c=>`<button class="log-card" onclick="setV('${c.view}')">
   <span class="log-card-ic">${iconSvg(c.icon)}</span>
   <span class="log-card-body"><span class="log-card-ttl">${c.label}</span><span class="log-card-desc">${c.desc}</span></span>
 </button>`).join('')}
 </div>`;
+}
+function rRecordSkipDayCard(){
+  const date=RECORD_SKIP_DATE||today(),skipped=isRecordSkipDay(date);
+  return`<section class="record-skip-card ${skipped?'is-skipped':''}">
+  <div class="record-skip-head"><div><div class="record-skip-kicker">RECOVERY DAY</div><h3>記録しない日</h3><p>休む日を先に決めると、継続が途切れにくくなります。</p></div><span class="record-skip-icon">${skipped?'✓':'◌'}</span></div>
+  <div class="record-skip-form"><label>対象日<input type="date" value="${date}" onchange="RECORD_SKIP_DATE=this.value;render()"></label><button class="btn ${skipped?'btn-g':'btn-p'}" onclick="setRecordSkipDay('${date}',${!skipped})">${skipped?'記録する日に戻す':'この日を休みにする'}</button></div>
+  <div class="record-skip-note">${skipped?'この日は前日確認の対象外です。':'習慣・フィットネス・禁欲の前日確認を、この日だけ免除します。✓や×の記録は作りません。'}</div>
+</section>`;
+}
+function editCounterDay(date){return S.editCounter?.days?.[date]||{count:0,totalMinutes:0,averageMinutes:null,records:0,pomodoroSets:0};}
+function editCounterMinutes(value){return value&&value>0?`${Math.round(value)}分`:'—';}
+function rEditCounterCard(){
+  const td=today(),[y,month]=td.slice(0,7).split('-').map(Number),first=new Date(y,month-1,1),last=new Date(y,month,0),days=[];
+  const blanks=(first.getDay()+6)%7;for(let i=0;i<blanks;i++)days.push(null);for(let i=1;i<=last.getDate();i++)days.push(`${y}-${String(month).padStart(2,'0')}-${String(i).padStart(2,'0')}`);while(days.length%7)days.push(null);
+  const monthRows=Object.entries(S.editCounter?.days||{}).filter(([d])=>d.slice(0,7)===td.slice(0,7)).map(([,v])=>v||{}),total=monthRows.reduce((n,v)=>n+Number(v.count||0),0),records=monthRows.reduce((n,v)=>n+Number(v.records||0),0),minutes=monthRows.reduce((n,v)=>n+Number(v.totalMinutes||0),0),monthPomodoros=monthRows.reduce((n,v)=>n+Number(v.pomodoroSets||0),0),target=Number(S.editCounter?.monthTarget||0),todayData=editCounterDay(td);
+  return`<section class="card edit-counter-card">
+  <div class="edit-counter-head"><div><div class="edit-counter-kicker">EDIT COUNTER</div><h3>納品ペース</h3><p>編集本数カウンターから自動取り込み</p></div><span class="edit-counter-cloud">自動同期</span></div>
+  <div class="edit-counter-stats"><div><small>今月の納品</small><b>${total} <i>/ ${target||'—'}本</i></b></div><div><small>平均編集時間</small><b>${records?editCounterMinutes(minutes/records):'—'} <i>/本</i></b></div><div><small>今日</small><b>${todayData.count} <i>本</i></b></div><div><small>ポモドーロ</small><b>${todayData.pomodoroSets} <i>セット</i></b></div></div>
+  <div class="edit-counter-monthbar"><span>${target?`残り ${Math.max(0,target-total)}本`:'月間目標未設定'}</span><span>${records?`今月の記録 ${records}本`:'所要時間の記録なし'} ・ ポモ ${monthPomodoros}セット</span></div>
+  <div class="edit-counter-calendar"><div class="edit-counter-weekdays">${['月','火','水','木','金','土','日'].map(d=>`<span>${d}</span>`).join('')}</div><div class="edit-counter-days">${days.map(d=>{if(!d)return'<div class="edit-counter-day empty"></div>';const v=editCounterDay(d);return`<div class="edit-counter-day ${d===td?'today':''}"><b>${Number(d.slice(8))}</b><strong>${v.count}本</strong><small>${editCounterMinutes(v.averageMinutes)}</small></div>`;}).join('')}</div></div>
+  <div class="edit-counter-foot">最終同期：${S.editCounter?.importedAt?new Date(S.editCounter.importedAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'未同期'}　※このブラウザの編集本数カウンターと連動</div>
+</section>`;
 }
 
 // ─── 夜の締め（Today Review）: 起動時ロック6系統をこの1画面に統合 ─────────
@@ -11760,6 +11877,7 @@ function getNavCfg(){
 }
 function navMeta(id){
   const bv=BUILTIN_VIEWS.find(v=>v.id===id);if(bv)return{label:bv.label,icon:bv.icon};
+  if(id==='abstinence')return{label:'禁欲カレンダー',icon:'i-shield'};
   if(id.startsWith('cp_')){const p=(S.customPages||[]).find(p=>`cp_${p.id}`===id);if(p)return{label:p.title,icon:p.icon||'i-doc'};}
   if(id==='customize')return{label:'カスタマイズ',icon:'i-tools'};
   if(id==='settings')return{label:'設定',icon:'i-gear'};
@@ -13235,7 +13353,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260918-02';
+const APP_VERSION='20260918-03';
 
 render();
 renderSyncGate();
@@ -13248,7 +13366,7 @@ renderSyncGate();
 
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/editflow-app/sw.js').then(reg=>{
+  navigator.serviceWorker.register('/editflow-app/sw.js?v=20260918-03',{updateViaCache:'none'}).then(reg=>{
     reg.update();
   }).catch(e=>console.warn('SW:',e));
 }
