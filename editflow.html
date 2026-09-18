@@ -4179,7 +4179,6 @@ ${secTitle('今月の収益')}
   <button class="btn btn-g btn-sm" style="margin-top:10px" onclick="V='revenue';render()">収益を記録 →</button>
 </div>
 
-${rGoalActionWidget()}
 
 ${(()=>{
   const shortNoEditor=S.jobs.filter(j=>!j.deleted&&j.status!=='完了'&&j.status!=='キャンセル'&&j.scope==='ショート動画'&&j.clientDraftDate).filter(j=>{
@@ -4462,7 +4461,6 @@ function rTasks(){
   if(!taskViews.includes(TV))TV='today';
   const sortSel=`<select onchange="setTaskSort(this.value)" style="font-size:11px;padding:3px 7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text)">${TASK_SORT_OPTS.map(([v,l])=>`<option value="${v}" ${getTaskSort()===v?'selected':''}>${l}</option>`).join('')}</select>`;
   return`<div class="ph"><div class="ph-title">タスク管理</div><div style="display:flex;gap:7px;align-items:center">${sortSel}<button class="btn btn-p" onclick="openTaskModal()">＋ タスク追加</button></div></div>
-${rGoalActionWidget()}
 ${subTabs([['today','今日'],['tomorrow','明日'],['weekly','週間'],['monthly','月間'],['later','後回し']],TV,'setTV')}
 ${{today:rTasksToday,tomorrow:rTasksTomorrow,weekly:rTasksWeekly,monthly:rTasksMonthly,later:rTasksLater}[TV]?.()??rTasksToday()}`;
 }
@@ -4981,7 +4979,6 @@ function rTasksToday(){
   const habitDoneCount=todayHabits.filter(h=>(h.completedDates||[]).includes(td)).length;
   const hasFs=S.fs&&S.fs.length>0;
   return`
-${rDailyPerformanceCard(td)}
 ${hasFs?`${secTitle('固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${rFsDashPanel()}`:''}
 ${gcalToday.length?`${secTitle(`カレンダー予定 (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${todayHabits.length?`${secTitle(`今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
@@ -13349,7 +13346,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260918-05';
+const APP_VERSION='20260918-06';
 
 render();
 renderSyncGate();
@@ -13362,7 +13359,7 @@ renderSyncGate();
 
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/editflow-app/sw.js?v=20260918-05',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('/editflow-app/sw.js?v=20260918-06',{updateViaCache:'none'}).then(reg=>{
     reg.update();
   }).catch(e=>console.warn('SW:',e));
 }
