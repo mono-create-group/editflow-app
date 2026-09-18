@@ -1305,9 +1305,9 @@ function _flushQueuedCloudSync(){
   if(queued.cloudTs<=(S._savedAt||0)+2000)return;
   const remoteState=_decodePersonalState(queued.raw),remoteSignature=_personalSyncSignature(remoteState),currentSignature=_personalSyncSignature(_decodePersonalState(_packState()));
   if(remoteSignature===currentSignature){if(remoteState._savedAt>(S._savedAt||0)){S._savedAt=remoteState._savedAt;localStorage.setItem(DB,JSON.stringify(S));}return;}
-  const formDraft=captureUnsavedFormDraft();
+  const localWasDirty=!!_lastPersonalSyncSignature&&currentSignature!==_lastPersonalSyncSignature,formDraft=captureUnsavedFormDraft();
   _applyCloudData(queued.raw);renderAfterCloudSync(formDraft);
-  if(!queued.fromCache&&_personalSyncSignature(_decodePersonalState(_packState()))!==remoteSignature)fbSave();
+  if(!queued.fromCache&&localWasDirty&&_personalSyncSignature(_decodePersonalState(_packState()))!==remoteSignature)fbSave();
   if(!queued.fromCache)toast('他のデバイスから同期しました');
 }
 document.addEventListener('compositionstart',()=>{_imeComposing=true;},{capture:true});
@@ -1412,6 +1412,7 @@ function fbSetupRealtimeSync(){
   let _firstLoad=true;
   _fbUnsubscribe=fbDb.collection('users').doc(FB_USER.uid).onSnapshot(doc=>{
     const fromCache=doc.metadata?.fromCache===true,pending=doc.metadata?.hasPendingWrites===true,data=doc.data()||{},raw=data.json||'';
+    const localBeforeSignature=_personalSyncSignature(_decodePersonalState(_packState())),localWasDirty=!!_lastPersonalSyncSignature&&localBeforeSignature!==_lastPersonalSyncSignature;
     if(!fromCache&&!pending&&raw)_setPersonalRemoteBaseline(raw);
     if(fromCache&&!pending){_setPersonalSyncState('offline');_scheduleFirestoreReconnect();}
     else if(!pending){_markFirestoreConfirmed();_setPersonalSyncState('synced');}
@@ -1443,7 +1444,7 @@ function fbSetupRealtimeSync(){
         }
         const formDraft=captureUnsavedFormDraft();_applyCloudData(raw);
         renderAfterCloudSync(formDraft);
-        if(!fromCache&&_personalSyncSignature(_decodePersonalState(_packState()))!==remoteSignature)fbSave();
+        if(!fromCache&&localWasDirty&&_personalSyncSignature(_decodePersonalState(_packState()))!==remoteSignature)fbSave();
         if(!fromCache)toast('他のデバイスから同期しました');
       }
     }
@@ -13382,7 +13383,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260918-09';
+const APP_VERSION='20260918-10';
 
 render();
 renderSyncGate();
@@ -13395,7 +13396,7 @@ renderSyncGate();
 
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/editflow-app/sw.js?v=20260918-09',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('/editflow-app/sw.js?v=20260918-10',{updateViaCache:'none'}).then(reg=>{
     reg.update();
   }).catch(e=>console.warn('SW:',e));
 }
