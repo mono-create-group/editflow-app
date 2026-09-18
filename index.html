@@ -451,6 +451,57 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .habit-sched-name{font-weight:600}
 .habit-sched-days{font-size:11px;color:var(--t2);margin-top:2px}
 
+/* ─── ABSTINENCE CALENDAR ─── */
+.abstinence-head{margin-bottom:12px}
+.abstinence-head .ph-title small{display:block;font-size:11px;color:var(--t2);font-weight:500;margin-top:2px}
+.abstinence-guide{display:flex;align-items:center;gap:8px;background:var(--pdim);border:1px solid rgba(109,40,217,.18);border-radius:var(--rs);padding:9px 12px;margin-bottom:10px;font-size:11px;color:var(--t2)}
+.abstinence-guide-mark{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--purple);color:#fff;font-weight:800;flex-shrink:0}
+.abstinence-legend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:12px}
+.abstinence-legend-item{display:flex;align-items:center;gap:6px;min-width:0;padding:9px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--rs)}
+.abstinence-legend-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.abstinence-legend-name{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.abstinence-legend-count{margin-left:auto;font-size:10px;color:var(--green);font-weight:800;white-space:nowrap}
+.abstinence-calendar-card{padding:12px}
+.abstinence-month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.abstinence-month-nav strong{font-size:15px}
+.abstinence-weekdays,.abstinence-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.abstinence-weekdays{margin-bottom:4px;text-align:center;color:var(--t3);font-size:10px;font-weight:700}
+.abstinence-day{min-height:78px;border:1px solid var(--border);border-radius:9px;padding:6px 3px;background:var(--surface);transition:border-color .15s,background .15s}
+.abstinence-day.is-today{border:2px solid var(--purple);padding:5px 2px;background:var(--pdim)}
+.abstinence-day.is-complete{background:var(--gdim)}
+.abstinence-empty{border-color:transparent;background:transparent}
+.abstinence-day-number{font-size:11px;font-weight:800;color:var(--t2);text-align:center;margin-bottom:6px}
+.abstinence-day.is-today .abstinence-day-number{color:var(--purple)}
+.abstinence-dots{display:flex;justify-content:center;gap:3px}
+.abstinence-dot{width:25px;height:25px;padding:0;border-radius:7px;border:1px solid var(--border);background:var(--card2);color:var(--t3);font-size:11px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .12s,background .15s,border-color .15s}
+.abstinence-dot:hover,.abstinence-dot:focus-visible{transform:translateY(-1px);border-color:var(--purple);outline:none}
+.abstinence-dot.kept{background:var(--gdim);border-color:var(--green);color:var(--green)}
+.abstinence-dot.failed{background:var(--rdim);border-color:var(--red);color:var(--red)}
+.abstinence-footnote{font-size:10px;color:var(--t3);margin:7px 2px 0;text-align:right}
+.fitness-date-picker{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:var(--t2)}
+.fitness-date-picker input{width:auto;min-height:38px;padding:6px 9px;font-size:13px}
+.previous-day-gate{max-width:640px;margin:0 auto;border:1px solid var(--purple);box-shadow:0 10px 30px rgba(109,40,217,.08)}
+.previous-day-gate-kicker{font-size:11px;color:var(--purple);font-weight:800;letter-spacing:.08em;margin-bottom:6px}
+.previous-day-gate h2{font-size:21px;margin:0 0 6px}
+.previous-day-gate-lead{font-size:12px;color:var(--t2);margin:0 0 16px;line-height:1.6}
+.previous-day-gate-section{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:9px;background:var(--card2)}
+.previous-day-gate-section.is-done{border-color:var(--green);background:var(--gdim)}
+.previous-day-gate-title{display:flex;align-items:center;gap:8px;font-size:14px}
+.previous-day-gate-title>span{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--purple);color:#fff;font-size:11px;font-weight:800}
+.previous-day-gate-title em{margin-left:auto;font-style:normal;font-size:11px;color:var(--red);font-weight:800}
+.previous-day-gate-section.is-done .previous-day-gate-title em{color:var(--green)}
+.previous-day-gate-items{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.previous-day-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text);padding:7px 10px;font-size:12px;cursor:pointer}
+.previous-day-chip span{font-weight:900;color:var(--t3)}
+.previous-day-chip.kept{border-color:var(--green);background:var(--gdim);color:var(--green)}
+.previous-day-chip.failed{border-color:var(--red);background:var(--rdim);color:var(--red)}
+.previous-day-chip.kept span{color:var(--green)}
+.previous-day-chip.failed span{color:var(--red)}
+.previous-day-gate-note,.previous-day-gate-help{font-size:11px;color:var(--t2);margin-top:8px}
+.previous-day-gate-help{color:var(--t3)}
+.previous-day-gate-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.previous-day-gate-foot{text-align:center;color:var(--t3);font-size:11px;margin-top:16px}
+
 /* ─── GOALS ─── */
 .goal-item{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:11px;box-shadow:var(--shadow-sm);transition:box-shadow .2s}
 .goal-item:hover{box-shadow:var(--shadow)}
@@ -640,6 +691,11 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
   .actions{gap:6px}.actions .btn{flex:1 1 130px;min-width:0}
   .card,.task-item,.proj-card,.habit-item,.modal{overflow-wrap:anywhere}
   .board-wrap{margin-right:-14px;padding-right:14px}
+  .abstinence-legend{grid-template-columns:1fr}
+  .abstinence-calendar-card{padding:9px 6px}
+  .abstinence-day{min-height:64px;padding:5px 1px}.abstinence-day.is-today{padding:4px 0}
+  .abstinence-day-number{font-size:10px;margin-bottom:5px}.abstinence-dots{gap:2px}.abstinence-dot{width:calc((100vw - 100px)/7);max-width:25px;height:24px;font-size:10px;border-radius:6px}
+  .previous-day-gate{padding:15px 12px}.previous-day-gate h2{font-size:19px}.previous-day-gate-section{padding:10px}.previous-day-gate-title{font-size:13px}.previous-day-chip{font-size:11px;padding:7px 8px}.previous-day-gate-actions .btn{flex:1;min-width:130px}
 }
 #mob-topbar{display:none}
 #mob-nav{
@@ -959,6 +1015,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 <symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="3.5" y="8" width="17" height="11" rx="2"/><path d="M9 8V5.5h6V8M3.5 13h17"/></symbol>
 <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 20.5a8.5 8.5 0 1 1 8.5-8.5c0 2.2-2 2.6-3.6 2.6h-1.7a2 2 0 0 0-1.4 3.4 1.7 1.7 0 0 1-1.8 2.5z"/><path d="M8 10h.01M12 8h.01M16 11h.01"/></symbol>
 <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="9.5" r="4"/><path d="M11 12l8 8M16.5 17.5l2-2M14 15l2-2"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 19 6v5.3c0 4.5-2.8 7.8-7 9.2-4.2-1.4-7-4.7-7-9.2V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></symbol>
 <symbol id="i-drag" viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></symbol>
 <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></symbol>
 <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19 14.5A8 8 0 0 1 9.5 5a8 8 0 1 0 9.5 9.5z"/></symbol>
@@ -1036,6 +1093,7 @@ const BUILTIN_VIEWS=[
   {id:'docs',label:'ドキュメント',icon:'i-folder'},
   {id:'workers',label:'ワーカー管理',icon:'i-users'},
   {id:'habits',label:'習慣トラッカー',icon:'i-flame'},
+  {id:'abstinence',label:'禁欲カレンダー',icon:'i-shield'},
   {id:'chores',label:'家事',icon:'i-broom'},
   {id:'goals',label:'目標・KPI管理',icon:'i-target'},
   {id:'journal',label:'ジャーナル',icon:'i-book'},
@@ -1071,6 +1129,11 @@ const SCOL={'案件掲載中':'--cyan','未着手':'--t3','進行中':'--blue','
 const SCOLBG={'案件掲載中':'bc','未着手':'bk','進行中':'bb','編集者進行中':'bpk','初稿完成':'bp','確認待ち':'ba','FB待ち':'bk','修正中':'br','完了':'bg','キャンセル':'bk'};
 const DAYS=['日','月','火','水','木','金','土'];
 const LOG_TYPES=['revenue','sales','hire'];
+const ABSTINENCE_ITEMS=[
+  {key:'masturbation',label:'おナニ禁止',short:'おナニ',icon:'○'},
+  {key:'junkFood',label:'ジャンクフード禁止',short:'ジャンク',icon:'🍔'},
+  {key:'snacks',label:'おやつ・ジュース禁止',short:'おやつ・ジュース',icon:'🍭'},
+];
 
 // ===FIREBASE===
 firebase.initializeApp({
@@ -1229,11 +1292,19 @@ function compactHistoryRecords(records,type){
   return result;
 }
 function mergeFinanceState(localFinance,remoteFinance){const l=localFinance||{},r=remoteFinance||{},merged={...r,...l,monthlyBudgets:{...(r.monthlyBudgets||{}),...(l.monthlyBudgets||{})},savings:{...(r.savings||{}),...(l.savings||{})}};['fixedExpenses','payments','incomes','debts','rewards'].forEach(k=>merged[k]=mergeRecordArrays(l[k],r[k]));return merged;}
+function mergeAbstinenceState(localAbstinence,remoteAbstinence){
+  const l=localAbstinence||{},r=remoteAbstinence||{},records={...(r.records||{})};
+  Object.entries(l.records||{}).forEach(([date,item])=>{
+    const remote=records[date],localTs=Number(item?.updatedAt||0),remoteTs=Number(remote?.updatedAt||0);
+    if(!remote||localTs>=remoteTs)records[date]=item;
+  });
+  return{...r,...l,records};
+}
 function mergeCloudStateWithLocal(local,remote){
   remote={...remote,decisions:mergeRecordArrays(local.decisions,remote.decisions),sessionTasks:mergeRecordArrays(local.sessionTasks,remote.sessionTasks)};
   const merged={...remote};const arrays=['habits','jobs','logs','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','choreRoutines','meals','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];arrays.forEach(k=>merged[k]=mergeRecordArrays(local[k],remote[k]));
   ['journals','performanceLogs','workouts'].forEach(k=>merged[k]=compactHistoryRecords([...(remote[k]||[]),...(local[k]||[])],k));
-  merged.finance=mergeFinanceState(local.finance,remote.finance);merged.dailyOpenReviews={...(remote.dailyOpenReviews||{}),...(local.dailyOpenReviews||{})};merged.goalReviews={...(remote.goalReviews||{}),...(local.goalReviews||{})};merged.dailySchedules={...(remote.dailySchedules||{}),...(local.dailySchedules||{})};merged.fsChecked={...(remote.fsChecked||{}),...(local.fsChecked||{})};return merged;
+  merged.finance=mergeFinanceState(local.finance,remote.finance);merged.abstinence=mergeAbstinenceState(local.abstinence,remote.abstinence);merged.dailyOpenReviews={...(remote.dailyOpenReviews||{}),...(local.dailyOpenReviews||{})};merged.goalReviews={...(remote.goalReviews||{}),...(local.goalReviews||{})};merged.dailySchedules={...(remote.dailySchedules||{}),...(local.dailySchedules||{})};merged.fsChecked={...(remote.fsChecked||{}),...(local.fsChecked||{})};return merged;
 }
 function _applyCloudData(json){
   if(typeof json==='string'&&json.slice(0,3)==='LZ:'){
@@ -1252,6 +1323,8 @@ function _applyCloudData(json){
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
   ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','chores','choreRoutines','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  if(!S.abstinence||typeof S.abstinence!=='object')S.abstinence={records:{}};
+  if(!S.abstinence.records||typeof S.abstinence.records!=='object')S.abstinence.records={};
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
 }
@@ -2179,6 +2252,7 @@ let PVMT='board'; // projects main tab (board/list/profit/payment/worker/priorit
 let PRIO_DRAFT='client'; // 優先度表の基準: 'client'=クライアント初稿 / 'editor'=編集者初稿
 let JT='morning'; // journal tab (morning/evening)
 let JCM=today().slice(0,7); // journal calendar month (YYYY-MM)
+let ACM=today().slice(0,7); // abstinence calendar month (YYYY-MM)
 let FIN_MONTH=today().slice(0,7); // 家計簿の表示月
 let JOB_SORT='deadline'; // job sort order
 
@@ -2205,6 +2279,7 @@ function defState(){return{
   activeFsScheduleId:null,
   finance:{monthlyBudgets:{},fixedExpenses:[],payments:[],incomes:[],savings:{monthlyTarget:0,saved:0},debts:[],rewards:[]},
   dailyOpenReviews:{},
+  abstinence:{records:{}},
 };}
 function migrate(d){
   // migrate ef_v4 → ef_v5
@@ -2227,6 +2302,8 @@ function migrate(d){
   ['fixedExpenses','payments','incomes','debts','rewards'].forEach(k=>{if(!Array.isArray(d.finance[k]))d.finance[k]=[];});
   if(!d.finance.savings)d.finance.savings={monthlyTarget:0,saved:0};
   if(!d.dailyOpenReviews||typeof d.dailyOpenReviews!=='object')d.dailyOpenReviews={};
+  if(!d.abstinence||typeof d.abstinence!=='object')d.abstinence={};
+  if(!d.abstinence.records||typeof d.abstinence.records!=='object')d.abstinence.records={};
   if(Array.isArray(d.customEx))d.customEx=d.customEx.map(x=>typeof x==='string'?{name:x}:x);
   (d.workouts||[]).forEach(w=>{if(Array.isArray(w.exercises))w.exercises=w.exercises.map(e=>typeof e==='string'?{name:e}:e);});
   // 記録を workout.entries に一本化: 旧クイック選択(exercises)を記録へ移行して空にする
@@ -2805,6 +2882,38 @@ function checkKpiLock(){
 // タイムスケジュール／目標／初稿朝／初稿夜／朝ジャーナル／KPI の6系統は
 // 夜の締め（Today Review）1画面に統合した。関数は他所からの呼び出し互換のため残す。
 function checkDailyLock(){return false;}
+function previousDay(){const d=new Date();d.setDate(d.getDate()-1);return d.toLocalYmd();}
+function previousDayGateState(date=previousDay()){
+  const habits=habitsForDate(date),habitDone=habits.every(h=>(h.completedDates||[]).includes(date)||(h.failedDates||[]).includes(date));
+  const w=S.workouts.find(x=>x.date===date),hasWorkout=!!(w&&((w.entries||[]).length>0||(w.exercises||[]).length>0)),fitnessDone=hasWorkout||!!w?.isRest;
+  const abstinence=ABSTINENCE_ITEMS.map(item=>({...item,status:abstinenceStatus(date,item.key)}));
+  return{date,habits,habitDone,fitnessDone,abstinence,abstinenceDone:abstinence.every(item=>item.status)};
+}
+function needsPreviousDayCheck(){const g=previousDayGateState();return!(g.habitDone&&g.fitnessDone&&g.abstinenceDone);}
+function rPreviousDayGate(){
+  const g=previousDayGateState(),status=(s)=>s==='kept'?'✓ 達成':s==='failed'?'✕ できなかった':'未記録';
+  return`<section class="card previous-day-gate" role="dialog" aria-labelledby="previous-day-gate-title">
+  <div class="previous-day-gate-kicker">毎朝の記録確認</div>
+  <h2 id="previous-day-gate-title">昨日の記録を完了してください</h2>
+  <p class="previous-day-gate-lead">${g.date} 分が未確認です。3つすべて完了するとアプリを開けます。</p>
+  <div class="previous-day-gate-section ${g.habitDone?'is-done':''}">
+    <div class="previous-day-gate-title"><span>1</span><b>習慣トラッカー</b><em>${g.habitDone?'✓ 完了':'未完了'}</em></div>
+    ${g.habits.length?`<div class="previous-day-gate-items">${g.habits.map(h=>{const done=(h.completedDates||[]).includes(g.date),fail=(h.failedDates||[]).includes(g.date);return`<button type="button" class="previous-day-chip ${done?'kept':fail?'failed':''}" onclick="toggleHabit('${h.id}','${g.date}')"><span>${done?'✓':fail?'✕':'○'}</span>${esc(h.title)}</button>`;}).join('')}</div>`:'<div class="previous-day-gate-note">対象の習慣はありません。</div>'}
+    <div class="previous-day-gate-help">各項目をタップして、✓か✕を付けてください。</div>
+  </div>
+  <div class="previous-day-gate-section ${g.fitnessDone?'is-done':''}">
+    <div class="previous-day-gate-title"><span>2</span><b>フィットネス</b><em>${g.fitnessDone?'✓ 完了':'未完了'}</em></div>
+    <div class="previous-day-gate-note">${g.fitnessDone?'休み、または種目の記録があります。':'休みの記録か、種目の記録が必要です。'}</div>
+    ${g.fitnessDone?'':`<div class="previous-day-gate-actions"><button class="btn btn-g btn-sm" onclick="markGymRest('${g.date}')">今日は休みにする</button><button class="btn btn-p btn-sm" onclick="FIT_DATE='${g.date}';FTV='training';render()">種目を追加する</button></div>`}
+  </div>
+  <div class="previous-day-gate-section ${g.abstinenceDone?'is-done':''}">
+    <div class="previous-day-gate-title"><span>3</span><b>禁欲カレンダー</b><em>${g.abstinenceDone?'✓ 完了':'未完了'}</em></div>
+    <div class="previous-day-gate-note">3項目は別々に判定します。できなかった項目には✕を付けてください。</div>
+    <div class="previous-day-gate-items">${g.abstinence.map(item=>`<button type="button" class="previous-day-chip abstinence-gate-chip ${item.status}" onclick="toggleAbstinence('${g.date}','${item.key}')"><span>${item.status==='kept'?'✓':item.status==='failed'?'✕':item.icon}</span>${item.label}</button>`).join('')}</div>
+  </div>
+  <div class="previous-day-gate-foot">昨日の記録がそろうと、自動的に通常画面へ戻ります。</div>
+</section>`;
+}
 // 夜の締めゲート: 21時以降・当日未記録・このセッションで「あとで」を押していない場合だけ表示する。
 function needsTodayReview(){
   const td=today();
@@ -3010,12 +3119,17 @@ function render(){
     // 旧6系統（タイムスケジュール/目標/初稿朝/初稿夜/朝ジャーナル/KPI + 家計簿ゲート）は廃止。
     V=resolveView(V); // 旧ビュー名(dashboard/kpi)は新ビューへ寄せる。未知の値でも落ちない。
     sessionStorage.setItem('ef_view',V);
+    if(needsPreviousDayCheck()){
+      document.getElementById('view').innerHTML=rPreviousDayGate();
+      renderNav();
+      return;
+    }
     if(needsTodayReview()){
       document.getElementById('view').innerHTML=rTodayReviewGate();
       renderNav();
       return;
     }
-    const views={today:rToday,plan:rPlan,life:rLife,log:rLog,dashboard:rToday,tasks:rTasks,performance:rPerformanceHistory,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,chores:rChores,goals:rGoals,journal:rJournal,finance:rFinance,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
+    const views={today:rToday,plan:rPlan,life:rLife,log:rLog,dashboard:rToday,tasks:rTasks,performance:rPerformanceHistory,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,abstinence:rAbstinence,chores:rChores,goals:rGoals,journal:rJournal,finance:rFinance,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -7341,7 +7455,7 @@ function getWorkout(date){
 }
 // クイック選択タップ＝「種目を追加して記録」へ記録を追加/削除（記録は workout.entries に一本化）
 function toggleExercise(ex){
-  const w=getWorkout(today());
+  const w=getWorkout(FIT_DATE||today());
   if(!Array.isArray(w.entries))w.entries=[];
   const i=w.entries.findIndex(e=>e.name===ex);
   if(i>=0)w.entries.splice(i,1);
@@ -7351,7 +7465,7 @@ function toggleExercise(ex){
 // セットメニューをワンタップでまとめて記録に追加（既に記録済みの種目はスキップ）
 function applyExSet(setId){
   const s=(S.customExSets||[]).find(x=>x.id===setId);if(!s)return;
-  const w=getWorkout(today());if(!Array.isArray(w.entries))w.entries=[];
+  const w=getWorkout(FIT_DATE||today());if(!Array.isArray(w.entries))w.entries=[];
   let added=0;
   (s.items||[]).forEach(nm=>{
     if(!w.entries.some(e=>e.name===nm)){const m=exMeta(nm);w.entries.push({id:uid(),name:nm,sets:m.sets||null,reps:m.reps||null,weight:null,note:null});added++;}
@@ -7379,8 +7493,9 @@ function weFillPreset(name){
   const s=document.getElementById('we-sets');if(s&&!s.value&&m.sets)s.value=m.sets;
   const r=document.getElementById('we-reps');if(r&&!r.value&&m.reps)r.value=m.reps;
 }
-function openWorkoutEntryModal(id){
-  const td=today();
+function openWorkoutEntryModal(id,date){
+  WORKOUT_DATE=date||FIT_DATE||today();
+  const td=WORKOUT_DATE;
   const w=getWorkout(td);
   const e=id?(w.entries||[]).find(e=>e.id===id):null;
   openModal(`<div class="mhdr"><div class="mtitle">${e?'種目編集':'種目追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
@@ -7408,7 +7523,7 @@ function openWorkoutEntryModal(id){
 function saveWorkoutEntry(id){
   const name=document.getElementById('we-name')?.value.trim();
   if(!name){toast('種目名を入力してください','err');return;}
-  const w=getWorkout(today());
+  const w=getWorkout(WORKOUT_DATE||FIT_DATE||today());
   if(!w.entries)w.entries=[];
   const entry={
     id:id||uid(),name,
@@ -8397,6 +8512,49 @@ function rGoalCard(g){
   </div>`:''}
 </div>`;
 }
+// ===禁欲カレンダー===
+function acmShift(delta){
+  const [y,m]=ACM.split('-').map(Number),d=new Date(y,m-1+delta,1);
+  ACM=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;render();
+}
+function abstinenceRecord(date){return S.abstinence?.records?.[date]||{};}
+function abstinenceStatus(date,key){const v=abstinenceRecord(date)[key];return v==='kept'||v==='failed'?v:'';}
+function abstinenceDateComplete(date){return ABSTINENCE_ITEMS.every(item=>abstinenceStatus(date,item.key));}
+function toggleAbstinence(date,key){
+  if(!S.abstinence||typeof S.abstinence!=='object')S.abstinence={records:{}};
+  if(!S.abstinence.records||typeof S.abstinence.records!=='object')S.abstinence.records={};
+  const record={...(S.abstinence.records[date]||{})},current=record[key]||'';
+  record[key]=current===''?'kept':current==='kept'?'failed':'';
+  record.updatedAt=Date.now();
+  if(!ABSTINENCE_ITEMS.some(item=>record[item.key]))delete record.updatedAt;
+  if(Object.keys(record).length)S.abstinence.records[date]=record;else delete S.abstinence.records[date];
+  save();render();
+}
+function abstinenceStatusLabel(status){return status==='kept'?'達成':status==='failed'?'できなかった':'未記録';}
+function rAbstinence(){
+  const td=today();if(!ACM)ACM=td.slice(0,7);
+  const [y,ms]=ACM.split('-').map(Number),m=ms-1,first=new Date(y,m,1),last=new Date(y,m+1,0);
+  const blanks=(first.getDay()+6)%7,days=[];
+  for(let i=0;i<blanks;i++)days.push(null);
+  for(let i=1;i<=last.getDate();i++)days.push(`${y}-${String(m+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`);
+  while(days.length%7)days.push(null);
+  const monthRecords=days.filter(Boolean).map(d=>abstinenceRecord(d));
+  const count=item=>monthRecords.filter(r=>r[item.key]==='kept').length;
+  return`<div class="ph abstinence-head"><div><div class="ph-title">禁欲カレンダー <small>3項目を別々に記録</small></div></div><button class="btn btn-p btn-sm" onclick="ACM=today().slice(0,7);render()">今日</button></div>
+<div class="abstinence-guide"><span class="abstinence-guide-mark">✓</span><span>タップで 未記録 → 達成 → できなかった。3項目は別々にカウントします。</span></div>
+<div class="abstinence-legend">${ABSTINENCE_ITEMS.map(item=>`<div class="abstinence-legend-item"><span class="abstinence-legend-icon">${item.icon}</span><span class="abstinence-legend-name">${item.label}</span><span class="abstinence-legend-count">${count(item)}日</span></div>`).join('')}</div>
+<div class="card abstinence-calendar-card">
+  <div class="abstinence-month-nav"><button class="btn btn-g btn-sm" onclick="acmShift(-1)" aria-label="前月">◀</button><strong>${y}年${m+1}月</strong><button class="btn btn-g btn-sm" onclick="acmShift(1)" aria-label="次月">▶</button></div>
+  <div class="abstinence-weekdays">${['月','火','水','木','金','土','日'].map(d=>`<span>${d}</span>`).join('')}</div>
+  <div class="abstinence-grid">${days.map(d=>{
+    if(!d)return'<div class="abstinence-day abstinence-empty"></div>';
+    const rec=abstinenceRecord(d),isToday=d===td,complete=abstinenceDateComplete(d);
+    return`<div class="abstinence-day ${isToday?'is-today':''} ${complete?'is-complete':''}"><div class="abstinence-day-number">${Number(d.slice(8))}</div><div class="abstinence-dots">${ABSTINENCE_ITEMS.map(item=>{const st=rec[item.key]||'';return`<button type="button" class="abstinence-dot ${st}" title="${esc(item.label)}: ${abstinenceStatusLabel(st)}" aria-label="${esc(d+' '+item.label+' '+abstinenceStatusLabel(st))}" onclick="toggleAbstinence('${d}','${item.key}')">${st==='kept'?'✓':st==='failed'?'✕':item.icon}</button>`;}).join('')}</div></div>`;
+  }).join('')}</div>
+</div>
+<div class="abstinence-footnote">${td.slice(0,7)===ACM?`今日（${td.slice(5).replace('-','/')}）もこのカレンダーから記録できます。`:''}</div>`;
+}
+
 // ===JOURNAL===
 function jcmShift(delta){
   const [cy,cmStr]=JCM.split('-').map(Number);
@@ -8699,6 +8857,8 @@ function memoToTask(id){
 // ===SETTINGS===
 // ===FITNESS===
 let FTV='overview'; // fitness tab view
+let FIT_DATE=today();
+let WORKOUT_DATE=today();
 function rFitness(){
   const td=today();
   const tabs=[['overview','📊 概要'],['training','🏋️ 筋トレ'],['meal','🥗 食事'],['goals','🎯 目標']];
@@ -8764,7 +8924,7 @@ function rFitnessOverview(){
 }
 
 function rFitnessTraining(){
-  const td=today();
+  const td=FIT_DATE||today();
   const workout=getWorkout(td);
   const todayDone=(workout.entries||[]).length>0||(workout.exercises||[]).length>0;
   // 過去7日間の記録
@@ -8779,9 +8939,10 @@ function rFitnessTraining(){
       ${(w.exercises||[]).map(ex=>`<div style="font-size:11px;color:var(--t2);padding:2px 0">✓ ${esc(exName(ex))}${ex&&ex.sets?` ${ex.sets}セット`:''}${ex&&ex.reps?` ${esc(ex.reps)}`:''}</div>`).join('')}
     </div>`;}).join('');
   const todayRest=workout.isRest&&!todayDone;
-  return`${secTitle('今日の筋トレ記録 '+(todayDone?'<span class="badge bg">✓ 完了</span>':todayRest?'<span class="badge br">❌ 休み</span>':'<span class="badge br">未記録</span>'))}
+  return`<div class="fitness-date-picker"><span>記録日</span><input type="date" value="${td}" onchange="FIT_DATE=this.value;render()"></div>
+${secTitle(`${td===today()?'今日':'指定日'}の筋トレ記録 `+(todayDone?'<span class="badge bg">✓ 完了</span>':todayRest?'<span class="badge br">❌ 休み</span>':'<span class="badge br">未記録</span>'))}
 <div style="display:flex;gap:8px;margin-bottom:10px">
-  <button class="btn ${todayRest?'btn-red':'btn-g'} btn-sm" onclick="markGymRest()">❌ ${todayRest?'休みを取り消す':'今日は休みにする'}</button>
+  <button class="btn ${todayRest?'btn-red':'btn-g'} btn-sm" onclick="markGymRest('${td}')">❌ ${todayRest?'休みを取り消す':'この日を休みにする'}</button>
 </div>
 <div class="card" style="margin-bottom:12px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -8795,7 +8956,7 @@ function rFitnessTraining(){
     ${e.reps?`<span class="badge bb">${esc(e.reps)}</span>`:''}
     ${e.weight?`<span class="badge ba">${e.weight}kg</span>`:''}
     ${e.note?`<span style="font-size:11px;color:var(--t2)">${esc(e.note)}</span>`:''}
-    <button class="tact" onclick="openWorkoutEntryModal('${e.id}')">✏️</button>
+    <button class="tact" onclick="openWorkoutEntryModal('${e.id}','${td}')">✏️</button>
     <button class="tact del" onclick="delWorkoutEntry('${e.id}')">🗑</button>
   </div>`;}).join('')}</div><div style="font-size:12px;color:var(--green);font-weight:600;margin-top:8px">合計 ${(workout.entries||[]).length}種目</div>`
   :`<div style="color:var(--t3);font-size:12px;text-align:center;padding:12px 0">まだ記録がありません</div>`}
@@ -11639,7 +11800,7 @@ function renderNav(){
 function renderMobileTopbar(){
   const meta=navMeta(V),title=document.getElementById('mob-title'),subtitle=document.getElementById('mob-subtitle');
   if(title)title.textContent=meta.label;
-  if(subtitle){const n=(S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.dueDate===today()).length;subtitle.textContent=({today:n?`今日の未完了 ${n}件`:'今日のタスクは完了',plan:'週間・月間の予定',life:'習慣と家事',log:'記録をふりかえる',dashboard:'今日の流れを確認',tasks:n?`今日の未完了 ${n}件`:'今日のタスクは完了',projects:'案件の進捗を確認',aichat:'相談内容を入力',habits:'今日の記録をつける'})[V]||'作業を進める';}
+  if(subtitle){const n=(S.tasks||[]).filter(t=>!t.deleted&&!t.done&&t.dueDate===today()).length;subtitle.textContent=({today:n?`今日の未完了 ${n}件`:'今日のタスクは完了',plan:'週間・月間の予定',life:'習慣と家事',log:'記録をふりかえる',dashboard:'今日の流れを確認',tasks:n?`今日の未完了 ${n}件`:'今日のタスクは完了',projects:'案件の進捗を確認',aichat:'相談内容を入力',habits:'今日の記録をつける',abstinence:'昨日の記録をつける',fitness:'運動の記録'})[V]||'作業を進める';}
 }
 function setV(view){V=view;CP_EDIT_MODE=false;render();}
 function toggleDrawer(){
@@ -13074,7 +13235,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260918-01';
+const APP_VERSION='20260918-02';
 
 render();
 renderSyncGate();
