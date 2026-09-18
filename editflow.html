@@ -1067,7 +1067,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
   <div style="padding:0 14px 10px" id="mob-auth-ui"></div>
 </div>
 <div id="mob-nav">
-  <button class="mnav-item active" data-view="today"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-today"></use></svg></span><span>今日</span></button><button class="mnav-item" data-view="plan"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-plan"></use></svg></span><span>予定</span></button><button class="mnav-item mnav-add" onclick="openTaskModal(null,today())" aria-label="タスクを追加"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg></span><span>追加</span></button><button class="mnav-item" data-view="life"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-life"></use></svg></span><span>くらし</span></button><button class="mnav-item" data-view="log"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-log"></use></svg></span><span>記録</span></button>
+  <button class="mnav-item active" data-view="today"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-today"></use></svg></span><span>今日</span></button><button class="mnav-item mnav-add" onclick="openTaskModal(null,today())" aria-label="タスクを追加"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg></span><span>追加</span></button><button class="mnav-item" data-view="life"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-life"></use></svg></span><span>くらし</span></button><button class="mnav-item" data-view="log"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-log"></use></svg></span><span>記録</span></button>
 </div>
 
 <div id="toast"></div>
@@ -1083,8 +1083,8 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
 <script>
 // ===CONSTANTS===
 const DB='ef_v5';
-// 個人運用の中核4ビュー。既存ビューは削除せず、初期状態で非表示にするだけ（カスタマイズから復帰可）。
-const CORE_VIEWS=['today','plan','life','log'];
+// 個人運用の中核3ビュー。既存ビューは削除せず、初期状態で非表示にするだけ（カスタマイズから復帰可）。
+const CORE_VIEWS=['today','life','log'];
 const BUILTIN_VIEWS=[
   {id:'today',label:'今日',icon:'i-today'},
   {id:'plan',label:'予定',icon:'i-plan'},
@@ -1121,6 +1121,7 @@ const DEFAULT_HIDDEN_VIEWS=[
   // 業務13タブ
   'projects','pipeline','teamgoals','posts','docs','workers',
   'bizboard','bizunits','minutes','salesleads','hpfee','salessites','templates',
+  'plan',
   // 新4ビューに統合済みの旧ビュー（機能はそのまま残る）
   'dashboard','tasks','performance','habits','chores','journal','finance','memo','fitness',
 ];
@@ -3002,7 +3003,7 @@ function rPreviousDayGate(){
     <div class="previous-day-gate-note">3項目は別々に判定します。できなかった項目には✕を付けてください。</div>
     <div class="previous-day-gate-items">${g.abstinence.map(item=>`<button type="button" class="previous-day-chip abstinence-gate-chip ${item.status}" onclick="toggleAbstinence('${g.date}','${item.key}')"><span>${item.status==='kept'?'✓':item.status==='failed'?'✕':item.icon}</span>${item.label}</button>`).join('')}</div>
   </div>
-  <div class="previous-day-gate-foot">昨日の記録がそろうと、自動的に通常画面へ戻ります。</div>
+  <div class="previous-day-gate-foot">昨日の記録がそろうと、自動的に通常画面へ戻ります。<br><button class="btn btn-g btn-sm" style="margin-top:10px" onclick="setRecordSkipDay('${g.date}',true)">昨日を「記録しない日」にする</button></div>
 </section>${rHabitRecordCalendar()}`;
 }
 // 夜の締めゲート: 21時以降・当日未記録・このセッションで「あとで」を押していない場合だけ表示する。
@@ -4457,19 +4458,13 @@ function rDailyPerformanceCard(date){
   return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b>今日の達成率</b><div style="display:flex;gap:6px"><button class="btn btn-g btn-xs" onclick="V='performance';render()">履歴一覧</button><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('i-check','タスク',p.tasks)}${item('i-calendar','スケジュール',p.schedule)}${item('i-clock','固定スケジュール',p.fixedSchedule)}${item('i-flame','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(historyLine).join('　')}</div>`:''}</div>`;
 }
 function rTasks(){
-  const isDecisionView=TV==='decisions',isSessionView=TV==='sessions';
-  const pendingDecisions=(S.decisions||[]).filter(d=>!d.deleted&&d.status!=='decided').length;
-  const activeSessions=(S.sessionTasks||[]).filter(t=>!t.deleted&&!t.done).length;
+  const taskViews=['today','tomorrow','weekly','monthly','later'];
+  if(!taskViews.includes(TV))TV='today';
   const sortSel=`<select onchange="setTaskSort(this.value)" style="font-size:11px;padding:3px 7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text)">${TASK_SORT_OPTS.map(([v,l])=>`<option value="${v}" ${getTaskSort()===v?'selected':''}>${l}</option>`).join('')}</select>`;
-  const headerActions=isDecisionView
-    ?`<button class="btn btn-p" onclick="openDecisionModal()">＋ 判断事項を追加</button>`
-    :isSessionView
-    ?`<button class="btn btn-p" onclick="openSessionTaskModal()">＋ Codexタスクを追加</button>`
-    :`${sortSel}<button class="btn btn-p" onclick="openTaskModal()">＋ タスク追加</button>`;
-  return`<div class="ph"><div class="ph-title">タスク管理</div><div style="display:flex;gap:7px;align-items:center">${headerActions}</div></div>
-${isDecisionView||isSessionView?'':rGoalActionWidget()}
-${subTabs([['today','今やる'],['later','後回し'],['sessions',`Codex進行タスク${activeSessions?` (${activeSessions})`:''}`],['decisions',`判断するべき事項${pendingDecisions?` (${pendingDecisions})`:''}`],['tomorrow','明日'],['weekly','週間'],['monthly','月間'],['schedule','スケジュール']],TV,'setTV')}
-${{today:rTasksToday,later:rTasksLater,sessions:rSessionTasks,decisions:rDecisions,tomorrow:rTasksTomorrow,weekly:rTasksWeekly,monthly:rTasksMonthly,schedule:rTasksSchedule}[TV]?.()??rTasksToday()}`;
+  return`<div class="ph"><div class="ph-title">タスク管理</div><div style="display:flex;gap:7px;align-items:center">${sortSel}<button class="btn btn-p" onclick="openTaskModal()">＋ タスク追加</button></div></div>
+${rGoalActionWidget()}
+${subTabs([['today','今日'],['tomorrow','明日'],['weekly','週間'],['monthly','月間'],['later','後回し']],TV,'setTV')}
+${{today:rTasksToday,tomorrow:rTasksTomorrow,weekly:rTasksWeekly,monthly:rTasksMonthly,later:rTasksLater}[TV]?.()??rTasksToday()}`;
 }
 function setTV(v){TV=v;if(v==='weekly')WO=0;if(v==='monthly')MO=0;render();}
 
@@ -4569,7 +4564,7 @@ function taskSetNow(id){
   const task=(S.tasks||[]).find(t=>t.id===id&&!t.deleted&&!t.done);if(!task)return;
   if(!S.settings)S.settings={};
   S.settings.nowTaskId=id;S.frogId=id;
-  save();TV='today';render();toast(`「${task.title}」を今やるタスクにしました`);
+  save();TV='today';render();toast(`「${task.title}」を今日のタスクにしました`);
 }
 function taskSendLater(id){
   if(S.settings?.nowTaskId===id)S.settings.nowTaskId=null;
@@ -4607,6 +4602,7 @@ function saveLaterSchedule(id){
   TV='schedule';render();toast(`「${task.title}」をスケジュールへ入れました`);
 }
 function rFocusNowCard(){
+  return'';
   const task=currentFocusTask();
   if(!task)return`<div class="focus-now-card"><div class="focus-now-label">◉ 今やること</div><div class="focus-now-title">まだ選ばれていません</div><div style="font-size:13px;color:var(--t2);margin-top:6px">後回しリストから1件だけ選ぶと、そのタスク以外を見ずに集中できます。</div><div class="focus-now-actions"><button class="btn btn-p" onclick="TV='later';render()">後回しリストから選ぶ</button></div></div>`;
   const isOver=task.dueDate&&task.dueDate<today();
@@ -4830,7 +4826,6 @@ function rToday(){
     <button class="btn btn-p btn-sm" onclick="openTaskModal(null,today())">＋ 詳しく追加</button>
   </div>
 </div>
-<div class="today-sticky">${rFocusNowCard()}</div>
 <div class="quick-add">
   <input id="quick-add-title" placeholder="やることを入力してEnter" aria-label="今日のタスクを追加" onkeydown="quickAddTask(event)" autocomplete="off">
   <button class="btn btn-p" onclick="quickAddTask()">追加</button>
@@ -4987,7 +4982,6 @@ function rTasksToday(){
   const hasFs=S.fs&&S.fs.length>0;
   return`
 ${rDailyPerformanceCard(td)}
-${rFocusNowCard()}
 ${hasFs?`${secTitle('固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${rFsDashPanel()}`:''}
 ${gcalToday.length?`${secTitle(`カレンダー予定 (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${todayHabits.length?`${secTitle(`今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
@@ -11867,7 +11861,9 @@ function getNavCfg(){
   if(!S.navConfig)S.navConfig=BUILTIN_VIEWS.map(v=>({id:v.id,hidden:DEFAULT_HIDDEN_VIEWS.includes(v.id)}));
   // 削除済みページをnavConfigから除去（kpi→goalsに統合、revenue→削除）
   S.navConfig=S.navConfig.filter(c=>c.id!=='kpi'&&c.id!=='revenue');
-  // 中核4ビューが未登録なら先頭へ（既存の並び順・表示設定はそのまま）
+  // 予定画面は今日に統合したため、既存ユーザーのナビ設定でも表示しない。
+  S.navConfig.forEach(c=>{if(c.id==='plan')c.hidden=true;});
+  // 中核ビューが未登録なら先頭へ（既存の並び順・表示設定はそのまま）
   CORE_VIEWS.slice().reverse().forEach(id=>{
     if(!S.navConfig.find(c=>c.id===id))S.navConfig.unshift({id,hidden:false});
   });
@@ -13353,7 +13349,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260918-03';
+const APP_VERSION='20260918-04';
 
 render();
 renderSyncGate();
@@ -13366,7 +13362,7 @@ renderSyncGate();
 
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/editflow-app/sw.js?v=20260918-03',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('/editflow-app/sw.js?v=20260918-04',{updateViaCache:'none'}).then(reg=>{
     reg.update();
   }).catch(e=>console.warn('SW:',e));
 }
