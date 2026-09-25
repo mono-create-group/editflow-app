@@ -477,6 +477,18 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .abstinence-dot:hover,.abstinence-dot:focus-visible{transform:translateY(-1px);border-color:var(--purple);outline:none}
 .abstinence-dot.kept{background:var(--gdim);border-color:var(--green);color:var(--green)}
 .abstinence-dot.failed{background:var(--rdim);border-color:var(--red);color:var(--red)}
+.abstinence-urge-card{padding:12px;margin-bottom:12px}
+.abstinence-urge-btn{width:100%;min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;border-radius:var(--rs);background:var(--purple);color:#fff;cursor:pointer;font-family:inherit;transition:transform .08s,filter .15s}
+.abstinence-urge-btn:active{transform:scale(.98);filter:brightness(.92)}
+.abstinence-urge-main{font-size:16px;font-weight:800}
+.abstinence-urge-sub{font-size:10px;opacity:.85}
+.abstinence-urge-stats{display:flex;justify-content:space-between;gap:8px;margin:10px 2px 6px;font-size:12px;color:var(--t2)}
+.abstinence-urge-stats b{font-size:16px;color:var(--purple);margin:0 2px}
+.abstinence-urge-times{display:flex;flex-wrap:wrap;gap:5px}
+.abstinence-urge-time{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border:1px solid var(--border);border-radius:999px;background:var(--card2);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.abstinence-urge-time span{color:var(--t3);font-size:10px}
+.abstinence-urge-empty{font-size:11px;color:var(--t3)}
+.abstinence-day-urge{margin-top:4px;text-align:center;font-size:9px;font-weight:800;color:var(--purple);white-space:nowrap}
 .abstinence-footnote{font-size:10px;color:var(--t3);margin:7px 2px 0;text-align:right}
 .fitness-date-picker{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:var(--t2)}
 .fitness-date-picker input{width:auto;min-height:38px;padding:6px 9px;font-size:13px}
@@ -1340,7 +1352,15 @@ function mergeAbstinenceState(localAbstinence,remoteAbstinence){
     const remote=records[date],localTs=Number(item?.updatedAt||0),remoteTs=Number(remote?.updatedAt||0);
     if(!remote||localTs>=remoteTs)records[date]=item;
   });
-  return{...r,...l,records};
+  return{...r,...l,records,urges:mergeAbstinenceUrges(l.urges,r.urges)};
+}
+function mergeAbstinenceUrges(local,remote){
+  const map=new Map();
+  [...(Array.isArray(remote)?remote:[]),...(Array.isArray(local)?local:[])].forEach(u=>{
+    if(!u||!u.id)return;const prev=map.get(u.id);
+    map.set(u.id,prev?{...prev,...u,deleted:!!(prev.deleted||u.deleted)}:u);
+  });
+  return[...map.values()].sort((a,b)=>Number(a.at||0)-Number(b.at||0));
 }
 function mergeDateSkipState(local,remote){
   const l=local||{},r=remote||{},merged={...r};
@@ -1379,6 +1399,7 @@ function _applyCloudData(json){
   ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','chores','choreRoutines','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(!S.abstinence||typeof S.abstinence!=='object')S.abstinence={records:{}};
   if(!S.abstinence.records||typeof S.abstinence.records!=='object')S.abstinence.records={};
+  if(!Array.isArray(S.abstinence.urges))S.abstinence.urges=[];
   if(!S.recordSkipDays||typeof S.recordSkipDays!=='object')S.recordSkipDays={};
   if(!S.editCounter||typeof S.editCounter!=='object')S.editCounter={days:{}};
   if(!S.editCounter.days||typeof S.editCounter.days!=='object')S.editCounter.days={};
@@ -2349,7 +2370,7 @@ function defState(){return{
   dailyOpenReviews:{},
   recordSkipDays:{},
   editCounter:{sourceHash:'',importedAt:0,monthTarget:0,days:{}},
-  abstinence:{records:{}},
+  abstinence:{records:{},urges:[]},
 };}
 function migrate(d){
   // migrate ef_v4 → ef_v5
@@ -2377,6 +2398,7 @@ function migrate(d){
   if(!d.editCounter.days||typeof d.editCounter.days!=='object')d.editCounter.days={};
   if(!d.abstinence||typeof d.abstinence!=='object')d.abstinence={};
   if(!d.abstinence.records||typeof d.abstinence.records!=='object')d.abstinence.records={};
+  if(!Array.isArray(d.abstinence.urges))d.abstinence.urges=[];
   if(Array.isArray(d.customEx))d.customEx=d.customEx.map(x=>typeof x==='string'?{name:x}:x);
   (d.workouts||[]).forEach(w=>{if(Array.isArray(w.exercises))w.exercises=w.exercises.map(e=>typeof e==='string'?{name:e}:e);});
   // 記録を workout.entries に一本化: 旧クイック選択(exercises)を記録へ移行して空にする
@@ -8669,6 +8691,30 @@ function toggleAbstinence(date,key){
   if(Object.keys(record).length)S.abstinence.records[date]=record;else delete S.abstinence.records[date];
   save();render();
 }
+// ムラムラした瞬間に押す「我慢した」記録。1日何回でも押せる。押した時刻(ms)を保存する
+function abstinenceUrges(){return(Array.isArray(S.abstinence?.urges)?S.abstinence.urges:[]).filter(u=>u&&!u.deleted&&u.at);}
+function abstinenceUrgesOn(date){return abstinenceUrges().filter(u=>new Date(u.at).toLocalYmd()===date).sort((a,b)=>a.at-b.at);}
+function recordAbstinenceUrge(){
+  if(!S.abstinence||typeof S.abstinence!=='object')S.abstinence={records:{}};
+  if(!Array.isArray(S.abstinence.urges))S.abstinence.urges=[];
+  const at=Date.now();S.abstinence.urges.push({id:uid(),at});
+  save();render();
+  toast(`我慢した！ 今日${abstinenceUrgesOn(today()).length}回目（${abstinenceUrgeTime(at)}）`);
+}
+function undoAbstinenceUrge(id){
+  const u=(S.abstinence?.urges||[]).find(x=>x&&x.id===id);if(!u||u.deleted)return;
+  if(!confirm(`${abstinenceUrgeTime(u.at)} の記録を取り消しますか？`))return;
+  u.deleted=true;u.deletedAt=Date.now();save();render();
+}
+function abstinenceUrgeTime(at){const d=new Date(at);return`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+function rAbstinenceUrge(td){
+  const list=abstinenceUrgesOn(td),monthCount=abstinenceUrges().filter(u=>new Date(u.at).toLocalYmd().slice(0,7)===ACM).length;
+  return`<div class="card abstinence-urge-card">
+  <button type="button" class="abstinence-urge-btn" onclick="recordAbstinenceUrge()"><span class="abstinence-urge-main">ムラムラした → 我慢した</span><span class="abstinence-urge-sub">押すたびに1回記録（時刻も保存）</span></button>
+  <div class="abstinence-urge-stats"><span>今日 <b>${list.length}</b>回</span><span>${ACM.replace('-','年')}月 <b>${monthCount}</b>回</span></div>
+  ${list.length?`<div class="abstinence-urge-times">${list.slice().reverse().map(u=>`<button type="button" class="abstinence-urge-time" title="タップで取り消し" onclick="undoAbstinenceUrge('${u.id}')">${abstinenceUrgeTime(u.at)}<span aria-hidden="true">×</span></button>`).join('')}</div>`:'<div class="abstinence-urge-empty">今日はまだ記録がありません。</div>'}
+</div>`;
+}
 function abstinenceStatusLabel(status){return status==='kept'?'達成':status==='failed'?'できなかった':'未記録';}
 function rAbstinence(){
   const td=today();if(!ACM)ACM=td.slice(0,7);
@@ -8679,7 +8725,9 @@ function rAbstinence(){
   while(days.length%7)days.push(null);
   const monthRecords=days.filter(Boolean).map(d=>abstinenceRecord(d));
   const count=item=>monthRecords.filter(r=>r[item.key]==='kept').length;
+  const urgeCount={};abstinenceUrges().forEach(u=>{const k=new Date(u.at).toLocalYmd();urgeCount[k]=(urgeCount[k]||0)+1;});
   return`<div class="ph abstinence-head"><div><div class="ph-title">禁欲カレンダー <small>3項目を別々に記録</small></div></div><button class="btn btn-p btn-sm" onclick="ACM=today().slice(0,7);render()">今日</button></div>
+${rAbstinenceUrge(td)}
 <div class="abstinence-guide"><span class="abstinence-guide-mark">✓</span><span>タップで 未記録 → 達成 → できなかった。3項目は別々にカウントします。</span></div>
 <div class="abstinence-legend">${ABSTINENCE_ITEMS.map(item=>`<div class="abstinence-legend-item"><span class="abstinence-legend-icon">${item.icon}</span><span class="abstinence-legend-name">${item.label}</span><span class="abstinence-legend-count">${count(item)}日</span></div>`).join('')}</div>
 <div class="card abstinence-calendar-card">
@@ -8687,8 +8735,8 @@ function rAbstinence(){
   <div class="abstinence-weekdays">${['月','火','水','木','金','土','日'].map(d=>`<span>${d}</span>`).join('')}</div>
   <div class="abstinence-grid">${days.map(d=>{
     if(!d)return'<div class="abstinence-day abstinence-empty"></div>';
-    const rec=abstinenceRecord(d),isToday=d===td,complete=abstinenceDateComplete(d);
-    return`<div class="abstinence-day ${isToday?'is-today':''} ${complete?'is-complete':''}"><div class="abstinence-day-number">${Number(d.slice(8))}</div><div class="abstinence-dots">${ABSTINENCE_ITEMS.map(item=>{const st=rec[item.key]||'';return`<button type="button" class="abstinence-dot ${st}" title="${esc(item.label)}: ${abstinenceStatusLabel(st)}" aria-label="${esc(d+' '+item.label+' '+abstinenceStatusLabel(st))}" onclick="toggleAbstinence('${d}','${item.key}')">${st==='kept'?'✓':st==='failed'?'✕':item.icon}</button>`;}).join('')}</div></div>`;
+    const rec=abstinenceRecord(d),isToday=d===td,complete=abstinenceDateComplete(d),urgeN=urgeCount[d]||0;
+    return`<div class="abstinence-day ${isToday?'is-today':''} ${complete?'is-complete':''}"><div class="abstinence-day-number">${Number(d.slice(8))}</div><div class="abstinence-dots">${ABSTINENCE_ITEMS.map(item=>{const st=rec[item.key]||'';return`<button type="button" class="abstinence-dot ${st}" title="${esc(item.label)}: ${abstinenceStatusLabel(st)}" aria-label="${esc(d+' '+item.label+' '+abstinenceStatusLabel(st))}" onclick="toggleAbstinence('${d}','${item.key}')">${st==='kept'?'✓':st==='failed'?'✕':item.icon}</button>`;}).join('')}</div>${urgeN?`<div class="abstinence-day-urge" title="我慢した回数">我慢${urgeN}</div>`:''}</div>`;
   }).join('')}</div>
 </div>
 <div class="abstinence-footnote">${td.slice(0,7)===ACM?`今日（${td.slice(5).replace('-','/')}）もこのカレンダーから記録できます。`:''}</div>`;
@@ -13383,7 +13431,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260918-10';
+const APP_VERSION='20260925-01';
 
 render();
 renderSyncGate();
