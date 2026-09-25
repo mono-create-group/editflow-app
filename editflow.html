@@ -8714,13 +8714,32 @@ function recordAbstinenceUrge(){
 // 押した後に我慢できなかった回へ「負け」印を付ける／外す。負けた回は我慢回数に数えない
 function toggleAbstinenceUrgeLost(id){
   const u=(S.abstinence?.urges||[]).find(x=>x&&x.id===id);if(!u||u.deleted)return;
-  if(!u.lost&&!confirm(`${abstinenceUrgeTime(u.at)} の回は我慢できなかった？\n「負け」にすると我慢回数から外れます。`))return;
-  u.lost=!u.lost;u.updatedAt=Date.now();save();render();
+  if(!u.lost&&!confirm(`${abstinenceUrgeTime(u.at)} の回は我慢できなかった？\n「負け」にすると我慢回数から外れ、この日の「禁欲」が✕になります。`))return;
+  u.lost=!u.lost;u.updatedAt=Date.now();syncAbstinenceUrgeLost(u);save();render();
+}
+function setAbstinenceStatus(date,key,value){
+  if(!S.abstinence.records||typeof S.abstinence.records!=='object')S.abstinence.records={};
+  const record={...(S.abstinence.records[date]||{})};
+  if(value)record[key]=value;else delete record[key];
+  record.updatedAt=Date.now();
+  if(!ABSTINENCE_ITEMS.some(item=>record[item.key]))delete record.updatedAt;
+  if(Object.keys(record).length)S.abstinence.records[date]=record;else delete S.abstinence.records[date];
+}
+// 「負け」印とその日の「禁欲」を連動: 付けたら✕、全部外したら付ける前の状態に戻す
+function syncAbstinenceUrgeLost(u){
+  const date=new Date(u.at).toLocalYmd(),key='masturbation',current=abstinenceStatus(date,key);
+  if(u.lost&&!u.deleted){
+    const other=abstinenceUrgesOn(date).find(x=>x.lost&&x.id!==u.id&&'prevStatus' in x);
+    u.prevStatus=other?other.prevStatus:current;if(current!=='failed')setAbstinenceStatus(date,key,'failed');return;
+  }
+  if(abstinenceUrgesOn(date).some(x=>x.lost&&x.id!==u.id))return;
+  if(current==='failed')setAbstinenceStatus(date,key,u.prevStatus||'');
+  delete u.prevStatus;
 }
 function undoAbstinenceUrge(id){
   const u=(S.abstinence?.urges||[]).find(x=>x&&x.id===id);if(!u||u.deleted)return;
   if(!confirm(`${abstinenceUrgeTime(u.at)} の記録を取り消しますか？`))return;
-  u.deleted=true;u.deletedAt=Date.now();save();render();
+  u.deleted=true;u.deletedAt=Date.now();if(u.lost)syncAbstinenceUrgeLost(u);save();render();
 }
 function abstinenceUrgeTime(at){const d=new Date(at);return`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
 function rAbstinenceUrge(td){
@@ -8729,7 +8748,7 @@ function rAbstinenceUrge(td){
   return`<div class="card abstinence-urge-card">
   <button type="button" class="abstinence-urge-btn" onclick="recordAbstinenceUrge()"><span class="abstinence-urge-main">ムラムラした → 我慢した</span><span class="abstinence-urge-sub">押すたびに1回記録（時刻も保存）</span></button>
   <div class="abstinence-urge-stats"><span>今日 <b>${keptToday}</b>回${lostToday?`<em class="abstinence-urge-lostn">負け${lostToday}</em>`:''}</span><span>${ACM.replace('-','年')}月 <b>${monthCount}</b>回${monthLost?`<em class="abstinence-urge-lostn">負け${monthLost}</em>`:''}</span></div>
-  ${list.length?`<div class="abstinence-urge-times">${list.slice().reverse().map(u=>`<span class="abstinence-urge-time ${u.lost?'is-lost':''}"><button type="button" class="abstinence-urge-lost" title="${u.lost?'タップで「負け」を外す':'我慢できなかったらタップで「負け」'}" aria-label="${abstinenceUrgeTime(u.at)} ${u.lost?'負け（タップで外す）':'我慢した（タップで負けにする）'}" onclick="toggleAbstinenceUrgeLost('${u.id}')">${abstinenceUrgeTime(u.at)}${u.lost?'<b>負け</b>':''}</button><button type="button" class="abstinence-urge-del" title="押し間違いを取り消し" aria-label="${abstinenceUrgeTime(u.at)} の記録を取り消し" onclick="undoAbstinenceUrge('${u.id}')">×</button></span>`).join('')}</div><div class="abstinence-urge-hint">時刻をタップ＝我慢できなかった回に「負け」印／×＝押し間違いの取り消し</div>`:'<div class="abstinence-urge-empty">今日はまだ記録がありません。</div>'}
+  ${list.length?`<div class="abstinence-urge-times">${list.slice().reverse().map(u=>`<span class="abstinence-urge-time ${u.lost?'is-lost':''}"><button type="button" class="abstinence-urge-lost" title="${u.lost?'タップで「負け」を外す':'我慢できなかったらタップで「負け」'}" aria-label="${abstinenceUrgeTime(u.at)} ${u.lost?'負け（タップで外す）':'我慢した（タップで負けにする）'}" onclick="toggleAbstinenceUrgeLost('${u.id}')">${abstinenceUrgeTime(u.at)}${u.lost?'<b>負け</b>':''}</button><button type="button" class="abstinence-urge-del" title="押し間違いを取り消し" aria-label="${abstinenceUrgeTime(u.at)} の記録を取り消し" onclick="undoAbstinenceUrge('${u.id}')">×</button></span>`).join('')}</div><div class="abstinence-urge-hint">時刻をタップ＝我慢できなかった回に「負け」印（その日の禁欲も✕）／×＝押し間違いの取り消し</div>`:'<div class="abstinence-urge-empty">今日はまだ記録がありません。</div>'}
 </div>`;
 }
 function abstinenceStatusLabel(status){return status==='kept'?'達成':status==='failed'?'できなかった':'未記録';}
@@ -13448,7 +13467,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260925-02';
+const APP_VERSION='20260925-03';
 
 render();
 renderSyncGate();
