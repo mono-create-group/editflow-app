@@ -998,6 +998,33 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 @media(max-width:900px){.fin-hero-grid{grid-template-columns:1fr 1fr}.fin-hero-grid>div:first-child{grid-column:1/-1}.fin-grid{grid-template-columns:1fr}}
 @media(max-width:520px){.fin-hero{padding:16px}.fin-need{font-size:27px}.fin-hero-grid{grid-template-columns:1fr 1fr;gap:8px}.fin-metric{padding:9px}.fin-form{grid-template-columns:1fr}.fin-form .wide{grid-column:auto}.fin-row{grid-template-columns:minmax(0,1fr) auto}.fin-row .btn{grid-column:1/-1;width:100%;min-height:44px}.fin-income-entry{grid-template-columns:minmax(0,1fr) 44px}.fin-income-entry label:first-child{grid-column:1/-1}.fin-budget-entry{grid-template-columns:1fr}.fin-gate{margin:12px;padding:18px}}
 
+
+/* Fixed schedule editor: time controls above a full-width, multiline contents field. */
+.fs-editor-card{display:block;padding:16px;margin-bottom:12px;border-left:4px solid var(--fs-color,var(--purple))}
+.fs-editor-top,.fs-editor-times,.fs-editor-shortcuts,.fs-editor-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fs-editor-top{justify-content:space-between;margin-bottom:12px}
+.fs-editor-order{display:flex;align-items:center;gap:4px;color:var(--t2);font-size:12px;font-weight:700}
+.fs-editor-card .tact{min-width:32px;min-height:32px}
+.fs-editor-card .tact:disabled{opacity:.25;cursor:default}
+.fs-editor-times{align-items:flex-end;margin-bottom:12px}
+.fs-editor-field{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;color:var(--t2);min-width:0}
+.fs-editor-time-wrap{display:flex;align-items:center;gap:2px}
+.fs-editor-time-wrap input{width:126px;min-height:42px;font-size:15px;font-variant-numeric:tabular-nums;padding:8px}
+.fs-editor-duration{font-size:12px;font-weight:700;color:var(--purple);padding:10px 0}
+.fs-editor-shortcuts{margin-bottom:14px;font-size:11px;color:var(--t2)}
+.fs-editor-shortcuts .btn{min-height:32px}
+.fs-editor-content{display:block;font-size:12px;font-weight:700;color:var(--t2)}
+.fs-editor-content textarea{display:block;margin-top:6px;min-height:100px;font-size:14px;font-weight:400;line-height:1.75;padding:12px;resize:vertical;field-sizing:content;max-height:480px}
+.fs-editor-hint{font-size:11px;color:var(--t2);margin-top:6px;font-weight:400}
+.fs-editor-actions{justify-content:space-between;margin-top:12px}
+.fs-editor-appearance{display:flex;align-items:center;gap:10px}
+.fs-editor-appearance label{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2)}
+.fs-editor-appearance input[type=color]{width:34px;height:34px;padding:3px;cursor:pointer}
+.fs-editor-appearance input[type=text]{width:52px;height:34px;text-align:center;padding:4px}
+.fs-editor-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.fs-editor-toolbar .btn{min-height:40px}
+@media(max-width:700px){.fs-editor-card{padding:12px}.fs-editor-time-wrap input{width:105px;font-size:16px}.fs-editor-times{column-gap:4px}.fs-editor-duration{width:100%;padding:0}.fs-editor-card .fs-editor-content textarea{font-size:16px}.fs-editor-actions{gap:12px}.fs-editor-appearance{gap:8px}}
+
 </style>
 </head>
 <body>
@@ -10029,27 +10056,10 @@ ${secTitle('固定タイムスケジュール')}
     <button class="btn btn-g btn-sm" onclick="fsOpenScheduleModal('rename')">設定変更</button>
     <button class="btn btn-g btn-sm" ${(S.fsSchedules||[]).length<=1?'disabled':''} onclick="fsDeleteSchedule()" style="${(S.fsSchedules||[]).length<=1?'opacity:.45;cursor:not-allowed':''}">削除</button>
   </div>
-  <div id="fs-list">
-    ${S.fs.map((f,i)=>`<div class="sched-edit-item">
-      <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
-        <button class="tact" style="padding:1px 5px;font-size:11px;line-height:1.2;opacity:${i===0?'0.2':'0.7'}" ${i===0?'disabled':''} onclick="fsMove(${i},-1)" title="上へ">▲</button>
-        <button class="tact" style="padding:1px 5px;font-size:11px;line-height:1.2;opacity:${i===S.fs.length-1?'0.2':'0.7'}" ${i===S.fs.length-1?'disabled':''} onclick="fsMove(${i},1)" title="下へ">▼</button>
-      </div>
-      <div class="sched-edit-color" style="background:${f.c}"></div>
-      <input style="width:34px;flex-shrink:0;padding:4px 4px;font-size:14px;text-align:center" value="${esc(f.icon||'')}" onchange="S.fs[${i}].icon=this.value.trim();save();render()" placeholder="🔥" title="ノードに表示するアイコン（1文字・未入力ならタイトル頭文字）" maxlength="4">
-      <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.s)}" oninput="fsStageBlockTime(${i},'s',this.value)" onkeydown="fsCommitBlockTime(event,${i},'s')" placeholder="開始">
-      <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.s?'0.7':'0.2'}" onclick="fsSetBlockTime(${i},'s','')" title="開始時間をクリア">✕</button>
-      <span style="color:var(--t2)">〜</span>
-      <input type="time" step="60" style="width:92px;flex-shrink:0;padding:4px 6px;font-size:12px" value="${fsTimeInputVal(f.e)}" oninput="fsStageBlockTime(${i},'e',this.value)" onkeydown="fsCommitBlockTime(event,${i},'e')" placeholder="${f.e==='24:00'?'24:00(終日)':'終了'}">
-      <button class="tact" style="font-size:10px;padding:1px 4px;flex-shrink:0;opacity:${f.e?'0.7':'0.2'}" onclick="fsSetBlockTime(${i},'e','')" title="終了時間をクリア">✕</button>
-      <input style="flex:1;padding:4px 8px;font-size:12px" value="${esc(f.t)}" onchange="fsCommitBlockText(${i},this.value)" placeholder="内容（→区切りで複数項目）">
-      <input type="color" value="${f.c}" style="width:32px;height:32px;padding:2px;border-radius:6px;cursor:pointer;background:none;border:1px solid var(--border)" onchange="S.fs[${i}].c=this.value">
-      ${f.t.includes('→')?`<button class="btn btn-xs" style="background:${f.c}12;color:${f.c};border:1px solid ${f.c}30;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;flex-shrink:0" onclick="save();openFsDetailModal('${f.id||('b'+i)}')" title="項目ごとの時刻・チェックを編集">項目時刻</button>`:''}
-      <button class="tact del" onclick="S.fs.splice(${i},1);save();render()">✕</button>
-    </div>`).join('')}
-  </div>
-  <div style="display:flex;gap:8px;margin-top:10px">
-    <button class="btn btn-g btn-sm" onclick="S.fs.push({id:uid(),s:'',e:'',t:'',c:'#7c3aed',icon:''});save();render()">＋ 追加</button>
+  <p class="fs-editor-hint" style="margin-bottom:12px">内容や時刻は、入力欄から移動すると保存されます。</p>
+  <div id="fs-list">${S.fs.map(rFsEditorBlock).join('')}</div>
+  <div class="fs-editor-toolbar">
+    <button class="btn btn-g btn-sm" onclick="fsEditorAdd()">＋ 予定を追加</button>
     <button class="btn btn-p btn-sm" onclick="saveFS()">保存</button>
     <button class="btn btn-g btn-sm" onclick="fsResetSchedule()">リセット</button>
   </div>
@@ -10791,6 +10801,60 @@ function fsResetSchedule(){
   S.fs=fsCloneBlocks(DEFAULT_FS);
   save();render();toast('デフォルトに戻しました');
 }
+
+function fsEditorText(value){return String(value||'').split('→').join('\n');}
+function fsEditorValue(value){return String(value||'').split(/[→\r\n]+/).map(x=>x.trim()).filter(Boolean).join('→');}
+function rFsEditorBlock(f,i){
+  const text=fsEditorText(f.t);
+  const color=/^#[0-9a-f]{6}$/i.test(f.c||'')?f.c:'#7c3aed';
+  const end=f.e==='24:00'?'00:00':fsTimeInputVal(f.e);
+  const duration=fsTimeInputVal(f.s)&&end?fsDurationLabel(tMin(f.s),tMin(f.e)):'';
+  return `<div class="sched-edit-item fs-editor-card" id="fs-editor-${i}" style="--fs-color:${color}">
+    <div class="fs-editor-top">
+      <div class="fs-editor-order"><span>予定 ${i+1}</span><button class="tact" ${i===0?'disabled':''} onclick="fsMove(${i},-1)" aria-label="予定${i+1}を上へ">↑</button><button class="tact" ${i===S.fs.length-1?'disabled':''} onclick="fsMove(${i},1)" aria-label="予定${i+1}を下へ">↓</button></div>
+      <button class="btn btn-xs btn-red" onclick="fsEditorDelete(${i})" aria-label="予定${i+1}を削除">削除</button>
+    </div>
+    <div class="fs-editor-times">
+      <label class="fs-editor-field">開始<div class="fs-editor-time-wrap"><input type="time" step="60" value="${fsTimeInputVal(f.s)}" aria-label="予定${i+1}の開始時刻" oninput="fsStageBlockTime(${i},'s',this.value)" onchange="fsEditorSaveTime(${i},'s',this.value)"><button type="button" class="tact" onclick="fsEditorClearTime(${i},'s')" aria-label="予定${i+1}の開始時刻をクリア">×</button></div></label>
+      <label class="fs-editor-field">終了<div class="fs-editor-time-wrap"><input type="time" step="60" value="${end}" aria-label="予定${i+1}の終了時刻" oninput="fsStageBlockTime(${i},'e',this.value)" onchange="fsEditorSaveTime(${i},'e',this.value)"><button type="button" class="tact" onclick="fsEditorClearTime(${i},'e')" aria-label="予定${i+1}の終了時刻をクリア">×</button></div></label>
+      <span class="fs-editor-duration" aria-live="polite">${duration}</span>
+    </div>
+    <div class="fs-editor-shortcuts"><span>所要時間で設定</span>${[[30,'30分'],[60,'1時間'],[120,'2時間']].map(([m,label])=>`<button class="btn btn-g btn-xs" onclick="fsEditorSetDuration(${i},${m})">${label}</button>`).join('')}</div>
+    <label class="fs-editor-content" for="fs-editor-text-${i}">内容<textarea id="fs-editor-text-${i}" rows="${Math.max(3,text.split('\n').length)}" aria-label="予定${i+1}の内容" aria-describedby="fs-editor-hint-${i}" placeholder="起床&#10;水を飲む&#10;散歩" onchange="fsCommitBlockText(${i},fsEditorValue(this.value))">${esc(text)}</textarea></label>
+    <div class="fs-editor-hint" id="fs-editor-hint-${i}">1行に1項目。Enterで次の項目へ。「→」区切りの貼り付けもできます。</div>
+    <div class="fs-editor-actions"><div class="fs-editor-appearance"><label>アイコン<input type="text" value="${esc(f.icon||'')}" maxlength="4" aria-label="予定${i+1}のアイコン" onchange="S.fs[${i}].icon=this.value.trim();save()"></label><label>色<input type="color" value="${color}" aria-label="予定${i+1}の色" onchange="S.fs[${i}].c=this.value;this.closest('.fs-editor-card').style.setProperty('--fs-color',this.value);save()"></label></div><button class="btn btn-g btn-sm" onclick="fsEditorOpenDetail(${i})">項目ごとの時刻</button></div>
+  </div>`;
+}
+function fsEditorSaveTime(i,key,value){
+  fsStageBlockTime(i,key,value);
+  save();
+  const f=S.fs[i],label=document.querySelector(`#fs-editor-${i} .fs-editor-duration`);
+  if(label)label.textContent=f&&fsTimeInputVal(f.s)&&(fsTimeInputVal(f.e)||f.e==='24:00')?fsDurationLabel(tMin(f.s),tMin(f.e)):'';
+}
+function fsEditorClearTime(i,key){fsEditorSaveTime(i,key,'');render();}
+function fsEditorSetDuration(i,minutes){
+  const f=S.fs[i];if(!f)return;
+  if(!fsTimeInputVal(f.s)){toast('開始時刻を入力してください','err');document.querySelector(`#fs-editor-${i} input[type=time]`)?.focus();return;}
+  const end=tMin(f.s)+minutes,m=end%1440;
+  f.e=end===1440?'24:00':`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  save();render();
+}
+function fsEditorAdd(){
+  const prev=S.fs[S.fs.length-1];
+  S.fs.push({id:uid(),s:prev?.e==='24:00'?'00:00':fsTimeInputVal(prev?.e),e:'',t:'',c:prev?.c||'#7c3aed',icon:''});
+  save();render();
+  document.getElementById(`fs-editor-text-${S.fs.length-1}`)?.focus();
+}
+function fsEditorDelete(i){
+  if(!S.fs[i]||!confirm('この予定を削除しますか？'))return;
+  S.fs.splice(i,1);save();render();
+}
+function fsEditorOpenDetail(i){
+  const f=S.fs[i];if(!f)return;
+  if(!f.id)f.id=uid();
+  save();openFsDetailModal(f.id);
+}
+
 function fsSetBlockTime(i,key,value){
   if(!S.fs[i]||(key!=='s'&&key!=='e'))return;
   S.fs[i][key]=value;
@@ -13475,7 +13539,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20260925-04';
+const APP_VERSION='20261001-01';
 
 render();
 renderSyncGate();
