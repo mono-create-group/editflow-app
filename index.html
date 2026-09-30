@@ -1025,6 +1025,28 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .fs-editor-toolbar .btn{min-height:40px}
 @media(max-width:700px){.fs-editor-card{padding:12px}.fs-editor-time-wrap input{width:105px;font-size:16px}.fs-editor-times{column-gap:4px}.fs-editor-duration{width:100%;padding:0}.fs-editor-card .fs-editor-content textarea{font-size:16px}.fs-editor-actions{gap:12px}.fs-editor-appearance{gap:8px}}
 
+/* Daily planner: time-led rows, existing EditFlow colors, mobile-first inputs. */
+.dp-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:20px 0 16px}
+.dp-head h2{font-size:23px;line-height:1.4;letter-spacing:-.03em}.dp-note{font-size:12px;color:var(--t2);margin-top:5px;line-height:1.7}
+.dp-date-nav{display:flex;align-items:center;gap:6px}.dp-date-nav input{width:156px;min-height:42px}.dp-date-nav .btn{min-width:42px;min-height:42px}
+.dp-compose{padding:20px;border:1px solid var(--border);border-top:3px solid var(--purple);border-radius:var(--r);background:var(--card);margin-bottom:20px}
+.dp-compose h3{font-size:14px;margin-bottom:12px}.dp-compose label,.dp-time-fields label{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;font-weight:650;color:var(--t2)}
+.dp-compose input,.dp-time-fields input{min-height:44px;font-size:16px;min-width:0;width:100%}.dp-compose .dp-title-input{font-size:17px}
+.dp-compose-bottom{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:end;margin-top:12px}
+.dp-time-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.dp-time-fields input{font-variant-numeric:tabular-nums}
+.dp-shortcuts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.dp-shortcuts .btn{min-height:32px;padding:5px 12px}
+.dp-submit{min-height:46px;white-space:nowrap}.dp-error{font-size:12px;color:var(--red);margin-top:10px;line-height:1.7}.dp-error:empty{display:none}
+.dp-grid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}.dp-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}.dp-section-head h3{font-size:16px}.dp-section-head span{font-size:12px;color:var(--t2)}
+.dp-agenda{border:1px solid var(--border);border-radius:var(--r);background:var(--card);overflow:hidden}.dp-row{display:grid;grid-template-columns:92px 34px minmax(0,1fr);gap:12px;padding:18px 16px;border-bottom:1px solid var(--border);position:relative}.dp-row:last-child{border-bottom:0}.dp-row.is-done .dp-row-title{text-decoration:line-through;color:var(--t3)}
+.dp-time{color:var(--blue);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;font-weight:700;font-size:20px;line-height:1.2}.dp-time small{display:block;font-size:12px;font-weight:500;color:var(--t2);margin-top:7px}
+.dp-check{display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--green);cursor:pointer}.dp-check[aria-pressed=true]{background:var(--gdim);border-color:var(--green)}
+.dp-row-title{font-size:15px;font-weight:700;overflow-wrap:anywhere}.dp-row-meta{font-size:11px;color:var(--t2);margin:4px 0 9px}.dp-row-actions{display:flex;gap:6px;flex-wrap:wrap}.dp-row-actions .btn{min-height:34px;padding:5px 10px}.dp-overlap{color:var(--amber);font-weight:600}.dp-aside{padding:16px;background:var(--card2);border-radius:var(--r);border:1px solid var(--border)}
+.dp-waiting{padding:12px 0;border-bottom:1px solid var(--border)}.dp-waiting:last-child{border-bottom:0}.dp-waiting p{font-size:13px;font-weight:600;overflow-wrap:anywhere;margin-bottom:7px}.dp-waiting small{display:block;color:var(--t2);font-size:11px;margin-bottom:8px}.dp-waiting .btn{min-height:36px}
+.dp-empty{padding:30px 18px;text-align:center;color:var(--t2);font-size:13px;line-height:1.8}.dp-empty strong{display:block;color:var(--text);font-size:15px;margin-bottom:6px}.dp-fixed{margin-top:20px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r);background:var(--card)}.dp-fixed summary{cursor:pointer;font-size:13px;font-weight:700}.dp-fixed-row{display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;font-size:12px;padding:10px 0;border-bottom:1px solid var(--border)}.dp-fixed-row:last-child{border:0}.dp-fixed-row span:first-child{font-variant-numeric:tabular-nums;color:var(--t2)}.dp-fixed-row span:last-child{overflow-wrap:anywhere}
+.dp-today-link{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 16px;margin-bottom:16px;background:var(--card);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:var(--rs)}.dp-today-link strong{font-size:14px}.dp-today-link p{font-size:12px;color:var(--t2);margin-top:3px}
+.dp-compose :focus-visible,.dp-grid :focus-visible,.dp-date-nav :focus-visible{outline:2px solid var(--purple);outline-offset:3px}
+@media(max-width:1000px){.dp-grid{grid-template-columns:minmax(0,1fr)}.dp-compose-bottom{grid-template-columns:minmax(0,1fr)}.dp-submit{width:100%}}
+@media(max-width:520px){.dp-head{margin-top:12px}.dp-head h2{font-size:21px}.dp-date-nav{width:100%}.dp-date-nav input{flex:1;width:0;min-width:0}.dp-compose{padding:14px}.dp-time-fields{gap:6px}.dp-time-fields input{padding:8px 5px}.dp-row{grid-template-columns:74px 30px minmax(0,1fr);gap:8px;padding:15px 10px}.dp-time{font-size:18px}.dp-check{width:30px;height:30px}.dp-row-actions .btn{min-height:40px}.dp-fixed-row{grid-template-columns:100px minmax(0,1fr)}}
 </style>
 </head>
 <body>
@@ -1126,6 +1148,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="./ai-bridge-client.js"></script>
 <script src="./personal-sync.js?v=20261001-02"></script>
+<script src="./day-plan.js?v=20261001-03"></script>
 <script>/* lz-string 1.5.0 (MIT) — CDN非依存でオフライン/圧縮チーム同期を保証するためインライン化 */
 var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",n="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",e={};function t(r,o){if(!e[r]){e[r]={};for(var n=0;n<r.length;n++)e[r][r.charAt(n)]=n}return e[r][o]}var i={compressToBase64:function(r){if(null==r)return"";var n=i._compress(r,6,function(r){return o.charAt(r)});switch(n.length%4){default:case 0:return n;case 1:return n+"===";case 2:return n+"==";case 3:return n+"="}},decompressFromBase64:function(r){return null==r?"":""==r?null:i._decompress(r.length,32,function(n){return t(o,r.charAt(n))})},compressToUTF16:function(o){return null==o?"":i._compress(o,15,function(o){return r(o+32)})+" "},decompressFromUTF16:function(r){return null==r?"":""==r?null:i._decompress(r.length,16384,function(o){return r.charCodeAt(o)-32})},compressToUint8Array:function(r){for(var o=i.compress(r),n=new Uint8Array(2*o.length),e=0,t=o.length;e<t;e++){var s=o.charCodeAt(e);n[2*e]=s>>>8,n[2*e+1]=s%256}return n},decompressFromUint8Array:function(o){if(null==o)return i.decompress(o);for(var n=new Array(o.length/2),e=0,t=n.length;e<t;e++)n[e]=256*o[2*e]+o[2*e+1];var s=[];return n.forEach(function(o){s.push(r(o))}),i.decompress(s.join(""))},compressToEncodedURIComponent:function(r){return null==r?"":i._compress(r,6,function(r){return n.charAt(r)})},decompressFromEncodedURIComponent:function(r){return null==r?"":""==r?null:(r=r.replace(/ /g,"+"),i._decompress(r.length,32,function(o){return t(n,r.charAt(o))}))},compress:function(o){return i._compress(o,16,function(o){return r(o)})},_compress:function(r,o,n){if(null==r)return"";var e,t,i,s={},u={},a="",p="",c="",l=2,f=3,h=2,d=[],m=0,v=0;for(i=0;i<r.length;i+=1)if(a=r.charAt(i),Object.prototype.hasOwnProperty.call(s,a)||(s[a]=f++,u[a]=!0),p=c+a,Object.prototype.hasOwnProperty.call(s,p))c=p;else{if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++),s[p]=f++,c=String(a)}if(""!==c){if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++)}for(t=2,e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;for(;;){if(m<<=1,v==o-1){d.push(n(m));break}v++}return d.join("")},decompress:function(r){return null==r?"":""==r?null:i._decompress(r.length,32768,function(o){return r.charCodeAt(o)})},_decompress:function(o,n,e){var t,i,s,u,a,p,c,l=[],f=4,h=4,d=3,m="",v=[],g={val:e(0),position:n,index:1};for(t=0;t<3;t+=1)l[t]=t;for(s=0,a=Math.pow(2,2),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 2:return""}for(l[3]=c,i=c,v.push(c);;){if(g.index>o)return"";for(s=0,a=Math.pow(2,d),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(c=s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 2:return v.join("")}if(0==f&&(f=Math.pow(2,d),d++),l[c])m=l[c];else{if(c!==h)return null;m=i+i.charAt(0)}v.push(m),l[h++]=i+m.charAt(0),i=m,0==--f&&(f=Math.pow(2,d),d++)}}};return i}();"function"==typeof define&&define.amd?define(function(){return LZString}):"undefined"!=typeof module&&null!=module?module.exports=LZString:"undefined"!=typeof angular&&null!=angular&&angular.module("LZString",[]).factory("LZString",function(){return LZString});
 </script>
@@ -4581,15 +4604,84 @@ function rDailyPerformanceCard(date){
   };
   return`<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b>今日の達成率</b><div style="display:flex;gap:6px"><button class="btn btn-g btn-xs" onclick="V='performance';render()">履歴一覧</button><button class="btn btn-p btn-xs" onclick="recordDailyPerformance('${date}')">記録する</button></div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${item('i-check','タスク',p.tasks)}${item('i-calendar','スケジュール',p.schedule)}${item('i-clock','固定スケジュール',p.fixedSchedule)}${item('i-flame','習慣',p.habits)}</div>${history.length?`<div style="font-size:11px;color:var(--t2);margin-top:8px">過去の記録: ${history.map(historyLine).join('　')}</div>`:''}</div>`;
 }
+let DAY_PLAN_DATE='';
 function rTasks(){
-  const taskViews=['today','tomorrow','weekly','monthly','later'];
+  const taskViews=['today','dayplan','tomorrow','weekly','monthly','later'];
   if(!taskViews.includes(TV))TV='today';
   const sortSel=`<select onchange="setTaskSort(this.value)" style="font-size:11px;padding:3px 7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text)">${TASK_SORT_OPTS.map(([v,l])=>`<option value="${v}" ${getTaskSort()===v?'selected':''}>${l}</option>`).join('')}</select>`;
   return`<div class="ph"><div class="ph-title">タスク管理</div><div style="display:flex;gap:7px;align-items:center">${sortSel}<button class="btn btn-p" onclick="openTaskModal()">＋ タスク追加</button></div></div>
-${subTabs([['today','今日'],['tomorrow','明日'],['weekly','週間'],['monthly','月間'],['later','後回し']],TV,'setTV')}
-${{today:rTasksToday,tomorrow:rTasksTomorrow,weekly:rTasksWeekly,monthly:rTasksMonthly,later:rTasksLater}[TV]?.()??rTasksToday()}`;
+${subTabs([['today','今日'],['dayplan','1日の予定'],['tomorrow','明日'],['weekly','週間'],['monthly','月間'],['later','後回し']],TV,'setTV')}
+${{today:rTasksToday,dayplan:rDayPlan,tomorrow:rTasksTomorrow,weekly:rTasksWeekly,monthly:rTasksMonthly,later:rTasksLater}[TV]?.()??rTasksToday()}`;
 }
 function setTV(v){TV=v;if(v==='weekly')WO=0;if(v==='monthly')MO=0;render();}
+
+function dayPlanTomorrow(){const d=new Date(today()+'T12:00:00');d.setDate(d.getDate()+1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function dayPlanDate(){return EditFlowDayPlan.validDate(DAY_PLAN_DATE)?DAY_PLAN_DATE:dayPlanTomorrow();}
+function dayPlanOpen(date=today()){DAY_PLAN_DATE=date;V='tasks';TV='dayplan';render();}
+function dayPlanSetDate(date){if(!EditFlowDayPlan.validDate(date))return;DAY_PLAN_DATE=date;render();}
+function dayPlanMoveDay(offset){const d=new Date(dayPlanDate()+'T12:00:00');d.setDate(d.getDate()+offset);dayPlanSetDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);}
+function dayPlanArg(value){return esc(JSON.stringify(value));}
+function dayPlanDurationLabel(n){return n>=60?`${Math.floor(n/60)}時間${n%60?`${n%60}分`:''}`:`${n}分`;}
+function dayPlanTimeFields(prefix,start='',end='',minutes=30){
+  return `<div class="dp-time-fields"><label for="${prefix}-start">開始<input id="${prefix}-start" type="time" step="60" value="${esc(start)}" oninput="dayPlanTimeChanged('${prefix}','start')"></label><label for="${prefix}-end">終了<input id="${prefix}-end" type="time" step="60" value="${esc(end==='24:00'?'00:00':end)}" oninput="dayPlanTimeChanged('${prefix}','end')"></label><label for="${prefix}-minutes">所要時間（分）<input id="${prefix}-minutes" type="number" min="1" max="1440" step="1" value="${Number(minutes)||30}" oninput="dayPlanTimeChanged('${prefix}','minutes')"></label></div>`;
+}
+function dayPlanTimeChanged(prefix,changed){
+  const start=document.getElementById(prefix+'-start'),end=document.getElementById(prefix+'-end'),duration=document.getElementById(prefix+'-minutes');
+  if(!start||!end||!duration)return;
+  const sm=EditFlowDayPlan.minute(start.value);if(sm===null)return;
+  if(changed==='end'){let em=EditFlowDayPlan.minute(end.value,true);if(em===0&&sm>0)em=1440;if(em!==null&&em>sm)duration.value=String(em-sm);}
+  else{const n=Number(duration.value);if(Number.isInteger(n)&&n>0&&sm+n<=1440){const value=EditFlowDayPlan.clock(sm+n);end.value=value==='24:00'?'00:00':value;}else end.value='';}
+}
+function dayPlanSetDuration(prefix,n){const el=document.getElementById(prefix+'-minutes');if(el)el.value=String(n);dayPlanTimeChanged(prefix,'minutes');}
+function dayPlanParseQuick(){
+  const title=document.getElementById('dp-title');if(!title)return;
+  try{const line=EditFlowDayPlan.parseLine(title.value);if(!line.start)return;title.value=line.title;document.getElementById('dp-start').value=line.start;if(line.end){document.getElementById('dp-end').value=line.end==='24:00'?'00:00':line.end;dayPlanTimeChanged('dp','end');}else dayPlanTimeChanged('dp','start');}catch(e){document.getElementById('dp-error').textContent=e.message;}
+}
+function dayPlanRead(prefix,date,title){return {date,title,start:document.getElementById(prefix+'-start')?.value||'',end:document.getElementById(prefix+'-end')?.value||'',duration:document.getElementById(prefix+'-minutes')?.value};}
+function dayPlanAdd(){
+  try{
+    const values=EditFlowDayPlan.input(dayPlanRead('dp',dayPlanDate(),document.getElementById('dp-title')?.value));
+    const task={id:uid(),...values,description:'',timeSlots:[],subtasks:[],done:false,procCount:0,createdAt:new Date().toISOString(),updatedAt:Date.now(),fsBlockId:null,fsSlot:null};
+    S.tasks.unshift(task);save();render();toast('予定を追加しました。「今日」にも反映されます');
+  }catch(e){document.getElementById('dp-error').textContent=e.message;}
+  return false;
+}
+function dayPlanOpenEditor(id,slotIndex=0){
+  const task=S.tasks.find(t=>t.id===id&&!t.deleted);if(!task)return;
+  const slot=slotIndex===0?{s:task.startTime,e:task.endTime}:task.timeSlots?.[slotIndex-1];if(!slot)return;
+  const row=EditFlowDayPlan.entries([{...task,dueDate:dayPlanDate()}],dayPlanDate()).find(x=>x.slotIndex===slotIndex);
+  openModal(`<form onsubmit="event.preventDefault();dayPlanSaveEditor(${dayPlanArg(id)},${slotIndex})"><div class="mhdr"><div class="mtitle">予定の日時を決める</div><button type="button" class="mclose" onclick="closeModal()" aria-label="閉じる">✕</button></div><label class="fg" for="dp-edit-title">予定の名前<input id="dp-edit-title" value="${esc(task.title)}"></label><label class="fg" for="dp-edit-date">予定日<input id="dp-edit-date" type="date" value="${esc(dayPlanDate())}"></label>${dayPlanTimeFields('dp-edit',slot.s||'',slot.e||'',row?.minutes||task.estimatedMinutes||30)}<div class="dp-shortcuts">${[15,30,60,90].map(n=>`<button type="button" class="btn btn-g btn-xs" onclick="dayPlanSetDuration('dp-edit',${n})">${n}分</button>`).join('')}</div><p class="dp-note">タスク名・日時・完了状態は「今日」と共通です。${task.timeSlots?.length?'予定日の変更は、このタスクのすべての時間帯に反映されます。':''}</p><div class="dp-error" id="dp-edit-error" role="alert"></div><div class="mfooter"><button type="button" class="btn btn-g" onclick="closeModal()">キャンセル</button><button type="submit" class="btn btn-p">日時を保存</button></div></form>`);
+}
+function dayPlanSaveEditor(id,slotIndex){
+  try{
+    const i=S.tasks.findIndex(t=>t.id===id&&!t.deleted);if(i<0)throw Error('このタスクは変更されています。画面を開き直してください。');
+    const values=dayPlanRead('dp-edit',document.getElementById('dp-edit-date').value,document.getElementById('dp-edit-title').value);
+    S.tasks[i]=EditFlowDayPlan.apply(S.tasks[i],values,slotIndex);DAY_PLAN_DATE=S.tasks[i].dueDate;save();closeModal();render();toast('予定の日時を保存しました');
+  }catch(e){document.getElementById('dp-edit-error').textContent=e.message;}
+}
+function dayPlanUnslot(id,slotIndex){
+  const task=S.tasks.find(t=>t.id===id&&!t.deleted);if(!task)return;
+  openModal(`<div class="mhdr"><div class="mtitle">この時間帯を外しますか？</div><button class="mclose" onclick="closeModal()" aria-label="閉じる">✕</button></div><p>${esc(task.title)}</p><p class="dp-note">タスク自体・予定日・完了状態は残ります。</p><div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button><button class="btn btn-p" onclick="dayPlanConfirmUnslot(${dayPlanArg(id)},${slotIndex})">時間帯だけ外す</button></div>`);
+}
+function dayPlanConfirmUnslot(id,slotIndex){
+  const i=S.tasks.findIndex(t=>t.id===id&&!t.deleted);if(i<0)return;
+  S.tasks[i]=EditFlowDayPlan.unslot(S.tasks[i],slotIndex);save();closeModal();render();toast('時間帯を外しました。タスクは残っています');
+}
+function rDayPlanRow(row,conflicts){
+  const t=row.task,arg=dayPlanArg(t.id),overlap=conflicts.has(row.key);
+  return `<article class="dp-row ${t.done?'is-done':''}" data-plan-task="${esc(t.id)}"><div class="dp-time">${EditFlowDayPlan.clock(row.start)}<small>〜 ${row.end===null?'終了未定':EditFlowDayPlan.clock(row.end)}</small></div><button type="button" class="dp-check" aria-pressed="${!!t.done}" aria-label="${esc(t.title)}を${t.done?'未完了に戻す':'完了にする'}" onclick="toggleDone(${arg})">${t.done?'✓':''}</button><div><div class="dp-row-title">${esc(t.title)}</div><div class="dp-row-meta">${row.minutes===null?'終了時刻を設定できます':dayPlanDurationLabel(row.minutes)}${row.slotIndex?` · 追加時間帯 ${row.slotIndex}`:''}${overlap?' · <span class="dp-overlap">ほかの予定と重複</span>':''}</div><div class="dp-row-actions"><button class="btn btn-g btn-xs" onclick="dayPlanOpenEditor(${arg},${row.slotIndex})" aria-label="${esc(t.title)}の時間を編集">時間を編集</button><button class="btn btn-g btn-xs" onclick="openTaskModal(${arg})" aria-label="${esc(t.title)}の詳細">詳細</button><button class="btn btn-g btn-xs" onclick="dayPlanUnslot(${arg},${row.slotIndex})" aria-label="${esc(t.title)}のこの時間帯を外す">時間を外す</button></div></div></article>`;
+}
+function rDayPlan(){
+  const date=dayPlanDate(),rows=EditFlowDayPlan.entries(S.tasks,date),stats=EditFlowDayPlan.summary(rows);
+  const assigned=new Set(rows.map(r=>r.task.id));
+  const waiting=S.tasks.filter(t=>!t.deleted&&!t.done&&(!t.dueDate||t.dueDate===date)&&!assigned.has(t.id));
+  const fixed=fsBlocksForDate(date),dateLabel=new Date(date+'T12:00:00').toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'long'});
+  return `<section class="dp-head"><div><h2>${esc(dateLabel)}の予定</h2><p class="dp-note">仕事が片付いたら、そのまま翌日の予定づくり。朝は確認するだけ。「今日」と同じタスクです。</p></div><div class="dp-date-nav"><button class="btn btn-g btn-sm" onclick="dayPlanMoveDay(-1)" aria-label="前の日">‹</button><input type="date" aria-label="予定を組む日付" value="${date}" onchange="dayPlanSetDate(this.value)"><button class="btn btn-g btn-sm" onclick="dayPlanMoveDay(1)" aria-label="次の日">›</button><button class="btn btn-g btn-sm" onclick="dayPlanSetDate(today())">今日</button><button class="btn btn-g btn-sm" onclick="dayPlanSetDate(dayPlanTomorrow())">明日</button></div></section>
+  <form class="dp-compose" onsubmit="event.preventDefault();dayPlanAdd()"><h3>この日に予定を追加</h3><label for="dp-title">予定の名前<input class="dp-title-input" id="dp-title" placeholder="12:00 ラーメン食べに行く" autocomplete="off" onchange="dayPlanParseQuick()"></label><div class="dp-compose-bottom"><div>${dayPlanTimeFields('dp')}<div class="dp-shortcuts">${[15,30,60,90].map(n=>`<button type="button" class="btn btn-g btn-xs" onclick="dayPlanSetDuration('dp',${n})">${n}分</button>`).join('')}</div></div><button class="btn btn-p dp-submit" type="submit">＋ この日の予定に追加</button></div><p class="dp-note">「12:00〜13:00 ラーメン食べに行く」と入力しても追加できます。1分単位で設定できます。</p><div class="dp-error" id="dp-error" role="alert"></div></form>
+  <div class="dp-grid"><div><div class="dp-section-head"><h3>時刻順の予定</h3><span>${stats.count}件 · ${dayPlanDurationLabel(stats.minutes)}${stats.conflicts.size?'（重複を含む）':''}</span></div>${stats.conflicts.size?'<p class="dp-note dp-overlap" style="margin-bottom:10px">時間が重なる予定があります。必要に応じて調整できます。</p>':''}<div class="dp-agenda">${rows.length?rows.map(r=>rDayPlanRow(r,stats.conflicts)).join(''):'<div class="dp-empty"><strong>この日の予定を自由に組みましょう</strong>上の入力欄から追加するか、既存のタスクに時刻を付けてください。</div>'}</div></div><aside class="dp-aside"><div class="dp-section-head"><h3>時間未定</h3><span>${waiting.length}件</span></div><p class="dp-note">当日・日付未設定のタスク。選んで時刻を決めると、この日の予定に入ります。</p>${waiting.length?waiting.map(t=>`<div class="dp-waiting"><p>${esc(t.title)}</p><small>${t.dueDate?'この日のタスク':'日付未設定'}</small><button class="btn btn-g btn-xs" onclick="dayPlanOpenEditor(${dayPlanArg(t.id)})" aria-label="${esc(t.title)}に時刻を設定">時刻を決める</button></div>`).join(''):'<p class="dp-note" style="padding:14px 0">時間未定のタスクはありません。</p>'}</aside></div>
+  <details class="dp-fixed"><summary>固定の時間割を見る（${fixed.length}枠・変更しません）</summary><p class="dp-note">曜日に応じた固定予定です。このページの追加・編集では、固定の時間割は変更しません。</p>${fixed.map(f=>`<div class="dp-fixed-row"><span>${esc(f.s||'時刻未定')}〜${esc(f.e||'')}</span><span>${esc(f.t||'')}</span></div>`).join('')}</details>`;
+}
+function rDayPlanTodayLink(){const rows=EditFlowDayPlan.entries(S.tasks,today()),stats=EditFlowDayPlan.summary(rows);return `<div class="dp-today-link"><div><strong>今日の予定を、細かく決める</strong><p>時刻指定 ${stats.count}件 · ${dayPlanDurationLabel(stats.minutes)}。開始・終了時刻を1分単位で設定できます。</p></div><button class="btn btn-g btn-sm" onclick="dayPlanOpen()">1日の予定を開く</button></div>`;}
 
 function decisionPriorityMeta(priority){
   return{high:{label:'優先度 高',cls:'br',rank:0},medium:{label:'優先度 中',cls:'ba',rank:1},low:{label:'優先度 低',cls:'bk',rank:2}}[priority]||{label:'優先度なし',cls:'bk',rank:3};
@@ -5104,6 +5196,8 @@ function rTasksToday(){
   const habitDoneCount=todayHabits.filter(h=>(h.completedDates||[]).includes(td)).length;
   const hasFs=S.fs&&S.fs.length>0;
   return`
+${rDayPlanTodayLink()}
+${!hasFs?S.tasks.filter(t=>!t.deleted&&!t.done&&(t.dueDate===td||!t.dueDate)).map(t=>rTaskItem(t)).join(''):''}
 ${hasFs?`${secTitle('固定タイムスケジュール')}<button class="btn btn-g btn-xs" style="margin-bottom:8px" onclick="V='habits';HV='schedule';render()">スケジュール編集 →</button>${rFsDashPanel()}`:''}
 ${gcalToday.length?`${secTitle(`カレンダー予定 (${gcalToday.length}件)`)}${gcalToday.map(e=>rGcalEventItem(e)).join('')}`:''}
 ${todayHabits.length?`${secTitle(`今日の習慣 (${habitDoneCount}/${todayHabits.length}件)`)}${todayHabits.map(h=>rHabitInTaskView(h,td,true)).join('')}`:''}
@@ -5163,7 +5257,7 @@ function rFsDashPanel(date){
       <div class="chk ${t.done?'done':''}" style="width:14px;height:14px;border-radius:4px;flex-shrink:0" onclick="toggleDone('${t.id}')"></div>
       <div class="task-body" style="min-width:0;gap:1px">
         <div class="task-ttl" style="font-size:12px">${esc(t.title)}</div>
-        ${t.startTime?`<div style="font-size:10px;color:var(--t2)">🕐 ${t.startTime}</div>`:''}
+        ${t.startTime?`<div style="font-size:10px;color:var(--t2)">🕐 ${esc(t.startTime)}${t.endTime?'〜'+esc(t.endTime):''}</div>`:''}
         ${t.fsBlockId?`<div style="font-size:10px;color:var(--purple)">📌 割当済</div>`:''}
       </div>
       <button class="tact" style="padding:2px 4px;font-size:11px;opacity:.6" onclick="openTaskModal('${t.id}')">✏️</button>
@@ -13572,7 +13666,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20261001-02';
+const APP_VERSION='20261001-03';
 
 render();
 renderSyncGate();
@@ -13585,7 +13679,7 @@ renderSyncGate();
 
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/editflow-app/sw.js?v=20261001-02',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('/editflow-app/sw.js?v=20261001-03',{updateViaCache:'none'}).then(reg=>{
     reg.update();
   }).catch(e=>console.warn('SW:',e));
 }
