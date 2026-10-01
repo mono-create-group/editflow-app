@@ -30,9 +30,11 @@ test('concurrent additions preserve both device records',()=>{
   const l=copy(base),r=copy(base);l.tasks.push({id:'local',done:false});r.tasks.push({id:'remote',done:false});
   assert.deepEqual(new Set(Sync.merge(base,l,r).tasks.map(x=>x.id)),new Set(['t1','local','remote']));
 });
-test('first install prefers cloud values without dropping local-only records',()=>{
+test('first install does not resurrect local-only records or fields',()=>{
   const local=copy(base),remote=copy(base);remote.chores[0].time='18:30';remote.fsChecked.day.b1=true;local.tasks.push({id:'local-only'});local._savedAt=9999999999999;
-  const result=Sync.merge(null,local,remote);assert.equal(result.chores[0].time,'18:30');assert.equal(result.fsChecked.day.b1,true);assert.ok(result.tasks.some(x=>x.id==='local-only'));
+  local.fsChecked.oldDay={old:true};local.habits.push({id:'old-habit'});local.settings.retired='old';
+  const before=JSON.stringify(local),result=Sync.merge(null,local,remote);
+  assert.equal(Sync.signature(result),Sync.signature(remote));assert.equal(JSON.stringify(local),before);
 });
 test('canonical signature ignores save time and object property order',()=>{
   assert.equal(Sync.signature({a:1,b:{y:2,x:1},_savedAt:1}),Sync.signature({b:{x:1,y:2},a:1,_savedAt:999}));
@@ -60,7 +62,7 @@ function harness(){
   ctx.fbDb={enableNetwork:async()=>{stats.enables++;},collection:()=>({doc:()=>({onSnapshot:(options,fn)=>{stats.options=options;stats.listeners.push(fn);return()=>{};}})}),runTransaction:async fn=>fn({get:async()=>({exists:true,data:()=>({json:JSON.stringify(stats.server||base)})}),set:(_ref,payload)=>stats.writes.push(JSON.parse(payload.json))})};
   vm.createContext(ctx);
   vm.runInContext(html.slice(html.indexOf('let FB_USER=null;'),html.indexOf('// ===チーム共有')),ctx);
-  vm.runInContext("FB_USER={uid:'test-account'};backupLocalState=()=>{};fbSetupRealtimeSync();",ctx);
+  vm.runInContext("FB_USER={uid:'test-account'};fbSetupRealtimeSync();",ctx);
   const snapshot=(state,ts=200,fromCache=false,pending=false)=>stats.listeners.at(-1)({exists:true,metadata:{fromCache,hasPendingWrites:pending},data:()=>({json:JSON.stringify(state),ts:{toMillis:()=>ts}})});
   return {ctx,stats,storage,timers,events,snapshot,run:s=>vm.runInContext(s,ctx)};
 }
@@ -71,6 +73,64 @@ test('cache-first then identical server metadata confirms without a reconnect lo
 test('future local clock and sub-two-second updates cannot suppress cloud data',()=>{
   const h=harness();h.ctx.S._savedAt=9999999999999;h.snapshot(base,200);
   const remote=copy(base);remote.chores[0].time='18:30';h.snapshot(remote,201);assert.equal(h.ctx.S.chores[0].time,'18:30');
+});
+test('stale first connection is backed up and never echoed into cloud',async()=>{
+  const h=harness();h.ctx.S.tasks.push({id:'stale',title:'old task'});h.ctx.S.habits.push({id:'stale-habit'});
+  h.run("_loadPersonalSyncBaseline('test-account')");
+  h.snapshot(base);
+  assert.equal(Sync.signature(h.ctx.S),Sync.signature(base));
+  const backups=[...h.storage].filter(([k])=>k.startsWith('ef_sync_backup_'));
+  assert.equal(backups.length,1);const saved=JSON.parse(backups[0][1]);
+  assert.equal(saved._backupReason,'before-first-cloud-apply-v3');
+  assert.ok(saved.tasks.some(t=>t.id==='stale'));assert.equal(saved.habits[0].id,'stale-habit');
+  await h.run('_flushFirebaseSave()');assert.equal(h.stats.writes.length,0);
+});
+test('new edits during first server wait survive but unchanged stale items do not',async()=>{
+  const h=harness();h.ctx.S.tasks.push({id:'stale'});h.run("_loadPersonalSyncBaseline('test-account')");
+  h.ctx.S.tasks.push({id:'new',title:'just added'});h.ctx.S.tasks[0].title='new edit';
+  const cloud=copy(base);cloud.tasks[0].done=true;h.snapshot(cloud);
+  assert.deepEqual(h.ctx.S.tasks.map(t=>t.id),['t1','new']);
+  assert.equal(h.ctx.S.tasks[0].title,'new edit');assert.equal(h.ctx.S.tasks[0].done,true);
+  h.stats.server=cloud;await h.run('_flushFirebaseSave()');
+  assert.equal(h.stats.writes.length,1);assert.ok(!h.stats.writes[0].tasks.some(t=>t.id==='stale'));
+});
+test('first connection requires a fresh backup even with three existing backups',()=>{
+  const h=harness();h.run("syncBackupKeys=()=>['ef_sync_backup_test-account_v3_1','ef_sync_backup_old_2','ef_sync_backup_old_3']");
+  h.ctx.S.tasks.push({id:'stale'});h.run("_loadPersonalSyncBaseline('test-account')");h.snapshot(base);
+  const saved=[...h.storage].filter(([k])=>k.startsWith('ef_sync_backup_'));
+  assert.equal(saved.length,1);assert.ok(JSON.parse(saved[0][1]).tasks.some(t=>t.id==='stale'));
+});
+test('old phone snapshot respects cloud task deletion on initial connection and restart',async()=>{
+  const h=harness(),cloud=copy(base);cloud.tasks[0].deleted=true;cloud.tasks[0].updatedAt=200;
+  h.snapshot(cloud);assert.equal(h.ctx.S.tasks[0].deleted,true);
+  h.run("_loadPersonalSyncBaseline('test-account')");h.snapshot(cloud,201);h.stats.server=cloud;
+  await h.run('_flushFirebaseSave()');assert.equal(h.ctx.S.tasks[0].deleted,true);assert.equal(h.stats.writes.length,0);
+});
+test('invalid or other-account persisted baseline cannot bypass first-sync safeguards',()=>{
+  for(const state of [null,[],{_uid:'other-account',tasks:[]}]){
+    const h=harness();h.storage.set('ef_personal_sync_base_test-account',JSON.stringify({uid:'test-account',state}));
+    h.ctx.S.tasks.push({id:'stale'});h.run("_loadPersonalSyncBaseline('test-account')");h.snapshot(base);
+    assert.ok(!h.ctx.S.tasks.some(t=>t.id==='stale'));
+    assert.ok([...h.storage.keys()].some(k=>k.startsWith('ef_sync_backup_')));
+  }
+});
+test('backup failure blocks local replacement, baseline acknowledgement, and cloud writes',async()=>{
+  const h=harness();h.ctx.S.tasks.push({id:'stale'});h.run("_loadPersonalSyncBaseline('test-account')");
+  const before=JSON.stringify(h.ctx.S);h.ctx.localStorage.setItem=()=>{throw Error('quota');};h.snapshot(base);
+  assert.equal(JSON.stringify(h.ctx.S),before);assert.equal(h.run('_personalSyncBase'),null);
+  assert.equal(h.run('_personalServerReady'),false);assert.equal(h.run('PERSONAL_SYNC_STATE'),'error');
+  await h.run('_flushFirebaseSave()');assert.equal(h.stats.writes.length,0);
+});
+test('backup readback failure also fails closed',()=>{
+  const h=harness();h.ctx.S.tasks.push({id:'stale'});h.run("_loadPersonalSyncBaseline('test-account')");
+  h.ctx.localStorage.setItem=()=>{};h.snapshot(base);
+  assert.ok(h.ctx.S.tasks.some(t=>t.id==='stale'));assert.equal(h.run('_personalServerReady'),false);
+});
+test('missing server document still seeds genuine first-time local work',async()=>{
+  const h=harness();h.ctx.S.tasks.push({id:'new-account-task'});
+  h.stats.listeners.at(-1)({exists:false,metadata:{fromCache:false,hasPendingWrites:false},data:()=>undefined});
+  h.stats.server={};await h.run('_flushFirebaseSave()');
+  assert.ok(h.stats.writes[0].tasks.some(t=>t.id==='new-account-task'));
 });
 test('server metadata-only acknowledgement does not repeatedly render or write',()=>{
   const h=harness();h.snapshot(base);const count=h.stats.renders;h.snapshot({...base,_savedAt:333},201);h.snapshot({...base,_savedAt:333},201);

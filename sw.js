@@ -1,7 +1,7 @@
-// EditFlow Service Worker v20261001-03
-const CACHE = 'editflow-20261001-03';
+// EditFlow Service Worker v20261001-04
+const CACHE = 'editflow-20261001-04';
 const APP_SHELL_URL = new URL('./editflow.html', self.registration.scope).href;
-const URLS = ['./', './editflow.html', './ai-bridge-client.js', './personal-sync.js?v=20261001-02', './day-plan.js?v=20261001-03'];
+const URLS = ['./', './editflow.html', './ai-bridge-client.js', './personal-sync.js?v=20261001-04', './day-plan.js?v=20261001-03'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(URLS)).then(() => self.skipWaiting()));
 });

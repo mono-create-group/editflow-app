@@ -1147,7 +1147,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="./ai-bridge-client.js"></script>
-<script src="./personal-sync.js?v=20261001-02"></script>
+<script src="./personal-sync.js?v=20261001-04"></script>
 <script src="./day-plan.js?v=20261001-03"></script>
 <script>/* lz-string 1.5.0 (MIT) — CDN非依存でオフライン/圧縮チーム同期を保証するためインライン化 */
 var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",n="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",e={};function t(r,o){if(!e[r]){e[r]={};for(var n=0;n<r.length;n++)e[r][r.charAt(n)]=n}return e[r][o]}var i={compressToBase64:function(r){if(null==r)return"";var n=i._compress(r,6,function(r){return o.charAt(r)});switch(n.length%4){default:case 0:return n;case 1:return n+"===";case 2:return n+"==";case 3:return n+"="}},decompressFromBase64:function(r){return null==r?"":""==r?null:i._decompress(r.length,32,function(n){return t(o,r.charAt(n))})},compressToUTF16:function(o){return null==o?"":i._compress(o,15,function(o){return r(o+32)})+" "},decompressFromUTF16:function(r){return null==r?"":""==r?null:i._decompress(r.length,16384,function(o){return r.charCodeAt(o)-32})},compressToUint8Array:function(r){for(var o=i.compress(r),n=new Uint8Array(2*o.length),e=0,t=o.length;e<t;e++){var s=o.charCodeAt(e);n[2*e]=s>>>8,n[2*e+1]=s%256}return n},decompressFromUint8Array:function(o){if(null==o)return i.decompress(o);for(var n=new Array(o.length/2),e=0,t=n.length;e<t;e++)n[e]=256*o[2*e]+o[2*e+1];var s=[];return n.forEach(function(o){s.push(r(o))}),i.decompress(s.join(""))},compressToEncodedURIComponent:function(r){return null==r?"":i._compress(r,6,function(r){return n.charAt(r)})},decompressFromEncodedURIComponent:function(r){return null==r?"":""==r?null:(r=r.replace(/ /g,"+"),i._decompress(r.length,32,function(o){return t(n,r.charAt(o))}))},compress:function(o){return i._compress(o,16,function(o){return r(o)})},_compress:function(r,o,n){if(null==r)return"";var e,t,i,s={},u={},a="",p="",c="",l=2,f=3,h=2,d=[],m=0,v=0;for(i=0;i<r.length;i+=1)if(a=r.charAt(i),Object.prototype.hasOwnProperty.call(s,a)||(s[a]=f++,u[a]=!0),p=c+a,Object.prototype.hasOwnProperty.call(s,p))c=p;else{if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++),s[p]=f++,c=String(a)}if(""!==c){if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++)}for(t=2,e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;for(;;){if(m<<=1,v==o-1){d.push(n(m));break}v++}return d.join("")},decompress:function(r){return null==r?"":""==r?null:i._decompress(r.length,32768,function(o){return r.charCodeAt(o)})},_decompress:function(o,n,e){var t,i,s,u,a,p,c,l=[],f=4,h=4,d=3,m="",v=[],g={val:e(0),position:n,index:1};for(t=0;t<3;t+=1)l[t]=t;for(s=0,a=Math.pow(2,2),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 2:return""}for(l[3]=c,i=c,v.push(c);;){if(g.index>o)return"";for(s=0,a=Math.pow(2,d),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(c=s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 2:return v.join("")}if(0==f&&(f=Math.pow(2,d),d++),l[c])m=l[c];else{if(c!==h)return null;m=i+i.charAt(0)}v.push(m),l[h++]=i+m.charAt(0),i=m,0==--f&&(f=Math.pow(2,d),d++)}}};return i}();"function"==typeof define&&define.amd?define(function(){return LZString}):"undefined"!=typeof module&&null!=module?module.exports=LZString:"undefined"!=typeof angular&&null!=angular&&angular.module("LZString",[]).factory("LZString",function(){return LZString});
@@ -1244,6 +1244,7 @@ let _fbSaveInFlight=false;
 let _fbSaveQueued=false;
 let _lastPersonalSyncSignature='';
 let _personalSyncBase=null;
+let _personalBootstrapStart=null;
 let _personalServerReady=false;
 let _lastPersonalServerTs=0;
 let _lastPersonalConfirmedAt=0;
@@ -1271,10 +1272,11 @@ _authSettleTimer=setTimeout(_openInLocalModeAfterAuthWait,8000);
 function _personalSyncSignature(value){return EditFlowSync.signature(value);}
 function _loadPersonalSyncBaseline(uid){
   _personalSyncBase=null;_lastPersonalSyncSignature='';_personalServerReady=false;_lastPersonalServerTs=0;_lastPersonalConfirmedAt=0;
-  try{const raw=localStorage.getItem('ef_personal_sync_base_'+uid);if(raw){const parsed=decodeSyncBackup(raw);if(parsed&&parsed.uid===uid){_personalSyncBase=parsed.state;_lastPersonalSyncSignature=_personalSyncSignature(parsed.state);}}}catch(e){console.warn('sync baseline unavailable',e?.name);}
+  _personalBootstrapStart=(!S._uid||S._uid===uid)?_decodePersonalState(_packState()):null;
+  try{const raw=localStorage.getItem('ef_personal_sync_base_'+uid);if(raw){const parsed=decodeSyncBackup(raw);if(parsed&&parsed.uid===uid&&parsed.state&&typeof parsed.state==='object'&&!Array.isArray(parsed.state)&&(!parsed.state._uid||parsed.state._uid===uid)){_personalSyncBase=parsed.state;_lastPersonalSyncSignature=_personalSyncSignature(parsed.state);}}}catch(e){console.warn('sync baseline unavailable',e?.name);}
 }
 function _setPersonalRemoteBaseline(raw){
-  _personalSyncBase=_decodePersonalState(raw);_lastPersonalSyncSignature=_personalSyncSignature(_personalSyncBase);
+  _personalSyncBase=_decodePersonalState(raw);_personalBootstrapStart=null;_lastPersonalSyncSignature=_personalSyncSignature(_personalSyncBase);
   if(window.AIBridge)_personalTaskBaseline=AIBridge.taskBaseline(_personalSyncBase.tasks||[]);
   if(!FB_USER)return;
   try{const json=JSON.stringify({uid:FB_USER.uid,state:_personalSyncBase});localStorage.setItem('ef_personal_sync_base_'+FB_USER.uid,window.LZString?'LZ1:'+LZString.compressToUTF16(json):json);}catch(e){console.warn('sync baseline persistence failed',e?.name);}
@@ -1426,7 +1428,7 @@ function _consumePersonalSnapshot(raw,cloudTs){
   if(_isCloudSyncEditing()){_queueCloudSync(raw,cloudTs,false);_setPersonalSyncState('checking');return;}
   const before=_personalSyncSignature(_decodePersonalState(_packState())),remoteSignature=_personalSyncSignature(_decodeCloudPersonalState(raw));
   const draft=captureUnsavedFormDraft();
-  if(before!==remoteSignature)_applyCloudData(raw);
+  if(before!==remoteSignature&&_applyCloudData(raw)===false)return;
   _setPersonalRemoteBaseline(raw);_lastPersonalServerTs=Math.max(_lastPersonalServerTs,cloudTs||0);_lastPersonalConfirmedAt=Date.now();
   _markFirestoreConfirmed();
   const after=_personalSyncSignature(_decodePersonalState(_packState()));
@@ -1437,8 +1439,16 @@ document.addEventListener('compositionstart',()=>{_imeComposing=true;},{capture:
 document.addEventListener('compositionend',()=>{_imeComposing=false;setTimeout(_flushQueuedCloudSync,0);},{capture:true});
 document.addEventListener('blur',e=>{if(_isEditableTextElement(e.target))setTimeout(_flushQueuedCloudSync,0);},{capture:true});
 function syncBackupKeys(){try{return Object.keys(localStorage).filter(k=>k.startsWith('ef_sync_backup_')||k.startsWith('ef_v5_backup_')).sort((a,b)=>(Number(b.match(/(\d+)$/)?.[1])||0)-(Number(a.match(/(\d+)$/)?.[1])||0));}catch(_){return[];}}
-function backupLocalState(reason='cloud-sync'){
-  try{const existing=syncBackupKeys(),migrationPrefix=`ef_sync_backup_${S._uid||'local'}_v2_`,migrationNeeded=_personalSyncBase===null&&!existing.some(k=>k.startsWith(migrationPrefix));if(existing.length>=3&&!migrationNeeded)return existing[0];const key=migrationNeeded?migrationPrefix+Date.now():`ef_sync_backup_${S._uid||'local'}_${Date.now()}`,personal={..._decodePersonalState(_packState()),_backupReason:reason,_backupAt:Date.now()},json=JSON.stringify(personal),stored=window.LZString?'LZ1:'+LZString.compressToUTF16(json):json;localStorage.setItem(key,stored);return key;}catch(e){console.warn('sync backup skipped',e&&e.name||e);return null;}
+function backupLocalState(reason='cloud-sync',force=false){
+  try{
+    const existing=syncBackupKeys(),prefix=`ef_sync_backup_${S._uid||'local'}_v3_`,migrationNeeded=_personalSyncBase===null&&!existing.some(k=>k.startsWith(prefix));
+    if(!force&&existing.length>=3&&!migrationNeeded)return existing[0];
+    let at=Date.now(),key=prefix+at;while(localStorage.getItem(key)!==null)key=prefix+(++at);
+    const personal={..._decodePersonalState(_packState()),_backupReason:reason,_backupAt:Date.now()},json=JSON.stringify(personal),stored=window.LZString?'LZ1:'+LZString.compressToUTF16(json):json;
+    localStorage.setItem(key,stored);
+    if(localStorage.getItem(key)!==stored)throw Error('backup verification failed');
+    return key;
+  }catch(e){console.warn('sync backup skipped',e&&e.name||e);return null;}
 }
 function decodeSyncBackup(raw){if(typeof raw!=='string'||!raw)return null;if(raw.slice(0,4)==='LZ1:'){if(!window.LZString)return null;const json=LZString.decompressFromUTF16(raw.slice(4));return json?JSON.parse(json):null;}return JSON.parse(raw);}
 function mergeRecordArrays(local,remote){
@@ -1500,12 +1510,22 @@ function _applyCloudData(json){
     json=LZString.decompressFromBase64(json.slice(3));
     if(json==null)return;
   }
-  const cloud=_decodeCloudPersonalState(json);backupLocalState('before-cloud-apply');
+  const cloud=_decodeCloudPersonalState(json),firstConnection=_personalSyncBase===null;
+  const backup=backupLocalState(firstConnection?'before-first-cloud-apply-v3':'before-cloud-apply',firstConnection);
+  if(firstConnection&&!backup){
+    // Fail closed: neither overwrite this device nor upload its stale records.
+    _personalServerReady=false;_lastFirestoreErrorCode='local-backup-failed';_setPersonalSyncState('error');
+    toast('同期前の端末データを保存できないため、同期を停止しました。データは削除せず、バックアップを確保してください','warn');
+    return false;
+  }
   const def=defState();
-  const localState=S;
+  const localState=_decodePersonalState(_packState());
   // チームデータは shared/team が唯一の真実。個人docで上書きせず現在のメモリ内容を保持する。
   const keepTeam={};TEAM_KEYS.forEach(k=>keepTeam[k]=S[k]);const keepBiz=S.bizBoard;
-  S=migrate(Object.assign(def,EditFlowSync.merge(_personalSyncBase,localState,cloud)));
+  // Only changes made in this session after startup are unambiguously new.
+  // Older device-only records remain in the backup, not in the shared document.
+  const mergeBase=firstConnection?_personalBootstrapStart:_personalSyncBase;
+  S=migrate(Object.assign(def,EditFlowSync.merge(mergeBase,localState,cloud)));
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
   ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','chores','choreRoutines','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
@@ -1517,6 +1537,7 @@ function _applyCloudData(json){
   if(!S.editCounter.days||typeof S.editCounter.days!=='object')S.editCounter.days={};
   if(FB_USER)S._uid=FB_USER.uid;
   localStorage.setItem(DB,JSON.stringify(S));
+  if(firstConnection)toast('同期前の端末データをバックアップし、クラウドを基準に同期しました','info');
 }
 
 function fbSetupRealtimeSync(){
@@ -1542,6 +1563,7 @@ function fbSetupRealtimeSync(){
   }
   // FB_USER確定後に理想スケジュール移行を再評価（会長アカウントはこの時点でfsが確定・クラウドへも同期される）
   S=migrate(S);
+  if(_personalSyncBase===null&&_personalBootstrapStart===null)_personalBootstrapStart=_decodePersonalState(_packState());
   const uid=FB_USER.uid;
   _fbUnsubscribe=fbDb.collection('users').doc(uid).onSnapshot({includeMetadataChanges:true},doc=>{
     if(FB_USER?.uid!==uid)return;
@@ -10278,7 +10300,7 @@ ${secTitle('アプリのアップデート')}
 
 ${secTitle('同期バックアップ')}
 <div class="card" style="margin-bottom:16px">
-  <div style="font-size:13px;color:var(--t2);margin-bottom:10px">他のデバイスから同期する直前の状態を自動保存します。端末側とクラウド側の記録は差分統合され、一方を丸ごと消しません。</div>
+  <div style="font-size:13px;color:var(--t2);margin-bottom:10px">初回同期では、この端末の記録をバックアップしてからクラウドを基準に表示します。端末だけに残る古い記録は自動追加しません。バックアップを保存できない場合は同期を停止します。復元すると古いタスクも戻るため、実行前に確認してください。</div>
   <div style="font-size:12px;color:var(--t3);margin-bottom:10px">この端末の復元候補: ${syncBackupKeys().length}件</div>
   <button class="btn btn-g btn-sm" onclick="restoreLatestSyncBackup()">最新の同期前バックアップを復元</button>
 </div>
@@ -13666,7 +13688,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20261001-03';
+const APP_VERSION='20261001-04';
 
 render();
 renderSyncGate();
@@ -13679,7 +13701,7 @@ renderSyncGate();
 
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/editflow-app/sw.js?v=20261001-03',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('/editflow-app/sw.js?v=20261001-04',{updateViaCache:'none'}).then(reg=>{
     reg.update();
   }).catch(e=>console.warn('SW:',e));
 }

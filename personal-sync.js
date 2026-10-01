@@ -44,20 +44,9 @@
     return clone(local);
   }
   function bootstrap(local,remote){
-    // Before the first acknowledged baseline, do not let a stale device replace
-    // an existing cloud value. Retain local-only records/fields and a UI backup.
-    if(remote===undefined)return clone(local);
-    if(object(local)&&object(remote)){
-      const out=clone(remote);
-      Object.keys(local).forEach(k=>{if(!['__proto__','constructor','prototype'].includes(k))out[k]=bootstrap(local[k],remote[k]);});
-      return out;
-    }
-    if(keyed(local)&&keyed(remote)){
-      const rm=new Map(remote.map(x=>[key(x),x]));
-      const out=remote.map(x=>clone(x));
-      local.forEach(x=>{if(!rm.has(key(x)))out.push(clone(x));});
-      return out;
-    }
+    // Without an acknowledged baseline, local-only records might be old cloud
+    // deletions, not new work. The caller must durably back up local data first.
+    // A missing cloud document is seeded separately, using an empty baseline.
     return clone(remote);
   }
   function signature(state){const copy={...(state||{})};delete copy._savedAt;return stable(copy);}
