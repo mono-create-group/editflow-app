@@ -9324,16 +9324,28 @@ function memoToTask(id){
 let FTV='overview'; // fitness tab view
 let FIT_DATE=today();
 let WORKOUT_DATE=today();
+function fitnessCustomPages(){return(S.customPages||[]).filter(p=>!p.deleted&&p.parentView==='fitness');}
+function isFitnessCustomNav(id){return fitnessCustomPages().some(p=>id===`cp_${p.id}`);}
+function openCustomPage(id){
+  const page=(S.customPages||[]).find(p=>p.id===id);if(!page)return;
+  if(page.parentView==='fitness'){V='fitness';FTV=`cp_${id}`;}else V=`cp_${id}`;
+  CP_EDIT_MODE=false;closeModal();render();
+}
+function customPageLocationField(page){
+  return`<label class="fg" style="max-width:180px"><span class="fl">表示場所</span><select id="cpe-parent" aria-label="ページの表示場所" onchange="updPageMeta('${page.id}')"><option value="" ${page.parentView!=='fitness'?'selected':''}>サイドメニュー</option><option value="fitness" ${page.parentView==='fitness'?'selected':''}>フィットネス内</option></select></label>`;
+}
 function rFitness(){
   const td=today();
-  const tabs=[['overview','📊 概要'],['training','🏋️ 筋トレ'],['meal','🥗 食事'],['goals','🎯 目標']];
+  const pages=fitnessCustomPages();
+  const tabs=[['overview','📊 概要'],['training','🏋️ 筋トレ'],...pages.map(p=>[`cp_${p.id}`,p.title]),['meal','🥗 食事'],['goals','🎯 目標']];
+  const selectedPage=pages.find(p=>FTV===`cp_${p.id}`);
   return`<div class="ph">
   <div class="ph-title">フィットネス</div>
   <div style="display:flex;gap:7px;flex-wrap:wrap">
-    ${tabs.map(([k,l])=>`<button class="btn btn-g btn-sm ${FTV===k?'btn-p':''}" onclick="FTV='${k}';render()">${l}</button>`).join('')}
+    ${tabs.map(([k,l])=>`<button class="btn btn-g btn-sm ${FTV===k?'btn-p':''}" onclick="FTV='${k}';CP_EDIT_MODE=false;render()">${esc(l)}</button>`).join('')}
   </div>
 </div>
-${{overview:rFitnessOverview,training:rFitnessTraining,meal:rFitnessMeal,goals:rFitnessGoals}[FTV]?.()??rFitnessOverview()}`;
+${selectedPage?rCustomPage(selectedPage):({overview:rFitnessOverview,training:rFitnessTraining,meal:rFitnessMeal,goals:rFitnessGoals}[FTV]?.()??rFitnessOverview())}`;
 }
 
 function rFitnessOverview(){
@@ -12281,7 +12293,7 @@ let _navRenderSignature='';
 function renderNav(){
   const cfg=getNavCfg();
   const el=document.getElementById('nav-items');if(!el)return;
-  const visible=cfg.filter(c=>!c.hidden);
+  const visible=cfg.filter(c=>!c.hidden&&!isFitnessCustomNav(c.id));
   const navItemHTML=(c,draggable=false)=>{
     const{label,icon}=navMeta(c.id);
     const idx=cfg.indexOf(c);
@@ -12488,18 +12500,27 @@ function editCustomPage(id){
 <div class="frow" style="margin-bottom:10px">
   <div class="fg"><div class="fl">タイトル</div><input id="cpe-ttl" value="${esc(page.title)}" oninput="updPageMeta('${id}')"></div>
   <div class="fg" style="max-width:150px"><div class="fl">アイコン</div><select id="cpe-icon" onchange="updPageMeta('${id}')">${CP_ICONS.map(ic=>`<option value="${ic}" ${(page.icon||'i-doc')===ic?'selected':''}>${ic.slice(2)}</option>`).join('')}</select></div>
+  ${customPageLocationField(page)}
 </div>
 <div id="cpe-blocks">${(page.blocks||[]).map((b,i)=>rBlockEd(b,i,id,page.blocks.length)).join('')}</div>
 <div class="block-add-row">${BLOCK_TYPES.map(bt=>`<button class="btn btn-g btn-sm" onclick="addBlock('${id}','${bt.t}')">${bt.l}</button>`).join('')}</div>
 <div class="mfooter">
   <button class="btn btn-g" onclick="closeModal()">閉じる</button>
-  <button class="btn btn-p" onclick="V='cp_${id}';closeModal();render()">ページを開く →</button>
+  <button class="btn btn-p" onclick="openCustomPage('${id}')">ページを開く →</button>
 </div>`);
 }
 function updPageMeta(id){
   const page=(S.customPages||[]).find(p=>p.id===id);if(!page)return;
   const t=document.getElementById('cpe-ttl')?.value.trim();const ic=document.getElementById('cpe-icon')?.value.trim();
-  if(t)page.title=t;if(ic)page.icon=ic;save();
+  if(t)page.title=t;if(ic)page.icon=ic;
+  const parent=document.getElementById('cpe-parent')?.value;
+  const moved=parent!==undefined&&parent!==(page.parentView||'');
+  if(moved)page.parentView=parent==='fitness'?'fitness':'';
+  save();
+  if(moved){
+    if(page.parentView==='fitness'){V='fitness';FTV=`cp_${id}`;}else V=`cp_${id}`;
+    closeModal();render();toast(page.parentView==='fitness'?'フィットネス内へ移動しました':'サイドメニューへ移動しました');
+  }
 }
 function rBlockEd(b,i,pid,total){
   const typeLbl={
@@ -12626,6 +12647,7 @@ function rCustomPage(page){
     <select id="cpe-icon" style="width:118px;padding:4px;flex-shrink:0" onchange="updPageMeta('${pid}')">${CP_ICONS.map(ic=>`<option value="${ic}" ${(page.icon||'i-doc')===ic?'selected':''}>${ic.slice(2)}</option>`).join('')}</select>
     <input id="cpe-ttl" value="${esc(page.title)}" style="font-size:17px;font-weight:700;flex:1;padding:4px 8px" oninput="updPageMeta('${pid}')">
   </div>
+  ${customPageLocationField(page)}
   <button class="btn btn-p btn-sm" onclick="CP_EDIT_MODE=false;render()">✓ 完了</button>
 </div>
 ${blocks.map((b,i)=>rBlockEd(b,i,pid,blocks.length)).join('')}
@@ -13747,7 +13769,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20261001-06';
+const APP_VERSION='20261001-07';
 
 render();
 renderSyncGate();
@@ -13760,7 +13782,7 @@ renderSyncGate();
 
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/editflow-app/sw.js?v=20261001-06',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('/editflow-app/sw.js?v=20261001-07',{updateViaCache:'none'}).then(reg=>{
     reg.update();
   }).catch(e=>console.warn('SW:',e));
 }
