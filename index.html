@@ -5767,7 +5767,13 @@ function fsTlColClick(e,date){
 // 指定日に予定されている習慣を返す
 function habitsForDate(date){
   const dow=new Date(date+'T00:00:00').getDay(); // 0=日, 1=月...
-  return S.habits.filter(h=>!h.deleted&&(!h.daysOfWeek?.length||h.daysOfWeek.includes(dow)));
+  return S.habits.filter(h=>{
+    if(h.deleted||(h.daysOfWeek?.length&&!h.daysOfWeek.includes(dow)))return false;
+    // 新しい習慣を作成日前の未記録として要求しない。既存の実績は保持する。
+    const created=h.createdAt?new Date(h.createdAt):null;
+    const startsOn=created&&!Number.isNaN(created.getTime())?created.toLocalYmd():'';
+    return !startsOn||date>=startsOn||(h.completedDates||[]).includes(date)||(h.failedDates||[]).includes(date);
+  });
 }
 // 習慣をタスクビュー内で表示するアイテム（interactive=trueで今日チェック可）
 function rHabitInTaskView(h,date,interactive){
@@ -13741,7 +13747,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20261001-05';
+const APP_VERSION='20261001-06';
 
 render();
 renderSyncGate();
@@ -13754,7 +13760,7 @@ renderSyncGate();
 
 // ===SERVICE WORKER===
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/editflow-app/sw.js?v=20261001-05',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('/editflow-app/sw.js?v=20261001-06',{updateViaCache:'none'}).then(reg=>{
     reg.update();
   }).catch(e=>console.warn('SW:',e));
 }
