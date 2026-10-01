@@ -4,6 +4,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 const Sync=require('../personal-sync.js');
+const Traffic=require('../sync-traffic-guard.js');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const copy=Sync.clone;
 const base={_uid:'test-account',_savedAt:100,tasks:[{id:'t1',title:'fixture',done:false}],chores:[{id:'c1',time:'18:00',completedDates:[]}],fsSchedules:[{id:'weekday',blocks:[{id:'b1',t:'old'}]}],fsChecked:{day:{b1:false}},settings:{identity:'old'},finance:{incomes:[{id:'i1',amount:10}]},abstinence:{records:{day:{kept:false}}}};
@@ -46,20 +47,20 @@ test('merge is pure and idempotent',()=>{
 });
 
 function harness(){
-  const storage=new Map(),timers=new Map(),events={},stats={writes:[],renders:0,enables:0,listeners:[]};let counter=0;
+  const storage=new Map(),timers=new Map(),events={},stats={writes:[],renders:0,enables:0,disables:0,transactions:0,listeners:[]};let counter=0;
   const doc={visibilityState:'visible',activeElement:null,addEventListener:(k,v)=>events[k]=v,getElementById:()=>null};
-  const ctx={console,EditFlowSync:Sync,window:{},document:doc,Date,Intl,JSON,Map,Set,Promise,
+  const ctx={console,EditFlowSync:Sync,EditFlowTraffic:Traffic,window:{},document:doc,Date,Intl,JSON,Map,Set,Promise,
     localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
     sessionStorage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}},
     setTimeout:fn=>{const id=++counter;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id),
-    S:copy(base),DB:'fixture-db',V:'today',TEAM_KEYS:[],TEAM_SHARE_OK:false,
+    S:copy(base),DB:'fixture-db',V:'today',TEAM_KEYS:[],TEAM_SHARE_OK:false,_teamUnsub:null,_teamServerReady:false,
     migrate:s=>s,defState:()=>({tasks:[],chores:[],settings:{},abstinence:{records:{}}}),
     render:()=>stats.renders++,renderAuthUI:()=>{},renderSyncGate:()=>{},toast:()=>{},
     _stampTeamChanges:()=>{},_teamSave:async()=>{},fbSetupTeamSync:()=>{},
     firebase:{firestore:{FieldValue:{serverTimestamp:()=>({server:true})}}},
   };
   ctx.window.addEventListener=(k,v)=>events[k]=v;
-  ctx.fbDb={enableNetwork:async()=>{stats.enables++;},collection:()=>({doc:()=>({onSnapshot:(options,fn)=>{stats.options=options;stats.listeners.push(fn);return()=>{};}})}),runTransaction:async fn=>fn({get:async()=>({exists:true,data:()=>({json:JSON.stringify(stats.server||base)})}),set:(_ref,payload)=>stats.writes.push(JSON.parse(payload.json))})};
+  ctx.fbDb={enableNetwork:async()=>{stats.enables++;},disableNetwork:async()=>{stats.disables++;},collection:()=>({doc:()=>({onSnapshot:(options,fn,onError)=>{stats.options=options;stats.listeners.push(fn);stats.onError=onError;return()=>{};}})}),runTransaction:async(fn,options)=>{stats.transactions++;stats.transactionOptions=options;return fn({get:async()=>({exists:true,data:()=>({json:JSON.stringify(stats.server||base)})}),set:(_ref,payload)=>stats.writes.push(JSON.parse(payload.json))});}};
   vm.createContext(ctx);
   vm.runInContext(html.slice(html.indexOf('let FB_USER=null;'),html.indexOf('// ===チーム共有')),ctx);
   vm.runInContext("FB_USER={uid:'test-account'};fbSetupRealtimeSync();",ctx);
@@ -116,14 +117,14 @@ test('invalid or other-account persisted baseline cannot bypass first-sync safeg
 });
 test('backup failure blocks local replacement, baseline acknowledgement, and cloud writes',async()=>{
   const h=harness();h.ctx.S.tasks.push({id:'stale'});h.run("_loadPersonalSyncBaseline('test-account')");
-  const before=JSON.stringify(h.ctx.S);h.ctx.localStorage.setItem=()=>{throw Error('quota');};h.snapshot(base);
+  const before=JSON.stringify(h.ctx.S),originalSet=h.ctx.localStorage.setItem;h.ctx.localStorage.setItem=(k,v)=>{if(k.startsWith('ef_sync_backup_'))throw Error('quota');originalSet(k,v);};h.snapshot(base);
   assert.equal(JSON.stringify(h.ctx.S),before);assert.equal(h.run('_personalSyncBase'),null);
   assert.equal(h.run('_personalServerReady'),false);assert.equal(h.run('PERSONAL_SYNC_STATE'),'error');
   await h.run('_flushFirebaseSave()');assert.equal(h.stats.writes.length,0);
 });
 test('backup readback failure also fails closed',()=>{
   const h=harness();h.ctx.S.tasks.push({id:'stale'});h.run("_loadPersonalSyncBaseline('test-account')");
-  h.ctx.localStorage.setItem=()=>{};h.snapshot(base);
+  const originalSet=h.ctx.localStorage.setItem;h.ctx.localStorage.setItem=(k,v)=>{if(!k.startsWith('ef_sync_backup_'))originalSet(k,v);};h.snapshot(base);
   assert.ok(h.ctx.S.tasks.some(t=>t.id==='stale'));assert.equal(h.run('_personalServerReady'),false);
 });
 test('missing server document still seeds genuine first-time local work',async()=>{
@@ -153,7 +154,7 @@ test('baseline restores unsent edits after restarting the app',()=>{
   assert.equal(h.ctx.S.settings.identity,'offline edit');assert.equal(h.ctx.S.chores[0].time,'18:30');
 });
 test('background save persists locally and foreground resumes, with throttling',()=>{
-  const h=harness();h.events.pagehide();assert.ok(h.storage.has('fixture-db'));h.events.pageshow();h.events.focus();assert.equal(h.stats.enables,1);
+  const h=harness();h.events.pagehide();assert.ok(h.storage.has('fixture-db'));h.events.pageshow();h.events.focus();assert.equal(h.stats.enables,0);
 });
 test('malformed server data fails closed without modifying local state',()=>{
   const h=harness();const before=JSON.stringify(h.ctx.S);h.stats.listeners.at(-1)({exists:true,metadata:{},data:()=>({json:'invalid',ts:{toMillis:()=>200}})});
@@ -195,4 +196,64 @@ test('concurrent habit outcomes remain mutually exclusive',()=>{
   const b={habits:[{id:'h',completedDates:[],failedDates:[]}]},l=copy(b),r=copy(b);
   l.habits[0].failedDates=['day'];r.habits[0].completedDates=['day'];
   const h=Sync.merge(b,l,r).habits[0];assert.deepEqual(h.completedDates,[]);assert.deepEqual(h.failedDates,['day']);
+});
+test('repeated foreground and setup events reuse healthy listeners',async()=>{
+  const h=harness();h.snapshot(base);for(let i=0;i<100;i++)h.run('fbSetupRealtimeSync()');
+  for(let i=0;i<10;i++)await h.run('retryFirestoreSync(true)');
+  assert.equal(h.stats.listeners.length,1);assert.equal(h.stats.enables,0);
+});
+test('cache-only snapshots leave reconnect to the SDK instead of a polling loop',()=>{
+  const h=harness();h.snapshot(base,200,true);assert.equal(h.run('_firestoreReconnectTimer'),null);
+});
+test('a failed listener can be replaced without accumulating subscriptions',async()=>{
+  const h=harness();h.stats.onError({code:'unavailable'});assert.equal(h.run('_fbUnsubscribe'),null);
+  await h.run('retryFirestoreSync(true)');assert.equal(h.stats.listeners.length,2);assert.equal(h.stats.enables,1);
+});
+test('unchanged pending save cannot repeat transactions or bump task timestamps',async()=>{
+  const h=harness();h.snapshot(base);let stamps=0;
+  h.ctx.AIBridge=h.ctx.window.AIBridge={stampChangedTasks:tasks=>{stamps++;tasks[0].updatedAt=stamps;}};
+  h.ctx.S.tasks[0].title='edit';await h.run('_flushFirebaseSave()');await h.run('_flushFirebaseSave()');
+  assert.equal(h.stats.transactions,1);assert.equal(stamps,1);assert.equal(h.stats.transactionOptions.maxAttempts,2);
+});
+test('new edits after a sent write still save while acknowledgement is pending',async()=>{
+  const h=harness();h.snapshot(base);h.ctx.S.tasks[0].title='first';await h.run('_flushFirebaseSave()');
+  h.ctx.S.tasks[0].title='second';await h.run('_flushFirebaseSave()');assert.equal(h.stats.writes.length,2);assert.equal(h.stats.writes[1].tasks[0].title,'second');
+});
+test('quota stop disables SDK network, persists edits and shares the stop with other tabs',async()=>{
+  const h=harness();h.snapshot(base);h.ctx.S.tasks[0].title='unsent';h.run("_handleFirestoreError({code:'resource-exhausted'},'test')");
+  assert.equal(h.stats.disables,1);assert.equal(h.run('_fbUnsubscribe'),null);assert.equal(h.run('_personalServerReady'),false);
+  assert.equal(JSON.parse(h.storage.get('fixture-db')).tasks[0].title,'unsent');
+  assert.ok(JSON.parse(h.storage.get('ef_sync_cloud_pause_v1')).until>Date.now());
+  await h.run('_flushFirebaseSave()');await h.run('retryFirestoreSync(true)');assert.equal(h.stats.transactions,0);assert.equal(h.stats.enables,0);
+});
+test('read safety threshold stops consumption without losing local edits',()=>{
+  const h=harness();h.snapshot(base);const ledger=JSON.parse(h.storage.get('ef_sync_traffic_v1'));ledger.read=3000;
+  h.storage.set('ef_sync_traffic_v1',JSON.stringify(ledger));const remote=copy(base);remote.tasks[0].done=true;
+  h.snapshot(remote,202);assert.equal(h.run('PERSONAL_SYNC_STATE'),'budget');assert.equal(h.ctx.S.tasks[0].done,false);assert.equal(h.stats.disables,1);
+});
+test('another tab stop is honored without a cloud request',()=>{
+  const h=harness();h.events.storage({key:'ef_sync_cloud_pause_v1',newValue:JSON.stringify({until:Date.now()+60000,reason:'budget'})});
+  assert.equal(h.run('PERSONAL_SYNC_STATE'),'budget');assert.equal(h.stats.disables,1);assert.equal(h.stats.transactions,0);
+});
+test('team signatures ignore record order but retain meaningful content changes',()=>{
+  const ctx={EditFlowSync:Sync,TEAM_KEYS:['jobs'],window:{},JSON,console};vm.createContext(ctx);
+  vm.runInContext(html.slice(html.indexOf('function _teamEncode('),html.indexOf('function _teamSave(')),ctx);
+  const a={jobs:JSON.stringify([{id:'b',title:'B'},{id:'a',title:'A'}]),bizBoard:'{}'};
+  const b={jobs:JSON.stringify([{title:'A',id:'a'},{title:'B',id:'b'}]),bizBoard:'{}'};
+  assert.equal(ctx._teamPayloadSignature(a),ctx._teamPayloadSignature(b));
+  b.jobs=JSON.stringify([{id:'a',title:'Changed'},{id:'b',title:'B'}]);assert.notEqual(ctx._teamPayloadSignature(a),ctx._teamPayloadSignature(b));
+});
+test('team save does not publish unchanged differently ordered records',async()=>{
+  let writes=0;
+  const ctx={EditFlowSync:Sync,TEAM_KEYS:['jobs'],window:{_teamSnap:{}},JSON,console,Promise,Date,
+    FB_USER:{uid:'fixture'},TEAM_SHARE_OK:true,_teamServerReady:true,_teamWritePending:false,_lastTeamSaveSignature:'',
+    S:{jobs:[{id:'b',title:'B'},{id:'a',title:'A'}],bizBoard:{}},
+    _isFirestoreQuotaBlocked:()=>false,_allowSyncTraffic:()=>true,renderAuthUI:()=>{},
+    firebase:{firestore:{FieldValue:{serverTimestamp:()=>1}}},
+    fbDb:{collection:()=>({doc:()=>({set:async()=>{writes++;}})})}};
+  vm.createContext(ctx);vm.runInContext(html.slice(html.indexOf('function _teamEncode('),html.indexOf('function fbSetupTeamSync(')),ctx);
+  ctx._lastTeamSaveSignature=ctx._teamPayloadSignature({jobs:JSON.stringify([{title:'A',id:'a'},{title:'B',id:'b'}]),bizBoard:'{}'});
+  await ctx._teamSave();assert.equal(writes,0);
+  ctx.S.jobs[0].title='User edit';await ctx._teamSave();assert.equal(writes,1);
+  await ctx._teamSave();assert.equal(writes,1);
 });
