@@ -10145,6 +10145,8 @@ function efResetPersonalData(){
   render();
 }
 function rSettings(){
+  // Presentation only. Restore either panel by changing its flag to true.
+  const visiblePanels={workers:false,aiKeys:false};
   return`<div class="ph"><div class="ph-title">設定</div></div>
 
 ${secTitle('アカウントとデータ管理')}
@@ -10302,7 +10304,7 @@ ${secTitle('Googleスプレッドシート連携')}
   </div>
 </div>
 
-${secTitle('担当者管理')}
+${visiblePanels.workers?`${secTitle('担当者管理')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:10px">案件管理の担当者選択に使われます</div>
   <div id="workers-list">
@@ -10315,7 +10317,7 @@ ${secTitle('担当者管理')}
     <input id="new-worker-name" placeholder="担当者名を入力" style="flex:1">
     <button class="btn btn-p btn-sm" onclick="addWorker()">追加</button>
   </div>
-</div>
+</div>`: ''}
 
 ${secTitle('カスタム筋トレメニュー')}
 <div class="card" style="margin-bottom:16px">
@@ -10376,7 +10378,7 @@ ${secTitle('同期バックアップ')}
   <button class="btn btn-g btn-sm" onclick="restoreLatestSyncBackup()">最新の同期前バックアップを復元</button>
 </div>
 
-${secTitle('AI APIキー設定')}
+${visiblePanels.aiKeys?`${secTitle('AI APIキー設定')}
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:12px;color:var(--t2);margin-bottom:12px">AIアシスタント機能で使用するAPIキーを登録します。キーはFirebaseに暗号化保存されます。</div>
   <div class="frow">
@@ -10394,7 +10396,7 @@ ${secTitle('AI APIキー設定')}
     <button class="btn btn-p btn-sm" onclick="saveAIKeys()">保存</button>
     <button class="btn btn-g btn-sm" onclick="V='aichat';render()">AIチャットを開く →</button>
   </div>
-</div>
+</div>`: ''}
 
 ${secTitle('Googleカレンダー連携')}
 <div class="card" id="gcal-settings-card">
@@ -11302,6 +11304,8 @@ async function callClaude(history,apiKey,system,ctx){
   return d.content?.[0]?.text||'(応答なし)';
 }
 function saveAIKeys(){
+  // A hidden panel must never clear existing credentials through an absent input.
+  if(!document.getElementById('set-gemini-key')||!document.getElementById('set-claude-key'))return;
   S.settings.geminiKey=document.getElementById('set-gemini-key')?.value.trim()||'';
   S.settings.claudeKey=document.getElementById('set-claude-key')?.value.trim()||'';
   save();toast('APIキーを保存しました ');
@@ -13769,7 +13773,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20261001-07';
+const APP_VERSION='20261007-settings-visibility';
 
 render();
 renderSyncGate();
