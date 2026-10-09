@@ -512,6 +512,9 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .previous-day-gate-title em{margin-left:auto;font-style:normal;font-size:11px;color:var(--red);font-weight:800}
 .previous-day-gate-section.is-done .previous-day-gate-title em{color:var(--green)}
 .previous-day-gate-items{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.previous-day-choice{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px;border:1px solid var(--border);border-radius:12px;background:var(--card);max-width:100%;box-sizing:border-box}
+.previous-day-choice-label{flex:1 1 100%;font-size:12px;overflow-wrap:anywhere}
+.previous-day-choice .previous-day-chip{min-height:44px}
 .previous-day-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text);padding:7px 10px;font-size:12px;cursor:pointer}
 .previous-day-chip span{font-weight:900;color:var(--t3)}
 .previous-day-chip.kept{border-color:var(--green);background:var(--gdim);color:var(--green)}
@@ -3204,6 +3207,10 @@ function rHabitRecordCalendar(){
 </section>`;
 }
 function needsPreviousDayCheck(){const g=previousDayGateState();return!(g.habitDone&&g.fitnessDone&&g.abstinenceDone);}
+// Choose the final result directly: the last unanswered item may close the gate.
+function rPreviousDayChoice(label,current,action){
+  return `<div class="previous-day-choice" role="group" aria-label="${esc(label)}"><b class="previous-day-choice-label">${esc(label)}</b>${[['kept','○ 達成'],['failed','× できなかった']].map(([value,text])=>`<button type="button" class="previous-day-chip ${current===value?value:''}" aria-pressed="${current===value}" onclick="${action},'${value}')">${text}</button>`).join('')}</div>`;
+}
 function rPreviousDayGate(){
   const g=previousDayGateState(),status=(s)=>s==='kept'?'✓ 達成':s==='failed'?'✕ できなかった':'未記録';
   return`<section class="card previous-day-gate" role="dialog" aria-labelledby="previous-day-gate-title">
@@ -3212,8 +3219,8 @@ function rPreviousDayGate(){
   <p class="previous-day-gate-lead">${g.date} 分が未確認です。3つすべて完了するとアプリを開けます。</p>
   <div class="previous-day-gate-section ${g.habitDone?'is-done':''}">
     <div class="previous-day-gate-title"><span>1</span><b>習慣トラッカー</b><em>${g.habitDone?'✓ 完了':'未完了'}</em></div>
-    ${g.habits.length?`<div class="previous-day-gate-items">${g.habits.map(h=>{const done=(h.completedDates||[]).includes(g.date),fail=(h.failedDates||[]).includes(g.date);return`<button type="button" class="previous-day-chip ${done?'kept':fail?'failed':''}" onclick="toggleHabit('${h.id}','${g.date}')"><span>${done?'✓':fail?'✕':'○'}</span>${esc(h.title)}</button>`;}).join('')}</div>`:'<div class="previous-day-gate-note">対象の習慣はありません。</div>'}
-    <div class="previous-day-gate-help">各項目をタップして、✓か✕を付けてください。</div>
+    ${g.habits.length?`<div class="previous-day-gate-items">${g.habits.map(h=>{const done=(h.completedDates||[]).includes(g.date),fail=(h.failedDates||[]).includes(g.date);return rPreviousDayChoice(h.title,done?'kept':fail?'failed':'',`toggleHabit('${h.id}','${g.date}'`);}).join('')}</div>`:'<div class="previous-day-gate-note">対象の習慣はありません。</div>'}
+    <div class="previous-day-gate-help">各項目の「○ 達成」か「× できなかった」を選んでください。</div>
   </div>
   <div class="previous-day-gate-section ${g.fitnessDone?'is-done':''}">
     <div class="previous-day-gate-title"><span>2</span><b>フィットネス</b><em>${g.fitnessDone?'✓ 完了':'未完了'}</em></div>
@@ -3223,7 +3230,7 @@ function rPreviousDayGate(){
   <div class="previous-day-gate-section ${g.abstinenceDone?'is-done':''}">
     <div class="previous-day-gate-title"><span>3</span><b>禁欲カレンダー</b><em>${g.abstinenceDone?'✓ 完了':'未完了'}</em></div>
     <div class="previous-day-gate-note">3項目は別々に判定します。できなかった項目には✕を付けてください。</div>
-    <div class="previous-day-gate-items">${g.abstinence.map(item=>`<button type="button" class="previous-day-chip abstinence-gate-chip ${item.status}" onclick="toggleAbstinence('${g.date}','${item.key}')"><span>${item.status==='kept'?'✓':item.status==='failed'?'✕':item.icon}</span>${item.label}</button>`).join('')}</div>
+    <div class="previous-day-gate-items">${g.abstinence.map(item=>rPreviousDayChoice(item.label,item.status,`toggleAbstinence('${g.date}','${item.key}'`)).join('')}</div>
   </div>
   <div class="previous-day-gate-foot">昨日の記録がそろうと、自動的に通常画面へ戻ります。<br><button class="btn btn-g btn-sm" style="margin-top:10px" onclick="setRecordSkipDay('${g.date}',true)">昨日を「記録しない日」にする</button></div>
 </section>${rHabitRecordCalendar()}`;
@@ -8927,11 +8934,12 @@ function acmShift(delta){
 function abstinenceRecord(date){return S.abstinence?.records?.[date]||{};}
 function abstinenceStatus(date,key){const v=abstinenceRecord(date)[key];return v==='kept'||v==='failed'?v:'';}
 function abstinenceDateComplete(date){return ABSTINENCE_ITEMS.every(item=>abstinenceStatus(date,item.key));}
-function toggleAbstinence(date,key){
+function toggleAbstinence(date,key,result){
+  if(result!==undefined&&result!=='kept'&&result!=='failed')return;
   if(!S.abstinence||typeof S.abstinence!=='object')S.abstinence={records:{}};
   if(!S.abstinence.records||typeof S.abstinence.records!=='object')S.abstinence.records={};
   const record={...(S.abstinence.records[date]||{})},current=record[key]||'';
-  record[key]=current===''?'kept':current==='kept'?'failed':'';
+  record[key]=result??(current===''?'kept':current==='kept'?'failed':'');
   record.updatedAt=Date.now();
   if(!ABSTINENCE_ITEMS.some(item=>record[item.key]))delete record.updatedAt;
   if(Object.keys(record).length)S.abstinence.records[date]=record;else delete S.abstinence.records[date];
@@ -12153,26 +12161,25 @@ ${t.procCount>=3?`<div style="margin-top:10px;background:var(--rdim);border-radi
 <div class="mfooter"><button class="btn btn-p" onclick="closeModal()">わかった、やってみる</button></div>`);
   },100);
 }
-function toggleHabit(id,date){
+function toggleHabit(id,date,result){
+  if(result!==undefined&&result!=='kept'&&result!=='failed')return;
   const h=S.habits.find(h=>h.id===id);if(!h)return;
   if(!h.completedDates)h.completedDates=[];
   if(!h.failedDates)h.failedDates=[];
   const beforeLv=habitLevel(h).level;
   const done=h.completedDates.includes(date);
   const fail=h.failedDates.includes(date);
-  if(!done&&!fail){
-    // なし→✓
+  const next=result??(!done&&!fail?'kept':done?'failed':'');
+  h.completedDates=h.completedDates.filter(d=>d!==date);
+  h.failedDates=h.failedDates.filter(d=>d!==date);
+  if(next==='kept'){
+    // 指定した結果、または従来の順番で記録する。
     h.completedDates.push(date);
     const s=calcStreak(h.completedDates);
     if(s%7===0&&s>0)toast(`${s}日連続達成！素晴らしい！`);else toast('習慣を記録しました！');
-  }else if(done){
-    // ✓→✗
-    h.completedDates=h.completedDates.filter(d=>d!==date);
+  }else if(next==='failed'){
     h.failedDates.push(date);
     toast('✕ できなかった日として記録しました');
-  }else{
-    // ✗→なし
-    h.failedDates=h.failedDates.filter(d=>d!==date);
   }
   // レベル変化フィードバック（既存の連続達成toastは残しつつ上書き通知）
   const afterLv=habitLevel(h).level;
@@ -13773,7 +13780,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20261007-settings-visibility';
+const APP_VERSION='20261010-record-choice';
 
 render();
 renderSyncGate();
