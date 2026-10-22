@@ -1540,6 +1540,8 @@ function mergeCloudStateWithLocal(local,remote){
   remote={...remote,decisions:mergeRecordArrays(local.decisions,remote.decisions),sessionTasks:mergeRecordArrays(local.sessionTasks,remote.sessionTasks)};
   const merged={...remote};const arrays=['habits','jobs','logs','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','choreRoutines','meals','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];arrays.forEach(k=>merged[k]=mergeRecordArrays(local[k],remote[k]));
   ['journals','performanceLogs','workouts'].forEach(k=>merged[k]=compactHistoryRecords([...(remote[k]||[]),...(local[k]||[])],k));
+  merged.performanceResetAt=[local.performanceResetAt,remote.performanceResetAt].filter(Boolean).sort().pop()||'';
+  if(merged.performanceResetAt)merged.performanceLogs=merged.performanceLogs.filter(x=>String(x.date||'')>=merged.performanceResetAt);
   merged.finance=mergeFinanceState(local.finance,remote.finance);merged.abstinence=mergeAbstinenceState(local.abstinence,remote.abstinence);merged.recordSkipDays=mergeDateSkipState(local.recordSkipDays,remote.recordSkipDays);merged.editCounter=mergeEditCounterState(local.editCounter,remote.editCounter);merged.dailyOpenReviews={...(remote.dailyOpenReviews||{}),...(local.dailyOpenReviews||{})};merged.goalReviews={...(remote.goalReviews||{}),...(local.goalReviews||{})};merged.dailySchedules={...(remote.dailySchedules||{}),...(local.dailySchedules||{})};merged.fsChecked={...(remote.fsChecked||{}),...(local.fsChecked||{})};return merged;
 }
 function _applyCloudData(json){
@@ -2558,6 +2560,7 @@ function migrate(d){
   if(!Array.isArray(d.journals))d.journals=[];
   if(!Array.isArray(d.workouts))d.workouts=[];
   d.performanceLogs=compactHistoryRecords(d.performanceLogs,'performanceLogs');
+  if(d.performanceResetAt)d.performanceLogs=d.performanceLogs.filter(x=>String(x.date||'')>=d.performanceResetAt);
   d.journals=compactHistoryRecords(d.journals,'journals');
   d.workouts=compactHistoryRecords(d.workouts,'workouts');
   if(!d.finance||typeof d.finance!=='object')d.finance={};
@@ -4656,6 +4659,16 @@ function performanceOverallRate(entry){
   const done=all.reduce((sum,x)=>sum+x.done,0),total=all.reduce((sum,x)=>sum+x.total,0);
   return total?Math.round(done/total*100):0;
 }
+function clearPerformanceHistory(){
+  const n=(S.performanceLogs||[]).length;
+  if(!n){toast('削除する記録がありません','warn');return;}
+  if(!confirm(`達成率の記録 ${n}件 をすべて削除します。\n今日から新しく始めます。元に戻せません。よろしいですか？`))return;
+  backupLocalState('before-clear-performance',true);
+  S.performanceLogs=[];S.performanceResetAt=today();
+  const r=S.dailyOpenReviews&&S.dailyOpenReviews[today()];
+  if(r){delete r.taskPerformanceRecorded;delete r.taskPerformanceRate;delete r.taskPerformanceRecordedAt;}
+  save();render();toast('達成率の記録を削除しました');
+}
 function rPerformanceHistory(){
   const logs=(S.performanceLogs||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const months=[...new Set(logs.map(x=>(x.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
@@ -4671,7 +4684,7 @@ function rPerformanceHistory(){
     const dateLabel=isNaN(d)?esc(entry.date||''):d.toLocaleDateString('ja-JP',{year:'numeric',month:'short',day:'numeric',weekday:'short'});
     return`<tr style="border-bottom:1px solid var(--border)"><td style="padding:12px 14px;font-weight:700;white-space:nowrap">${dateLabel}</td><td style="padding:10px 12px">${metricCell(m.tasks,'var(--green)')}</td><td style="padding:10px 12px">${metricCell(m.schedule,'var(--blue)')}</td><td style="padding:10px 12px">${metricCell(m.fixedSchedule,'var(--purple)')}</td><td style="padding:10px 12px">${metricCell(m.habits,'var(--amber)')}</td><td style="padding:10px 14px;text-align:center"><span class="badge ${overall>=80?'bg':overall>=50?'ba':'br'}" style="font-size:12px;padding:5px 10px">${overall}%</span></td></tr>`;
   }).join('');
-  return`<div class="ph"><div><div class="ph-title">達成率履歴</div><div style="font-size:12px;color:var(--t2);margin-top:3px">タスク・スケジュール・固定スケジュール・習慣の日別記録</div></div><div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-g btn-sm" onclick="V='tasks';TV='today';render()">← 今日のタスク</button><button class="btn btn-p btn-sm" onclick="recordDailyPerformance(today())">今日を記録</button></div></div>
+  return`<div class="ph"><div><div class="ph-title">達成率履歴</div><div style="font-size:12px;color:var(--t2);margin-top:3px">タスク・スケジュール・固定スケジュール・習慣の日別記録</div></div><div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-g btn-sm" onclick="V='tasks';TV='today';render()">← 今日のタスク</button><button class="btn btn-g btn-sm" style="color:var(--red);border-color:var(--red)" onclick="clearPerformanceHistory()">全記録を削除</button><button class="btn btn-p btn-sm" onclick="recordDailyPerformance(today())">今日を記録</button></div></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${summary('🗓','記録日数',filtered.length+'日','var(--text)')}${summary('◎','総合平均',overallAvg+'%','var(--purple)')}${summary('✅','タスク平均',avg('tasks')+'%','var(--green)')}${summary('📅','予定平均',avg('schedule')+'%','var(--blue)')}${summary('🕐','固定平均',avg('fixedSchedule')+'%','var(--purple)')}${summary('🔥','習慣平均',avg('habits')+'%','var(--amber)')}</div>
   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap"><div style="font-size:13px;font-weight:700">日別履歴 <span style="color:var(--t2);font-weight:500">${filtered.length}件</span></div><label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--t2)">期間<select aria-label="表示する月" onchange="PERF_MONTH=this.value;render()" style="width:auto;min-width:130px;padding:5px 9px"><option value="all" ${PERF_MONTH==='all'?'selected':''}>すべて</option>${months.map(m=>`<option value="${m}" ${PERF_MONTH===m?'selected':''}>${m.replace('-','年')}月</option>`).join('')}</select></label></div>
   ${filtered.length?`<div class="card" style="padding:0;overflow-x:auto"><table aria-label="達成率履歴" style="width:100%;min-width:780px;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--card2);color:var(--t2)"><th scope="col" style="padding:9px 14px;text-align:left">日付</th><th scope="col" style="padding:9px 12px;text-align:left">タスク</th><th scope="col" style="padding:9px 12px;text-align:left">スケジュール</th><th scope="col" style="padding:9px 12px;text-align:left">固定スケジュール</th><th scope="col" style="padding:9px 12px;text-align:left">習慣</th><th scope="col" style="padding:9px 14px;text-align:center">総合</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">達成率の記録がありません</div><div style="font-size:12px;color:var(--t3);margin-top:5px">「今日を記録」を押すと、ここに履歴が追加されます</div></div>`}`;
@@ -13780,7 +13793,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20261010-record-choice';
+const APP_VERSION='20261022-01';
 
 render();
 renderSyncGate();
