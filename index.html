@@ -198,6 +198,10 @@ a{color:inherit;text-decoration:none}
 .focus-now-title{font-size:20px;font-weight:800;line-height:1.4;overflow-wrap:anywhere}
 .focus-now-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .focus-now-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.focus-now-actions .btn{min-height:44px}
+.task-later-notice{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:12px;background:linear-gradient(100deg,rgba(245,158,11,.12),rgba(255,255,255,.72));border:1.5px solid rgba(180,83,9,.28);border-left:4px solid var(--amber);border-radius:12px;box-shadow:var(--shadow-sm)}
+.task-later-notice-mark{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex:0 0 28px;border-radius:50%;background:rgba(245,158,11,.18);color:#b45309;font-weight:850;font-size:16px}
+.task-later-notice-copy{flex:1;min-width:0;color:var(--text);font-size:13px;line-height:1.45}.task-later-notice-copy strong{font-size:16px;color:#b45309;font-variant-numeric:tabular-nums}.task-later-notice-label{font-size:11px;font-weight:800;color:#92400e;letter-spacing:.03em;margin-bottom:1px}
+.task-later-notice .btn{flex-shrink:0}
 .later-intro{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;margin-bottom:12px;background:var(--card2);border:1.5px solid var(--border);border-radius:12px}
 .later-task{align-items:center}.later-task .task-body{cursor:pointer}.later-actions{display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap}.later-actions .btn{min-height:40px}
 .decision-card{border-left:3px solid var(--amber)}
@@ -205,7 +209,7 @@ a{color:inherit;text-decoration:none}
 .decision-result{margin-top:8px;padding:9px 11px;border-radius:8px;background:var(--gdim);color:var(--text);font-size:12px;line-height:1.6}
 .session-card{border-left:3px solid var(--blue)}
 .session-card.done-item{border-left-color:var(--green);opacity:.72}
-@media(max-width:700px){.focus-now-card{padding:16px 14px}.focus-now-title{font-size:18px}.later-intro{align-items:flex-start;flex-direction:column}.later-task{flex-wrap:wrap}.later-task .task-body{flex-basis:calc(100% - 40px)}.later-actions{width:100%;padding-left:38px}.later-actions .btn{flex:1;min-height:44px}}
+@media(max-width:700px){.focus-now-card{padding:16px 14px}.focus-now-title{font-size:18px}.task-later-notice{align-items:flex-start;flex-wrap:wrap}.task-later-notice .btn{width:100%;margin-left:40px}.later-intro{align-items:flex-start;flex-direction:column}.later-task{flex-wrap:wrap}.later-task .task-body{flex-basis:calc(100% - 40px)}.later-actions{width:100%;padding-left:38px}.later-actions .btn{flex:1;min-height:44px}}
 .chk{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .chk:hover{border-color:var(--purple);box-shadow:0 0 0 3px rgba(109,40,217,0.1)}
 .chk.done{background:linear-gradient(135deg,var(--green),#34d399);border-color:var(--green)}
@@ -1071,6 +1075,7 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 6.5h6l2 2.5h9V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/></symbol>
 <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.2"/><path d="M3.5 19c0-3 2.5-4.8 5.5-4.8s5.5 1.8 5.5 4.8"/><path d="M16 6.4a3.2 3.2 0 0 1 0 6.2M17 14.6c2.2.5 3.5 2.2 3.5 4.4"/></symbol>
 <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3.5c3.5 3.4 5.5 6 5.5 9a5.5 5.5 0 1 1-11 0c0-1.6.7-3 2-4.4.3 1.4 1 2.2 2 2.4-.4-3 .5-5.3 1.5-7z"/></symbol>
+<symbol id="i-gift" viewBox="0 0 24 24"><path d="M4.5 10h15v9.5h-15z"/><path d="M3.5 7h17v3h-17z"/><path d="M12 7v12.5"/><path d="M12 7c-1-3.5-5-3.5-5-1.2C7 7 9 7 12 7zM12 7c1-3.5 5-3.5 5-1.2C17 7 15 7 12 7z"/></symbol>
 <symbol id="i-broom" viewBox="0 0 24 24"><path d="M14.5 3.5 9 9"/><path d="M6 12.5h7l1.5 8h-10z"/><path d="M8 12.5v8M11 12.5v8"/></symbol>
 <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></symbol>
 <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5h9a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M8 19.5h11"/></symbol>
@@ -1178,6 +1183,7 @@ const BUILTIN_VIEWS=[
   {id:'habits',label:'習慣トラッカー',icon:'i-flame'},
   {id:'abstinence',label:'禁欲カレンダー',icon:'i-shield'},
   {id:'chores',label:'家事',icon:'i-broom'},
+  {id:'wishlist',label:'欲しいものリスト',icon:'i-gift'},
   {id:'goals',label:'目標・KPI管理',icon:'i-target'},
   {id:'journal',label:'ジャーナル',icon:'i-book'},
   {id:'finance',label:'家計簿',icon:'i-yen'},
@@ -1200,6 +1206,7 @@ const DEFAULT_HIDDEN_VIEWS=[
   'plan',
   // 新4ビューに統合済みの旧ビュー（機能はそのまま残る）
   'dashboard','tasks','performance','habits','chores','journal','finance','memo','fitness',
+  'wishlist',
 ];
 // 旧ビュー名 → 新ビューへのエイリアス（sessionStorage ef_view に旧値が残っていても落とさない）
 const VIEW_ALIASES={dashboard:'today',kpi:'goals'};
@@ -1538,7 +1545,7 @@ function mergeEditCounterState(local,remote){
 }
 function mergeCloudStateWithLocal(local,remote){
   remote={...remote,decisions:mergeRecordArrays(local.decisions,remote.decisions),sessionTasks:mergeRecordArrays(local.sessionTasks,remote.sessionTasks)};
-  const merged={...remote};const arrays=['habits','jobs','logs','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','choreRoutines','meals','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];arrays.forEach(k=>merged[k]=mergeRecordArrays(local[k],remote[k]));
+  const merged={...remote};const arrays=['habits','jobs','logs','goals','clients','workers','checkIns','customPages','customEx','customExSets','chores','choreRoutines','wishlist','meals','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'];arrays.forEach(k=>merged[k]=mergeRecordArrays(local[k],remote[k]));
   ['journals','performanceLogs','workouts'].forEach(k=>merged[k]=compactHistoryRecords([...(remote[k]||[]),...(local[k]||[])],k));
   merged.performanceResetAt=[local.performanceResetAt,remote.performanceResetAt].filter(Boolean).sort().pop()||'';
   if(merged.performanceResetAt)merged.performanceLogs=merged.performanceLogs.filter(x=>String(x.date||'')>=merged.performanceResetAt);
@@ -1568,7 +1575,7 @@ function _applyCloudData(json){
   S=migrate(Object.assign(def,EditFlowSync.merge(mergeBase,localState,cloud)));
   TEAM_KEYS.forEach(k=>{if(keepTeam[k]!==undefined)S[k]=keepTeam[k];});
   if(keepBiz!==undefined)S.bizBoard=keepBiz;
-  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','chores','choreRoutines','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
+  ['tasks','habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','chores','choreRoutines','wishlist','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=def[k]||[];});
   if(!S.abstinence||typeof S.abstinence!=='object')S.abstinence={records:{}};
   if(!S.abstinence.records||typeof S.abstinence.records!=='object')S.abstinence.records={};
   if(!Array.isArray(S.abstinence.urges))S.abstinence.urges=[];
@@ -2531,6 +2538,7 @@ function defState(){return{
   customExSets:[],
   chores:[],
   choreRoutines:[],
+  wishlist:[],
   navConfig:null,
   customPages:[],
   divisions:[],
@@ -2554,6 +2562,7 @@ function migrate(d){
   if(!Array.isArray(d.customExSets))d.customExSets=[];
   if(!Array.isArray(d.chores))d.chores=[];
   if(!Array.isArray(d.choreRoutines))d.choreRoutines=[];
+  if(!Array.isArray(d.wishlist))d.wishlist=[];
   if(!Array.isArray(d.performanceLogs))d.performanceLogs=[];
   if(!Array.isArray(d.decisions))d.decisions=[];
   if(!Array.isArray(d.sessionTasks))d.sessionTasks=[];
@@ -3455,7 +3464,7 @@ function render(){
       renderNav();
       return;
     }
-    const views={today:rToday,plan:rPlan,life:rLife,log:rLog,dashboard:rToday,tasks:rTasks,performance:rPerformanceHistory,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,abstinence:rAbstinence,chores:rChores,goals:rGoals,journal:rJournal,finance:rFinance,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
+    const views={today:rToday,plan:rPlan,life:rLife,log:rLog,dashboard:rToday,tasks:rTasks,performance:rPerformanceHistory,projects:rProjects,pipeline:rPipeline,teamgoals:rTeamGoals,posts:rPosts,docs:rDocs,workers:rWorkers,habits:rHabits,abstinence:rAbstinence,chores:rChores,wishlist:rWishlist,goals:rGoals,journal:rJournal,finance:rFinance,revenue:rRevenue,memo:rMemo,settings:rSettings,customize:rCustomize,aichat:rAIChat,fitness:rFitness,kpi:rKpi,bizboard:rBizBoard,bizunits:rBizUnits,minutes:rMinutes,salesleads:rSalesLeads,hpfee:rHpFee,salessites:rSalesSites,templates:rTemplates};
     let html;
     if(V.startsWith('cp_')){
       const page=(S.customPages||[]).find(p=>`cp_${p.id}`===V);
@@ -4704,6 +4713,7 @@ function rTasks(){
   if(!taskViews.includes(TV))TV='today';
   const sortSel=`<select onchange="setTaskSort(this.value)" style="font-size:11px;padding:3px 7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text)">${TASK_SORT_OPTS.map(([v,l])=>`<option value="${v}" ${getTaskSort()===v?'selected':''}>${l}</option>`).join('')}</select>`;
   return`<div class="ph"><div class="ph-title">タスク管理</div><div style="display:flex;gap:7px;align-items:center">${sortSel}<button class="btn btn-p" onclick="openTaskModal()">＋ タスク追加</button></div></div>
+${rLaterTaskNotice()}
 ${subTabs([['today','今日'],['dayplan','1日の予定'],['tomorrow','明日'],['weekly','週間'],['monthly','月間'],['later','後回し']],TV,'setTV')}
 ${{today:rTasksToday,dayplan:rDayPlan,tomorrow:rTasksTomorrow,weekly:rTasksWeekly,monthly:rTasksMonthly,later:rTasksLater}[TV]?.()??rTasksToday()}`;
 }
@@ -4922,10 +4932,18 @@ function rLaterTaskItem(task){
   const priorityLabel={high:'優先度 高',medium:'優先度 中',low:'優先度 低'}[task.priority];
   return`<div class="task-item later-task ${isOver?'overdue':''}" id="ti-${task.id}"><div class="chk" onclick="toggleDone('${task.id}')" aria-label="${esc(task.title)}を完了"></div><div class="task-body" onclick="openTaskModal('${task.id}')"><div class="task-ttl">${esc(task.title)}</div>${task.description?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${esc(task.description)}</div>`:''}<div class="task-meta">${task.dueDate?`<span class="badge ${isOver?'br':'bk'}">期限 ${fmt(task.dueDate,task.dueTime)}</span>`:'<span class="badge bk">期限なし</span>'}${task.startTime?`<span class="badge bb">${esc(task.startTime)}</span>`:''}${priorityLabel?`<span class="badge ${task.priority==='high'?'br':task.priority==='medium'?'ba':'bk'}">${priorityLabel}</span>`:''}</div></div><div class="later-actions"><button class="btn btn-p btn-sm" onclick="taskSetNow('${task.id}')">今やる</button><button class="btn btn-g btn-sm" onclick="openLaterScheduleModal('${task.id}')" aria-label="${esc(task.title)}をスケジュールへ入れる">スケジュールへ</button><button class="btn btn-g btn-sm" onclick="openTaskModal('${task.id}')" aria-label="${esc(task.title)}を編集">編集</button></div></div>`;
 }
-function rTasksLater(){
+function tasksInLaterList(){
   const focus=currentFocusTask();
+  return sortTaskList((S.tasks||[]).filter(t=>!t.deleted&&!t.done&&(isTaskOverdue(t)||(t.id!==focus?.id&&!isTaskScheduled(t)))));
+}
+function rLaterTaskNotice(){
+  const count=tasksInLaterList().length;
+  if(!count)return'';
+  return`<div class="task-later-notice" role="status" aria-live="polite"><div class="task-later-notice-mark" aria-hidden="true">!</div><div class="task-later-notice-copy"><div class="task-later-notice-label">後回しに残っているタスク</div><div><strong>${count}件</strong>のタスクがまだ完了していません</div></div><button class="btn btn-g btn-sm" onclick="setTV('later')">後回しを確認</button></div>`;
+}
+function rTasksLater(){
   // 期限超過は予定済み・「今やる」指定より優先して後回しへ表示する。保存値は変更しない。
-  const tasks=sortTaskList((S.tasks||[]).filter(t=>!t.deleted&&!t.done&&(isTaskOverdue(t)||(t.id!==focus?.id&&!isTaskScheduled(t)))));
+  const tasks=tasksInLaterList();
   const overdueCount=tasks.filter(isTaskOverdue).length;
   return`${rFocusNowCard()}<div class="later-intro"><div><div style="font-size:15px;font-weight:800">後回しリスト</div><div style="font-size:12px;color:var(--t2);margin-top:3px">期限超過のタスクは、予定済み・「今やる」指定にかかわらず自動でここに表示します。</div></div><span class="badge ${overdueCount?'br':'bk'}">${tasks.length}件${overdueCount?`・期限超過 ${overdueCount}件`:''}</span></div>${tasks.length?tasks.map(rLaterTaskItem).join(''):`<div class="card card-sm" style="text-align:center;color:var(--t2);padding:28px">後回しのタスクはありません。</div>`}`;
 }
@@ -5171,12 +5189,15 @@ function rLife(){
   <div style="display:flex;gap:7px;flex-wrap:wrap">
     <button class="btn btn-g btn-sm" onclick="openHabitModal()">＋ 習慣</button>
     <button class="btn btn-p btn-sm" onclick="openChoreModal()">＋ 家事</button>
+    <button class="btn btn-g btn-sm" onclick="openWishModal()">＋ 欲しいもの</button>
   </div>
 </div>
 ${secTitle(`${iconSvg('i-flame','sec-ic')} 習慣`)}
 ${rHabitsWeekly()}
 <div style="height:18px"></div>
-${rChores()}`;
+${rChores()}
+<div style="height:18px"></div>
+${rWishlist()}`;
 }
 
 // ─── 「記録」ビュー ────────────────────────────────────────────────
@@ -6111,6 +6132,125 @@ ${secTitle(`登録済みの家事（${chores.length}件）`)}
     <button class="tact del" onclick="delChore('${c.id}')">🗑</button>
   </div>`).join(''):`<div style="color:var(--t3);font-size:12px;text-align:center;padding:16px">まだ家事が登録されていません。「＋ 家事を追加」またはクイック追加から登録してください。</div>`}
 </div>`;
+}
+
+// ===== 欲しいものリスト（名前・値段・買う期限。購入済みにすると下へ移る） =====
+function wishYen(n){return '¥'+Math.round(Number(n)||0).toLocaleString('ja-JP');}
+function wishDaysLeft(due){
+  if(!due)return null;
+  const a=new Date(due+'T00:00:00'),b=new Date(today()+'T00:00:00');
+  return Math.round((a-b)/86400000);
+}
+function wishDueBadge(w){
+  const d=wishDaysLeft(w.dueDate);
+  if(d===null)return`<span class="badge bk">期限なし</span>`;
+  if(d<0)return`<span class="badge br">${-d}日超過</span>`;
+  if(d===0)return`<span class="badge br">今日まで</span>`;
+  if(d<=7)return`<span class="badge ba">あと${d}日</span>`;
+  return`<span class="badge bb">あと${d}日</span>`;
+}
+function wishFmtDate(s){if(!s)return'';const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[1]}/${+m[2]}/${+m[3]}`:s;}
+function wishLive(){return (S.wishlist||[]).filter(w=>!w.deleted);}
+function wishPending(){
+  return wishLive().filter(w=>!w.bought).sort((a,b)=>{
+    const ad=a.dueDate||'9999-99-99',bd=b.dueDate||'9999-99-99';
+    return ad.localeCompare(bd)||(Number(a.createdAt)||0)-(Number(b.createdAt)||0);
+  });
+}
+function toggleWishBought(id){
+  const w=(S.wishlist||[]).find(x=>x.id===id);if(!w)return;
+  w.bought=!w.bought;w.boughtAt=w.bought?today():null;w.updatedAt=Date.now();
+  if(w.bought)toast(`${w.name} を購入済みにしました`);
+  save();render();
+}
+function delWish(id){
+  const w=(S.wishlist||[]).find(x=>x.id===id);if(!w)return;
+  if(!confirm(`「${w.name}」を削除しますか？`))return;
+  w.deleted=true;w.updatedAt=Date.now();
+  closeModal();save();render();
+}
+function wishSetDue(kind){
+  const el=document.getElementById('wish-due');if(!el)return;
+  const d=new Date();
+  if(kind==='none'){el.value='';return;}
+  if(kind==='eom')d.setMonth(d.getMonth()+1,0);
+  else if(kind==='eonm')d.setMonth(d.getMonth()+2,0);
+  else if(kind==='3m')d.setMonth(d.getMonth()+3);
+  else if(kind==='6m')d.setMonth(d.getMonth()+6);
+  else if(kind==='1y')d.setFullYear(d.getFullYear()+1);
+  el.value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function openWishModal(id){
+  const w=id?(S.wishlist||[]).find(x=>x.id===id):null;
+  const chip=(k,l)=>`<span style="padding:3px 10px;background:var(--border);border-radius:100px;cursor:pointer;font-size:11px" onclick="wishSetDue('${k}')">${l}</span>`;
+  openModal(`<div class="mhdr"><div class="mtitle">${w?'欲しいものを編集':'欲しいものを追加'}</div><button class="mclose" onclick="closeModal()">✕</button></div>
+  <div class="fg"><div class="fl">名前 *</div><input id="wish-name" value="${esc(w?.name||'')}" placeholder="例: ノートPCスタンド"></div>
+  <div class="fg"><div class="fl">値段（円）</div><input type="number" id="wish-price" min="0" step="1" inputmode="numeric" value="${w&&w.price!=null?w.price:''}" placeholder="例: 12800"></div>
+  <div class="fg"><div class="fl">いつまでに買う？</div><input type="date" id="wish-due" value="${esc(w?.dueDate||'')}">
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chip('eom','今月末')}${chip('eonm','来月末')}${chip('3m','3ヶ月後')}${chip('6m','半年後')}${chip('1y','1年後')}${chip('none','期限なし')}</div>
+  </div>
+  <div class="fg"><div class="fl">メモ・URL（任意）</div><textarea id="wish-note" rows="2" placeholder="買う理由、商品ページのURLなど">${esc(w?.note||'')}</textarea></div>
+  <div class="mfooter"><button class="btn btn-g" onclick="closeModal()">キャンセル</button>${w?`<button class="btn btn-red" onclick="delWish('${w.id}')">削除</button>`:''}<button class="btn btn-p" onclick="saveWish('${id||''}')">保存</button></div>`);
+  document.getElementById('wish-name')?.focus();
+}
+function saveWish(id){
+  const name=document.getElementById('wish-name')?.value.trim();
+  if(!name){toast('名前を入力してください','err');return;}
+  const pr=document.getElementById('wish-price')?.value;
+  const price=(pr===''||pr==null)?null:Math.max(0,Math.round(Number(pr)));
+  if(price!==null&&!isFinite(price)){toast('値段は数字で入力してください','err');return;}
+  const dueDate=document.getElementById('wish-due')?.value||'';
+  const note=document.getElementById('wish-note')?.value.trim()||'';
+  if(!Array.isArray(S.wishlist))S.wishlist=[];
+  const ex=id?S.wishlist.find(x=>x.id===id):null;
+  if(ex){Object.assign(ex,{name,price,dueDate,note,updatedAt:Date.now()});}
+  else S.wishlist.push({id:uid(),name,price,dueDate,note,bought:false,boughtAt:null,createdAt:Date.now(),updatedAt:Date.now()});
+  save();closeModal();render();toast(`${name} を保存しました`);
+}
+function rWishRow(w){
+  const url=/^https?:\/\/\S+$/.test(w.note||'')?w.note:'';
+  const noteHtml=w.note?(url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">${esc(url.length>40?url.slice(0,40)+'…':url)}</a>`:esc(w.note)):'';
+  return`<div style="display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;${w.bought?'opacity:.6':''}">
+    <button onclick="toggleWishBought('${w.id}')" title="${w.bought?'未購入に戻す':'購入済みにする'}" style="border:none;background:none;cursor:pointer;font-size:20px;flex-shrink:0;padding:0">${w.bought?'✅':'⚪'}</button>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${w.bought?'text-decoration:line-through':''}">${esc(w.name)}</div>
+      <div style="font-size:11px;color:var(--t2);display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:2px">
+        ${w.bought?`<span>購入日 ${wishFmtDate(w.boughtAt)}</span>`:`${wishDueBadge(w)}${w.dueDate?`<span>${wishFmtDate(w.dueDate)}</span>`:''}`}
+        ${noteHtml?`<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${noteHtml}</span>`:''}
+      </div>
+    </div>
+    <div style="font-size:14px;font-weight:700;flex-shrink:0">${w.price!=null?wishYen(w.price):'<span style="color:var(--t3);font-weight:500;font-size:12px">値段未設定</span>'}</div>
+    <button class="tact" onclick="openWishModal('${w.id}')">✏️</button>
+    <button class="tact del" onclick="delWish('${w.id}')">🗑</button>
+  </div>`;
+}
+function rWishlist(){
+  const pending=wishPending();
+  const bought=wishLive().filter(w=>w.bought).sort((a,b)=>String(b.boughtAt||'').localeCompare(String(a.boughtAt||'')));
+  const sum=a=>a.reduce((s,w)=>s+(Number(w.price)||0),0);
+  const td=today(),ym=td.slice(0,7);
+  const thisMonth=pending.filter(w=>w.dueDate&&w.dueDate.slice(0,7)===ym);
+  const overdue=pending.filter(w=>w.dueDate&&w.dueDate<td);
+  const noPrice=pending.filter(w=>w.price==null).length;
+  const stat=(label,val,sub,color)=>`<div style="flex:1;min-width:130px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px"><div style="font-size:11px;color:var(--t2)">${label}</div><div style="font-size:18px;font-weight:800;${color?`color:${color};`:''}margin-top:2px">${val}</div><div style="font-size:11px;color:var(--t3);margin-top:1px">${sub}</div></div>`;
+  return`${secTitle(`${iconSvg('i-gift','sec-ic')} 欲しいものリスト`)}
+<div style="font-size:12px;color:var(--t2);margin-bottom:12px">欲しいものに値段と「いつまでに買うか」を入れておくと、期限の近い順に並び、必要な金額が一目で分かります。</div>
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:13px;font-weight:700">これから買うもの <span style="color:var(--t2);font-weight:500">(${pending.length}件)</span></div>
+    <button class="btn btn-p btn-sm" onclick="openWishModal()">＋ 追加</button>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    ${stat('未購入の合計',wishYen(sum(pending)),noPrice?`値段未設定 ${noPrice}件は含まず`:`${pending.length}件`)}
+    ${stat('今月が期限',wishYen(sum(thisMonth)),`${thisMonth.length}件`)}
+    ${stat('期限切れ',`${overdue.length}件`,overdue.length?wishYen(sum(overdue)):'なし',overdue.length?'var(--red)':'')}
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    ${pending.length?pending.map(rWishRow).join(''):`<div style="color:var(--t3);font-size:12px;text-align:center;padding:16px">まだ欲しいものがありません。「＋ 追加」から登録してください。</div>`}
+  </div>
+</div>
+${bought.length?`${secTitle(`購入済み（${bought.length}件・合計 ${wishYen(sum(bought))}）`)}
+<div class="card" style="margin-bottom:14px;display:flex;flex-direction:column;gap:6px">${bought.map(rWishRow).join('')}</div>`:''}`;
 }
 
 function rGcalEventItem(e){
@@ -13793,7 +13933,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20261022-01';
+const APP_VERSION='20261024-01';
 
 render();
 renderSyncGate();

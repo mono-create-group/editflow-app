@@ -10,7 +10,7 @@ const copy=Sync.clone;
 const base={_uid:'test-account',_savedAt:100,tasks:[{id:'t1',title:'fixture',done:false}],chores:[{id:'c1',time:'18:00',completedDates:[]}],fsSchedules:[{id:'weekday',blocks:[{id:'b1',t:'old'}]}],fsChecked:{day:{b1:false}},settings:{identity:'old'},finance:{incomes:[{id:'i1',amount:10}]},abstinence:{records:{day:{kept:false}}}};
 // Match the shape normalized by the production migration, so an initial schema
 // upgrade is not incorrectly counted as an echo write in the two-device test.
-for(const k of ['habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','choreRoutines','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'])base[k]=[];
+for(const k of ['habits','jobs','logs','journals','goals','clients','workers','checkIns','performanceLogs','customPages','customEx','customExSets','choreRoutines','wishlist','navConfig','meals','workouts','pipeline','teamKgis','teamKpis','teamPosts','teamDocs','bizUnits','teamMeetings','salesLeads','hpFees','salesSites','templates'])base[k]=[];
 base.abstinence.urges=[];base.recordSkipDays={};base.editCounter={days:{}};
 test('all personal sections follow remote changes when local is unchanged',()=>{
   const remote=copy(base);remote.tasks[0].done=true;remote.chores[0].time='18:30';remote.chores[0].completedDates=['day'];remote.fsSchedules[0].blocks[0].t='new';remote.fsChecked.day.b1=true;remote.settings.identity='new';remote.finance.incomes[0].amount=20;remote.abstinence.records.day.kept=true;
