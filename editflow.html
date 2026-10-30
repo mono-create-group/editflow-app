@@ -6583,12 +6583,14 @@ function _tDragTargetEl(x,y){
   if(!el||!el.closest)return null;
   const item=el.closest('.task-item[draggable="true"]');
   if(!item||!item.id||item.id.indexOf('ti-')!==0)return null;
+  if(item.closest('[data-reorder-list]'))return null; // 既存の長押し並べ替え対象リストはそちらに任せる
   return item;
 }
 document.addEventListener('touchstart',e=>{
   if(_tdrag||e.touches.length!==1)return;
   const item=e.target&&e.target.closest?e.target.closest('.task-item[draggable="true"]'):null;
   if(!item||!item.id||item.id.indexOf('ti-')!==0)return;
+  if(item.closest('[data-reorder-list]'))return; // 既存の長押し並べ替え対象リストはそちらに任せる
   const t=e.touches[0];
   const st={id:item.id.slice(3),el:item,startX:t.clientX,startY:t.clientY,active:false,timer:null,curTarget:null};
   st.timer=setTimeout(()=>{
