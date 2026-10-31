@@ -777,6 +777,8 @@ body.month-drag-active .mday:not(.empty){cursor:copy}
 .task-item[draggable]{cursor:grab}
 .task-item.drag-over{border:2px dashed var(--purple);background:var(--pdim)}
 .task-item.dragging{opacity:.4}
+.task-item[draggable="true"]{-webkit-touch-callout:none}
+.task-item.touch-drag-src{opacity:.92;box-shadow:0 10px 28px rgba(0,0,0,.30)}
 
 /* ─── 直感操作（スワイプ / 長押し並べ替え / 44px以上のタップ領域） ─── */
 .task-item[data-kind]{touch-action:pan-y;min-height:56px;-webkit-user-select:none;user-select:none}
@@ -6569,6 +6571,84 @@ document.addEventListener('dragend',()=>{
     _taskDragId=null;_taskDragSnap=null;_wdayDragId=null;_schedDragId=null;_schedDragOffset=0;
     document.querySelectorAll('.dragging,.drag-over,.fs-drag-over,.fs-dz-over').forEach(el=>el.classList.remove('dragging','drag-over','fs-drag-over','fs-dz-over'));
   },0);
+});
+
+// === タッチ（スマホ）長押しドラッグ並び替え ===
+// HTML5ドラッグはタッチ操作で発火しないため、長押しで開始したドラッグを
+// 既存のドロップ処理（blockTaskDrop / taskListDrop）へ橋渡しする。
+// データの書き換えは既存ハンドラ経由のみで、保存も既存の save() に従う。
+let _tdrag=null,_tdragSuppressClick=false;
+function _tDragTargetEl(x,y){
+  const el=document.elementFromPoint(x,y);
+  if(!el||!el.closest)return null;
+  const item=el.closest('.task-item[draggable="true"]');
+  if(!item||!item.id||item.id.indexOf('ti-')!==0)return null;
+  if(item.closest('[data-reorder-list]'))return null; // 既存の長押し並べ替え対象リストはそちらに任せる
+  return item;
+}
+document.addEventListener('touchstart',e=>{
+  if(_tdrag||e.touches.length!==1)return;
+  const item=e.target&&e.target.closest?e.target.closest('.task-item[draggable="true"]'):null;
+  if(!item||!item.id||item.id.indexOf('ti-')!==0)return;
+  if(item.closest('[data-reorder-list]'))return; // 既存の長押し並べ替え対象リストはそちらに任せる
+  const t=e.touches[0];
+  const st={id:item.id.slice(3),el:item,startX:t.clientX,startY:t.clientY,active:false,timer:null,curTarget:null};
+  st.timer=setTimeout(()=>{
+    if(_tdrag!==st)return;
+    st.active=true;
+    _taskDragId=st.id; // 既存ドロップ処理が参照する
+    item.classList.add('touch-drag-src');
+    item.style.position='relative';item.style.zIndex='30';item.style.pointerEvents='none';
+    if(navigator.vibrate)try{navigator.vibrate(10);}catch(_){}
+  },350);
+  _tdrag=st;
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  const st=_tdrag;if(!st)return;
+  const t=e.touches[0];if(!t)return;
+  if(!st.active){
+    // 長押し成立前に指が動いたらスクロールとみなして中止（通常操作を邪魔しない）
+    if(Math.abs(t.clientX-st.startX)>10||Math.abs(t.clientY-st.startY)>10){clearTimeout(st.timer);_tdrag=null;}
+    return;
+  }
+  e.preventDefault();
+  st.el.style.transform='translateY('+(t.clientY-st.startY)+'px) scale(1.02)';
+  const tgt=_tDragTargetEl(t.clientX,t.clientY);
+  const tgtItem=(tgt&&tgt!==st.el)?tgt:null;
+  if(st.curTarget&&st.curTarget!==tgtItem)st.curTarget.classList.remove('drag-over');
+  if(tgtItem)tgtItem.classList.add('drag-over');
+  st.curTarget=tgtItem;
+},{passive:false});
+function _tDragFinish(commit){
+  const st=_tdrag;if(!st)return;
+  clearTimeout(st.timer);_tdrag=null;
+  if(!st.active)return;
+  const tgt=st.curTarget;
+  st.el.classList.remove('touch-drag-src');
+  st.el.style.transform='';st.el.style.position='';st.el.style.zIndex='';st.el.style.pointerEvents='';
+  if(tgt)tgt.classList.remove('drag-over');
+  // ドラッグ直後のタップ誤発火（モーダルが開く等）を1回だけ抑止
+  _tdragSuppressClick=true;setTimeout(()=>{_tdragSuppressClick=false;},300);
+  if(commit&&tgt){
+    const targetId=tgt.id.slice(3);
+    const fakeE={preventDefault:function(){},stopPropagation:function(){},target:tgt,currentTarget:tgt};
+    if(tgt.closest('.fs-drop-zone')||st.el.closest('.fs-drop-zone')){
+      blockTaskDrop(fakeE,targetId);
+    }else{
+      taskListDrop(fakeE);
+    }
+  }
+  if(_taskDragId===st.id)_taskDragId=null;
+}
+document.addEventListener('touchend',()=>_tDragFinish(true));
+document.addEventListener('touchcancel',()=>_tDragFinish(false));
+document.addEventListener('click',e=>{
+  if(_tdragSuppressClick){e.stopPropagation();e.preventDefault();_tdragSuppressClick=false;}
+},true);
+// 長押し時のコールアウト/コンテキストメニューをドラッグ対象行でのみ抑止
+document.addEventListener('contextmenu',e=>{
+  const item=e.target&&e.target.closest?e.target.closest('.task-item[draggable="true"]'):null;
+  if(item&&item.id&&item.id.indexOf('ti-')===0)e.preventDefault();
 });
 function taskDragStart(e,id){
   _taskDragId=id;
@@ -13933,7 +14013,7 @@ initReminders();
 checkClientDraftTasks();
 slMigrateRegions();
 // ===VERSION CHECK & AUTO-UPDATE===
-const APP_VERSION='20261024-01';
+const APP_VERSION='20261030-01';
 
 render();
 renderSyncGate();
